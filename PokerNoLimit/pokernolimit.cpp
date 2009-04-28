@@ -112,7 +112,8 @@ float walker(int gr, int pot, int pastbeti[3], int beti, float prob0, float prob
 
 	for(int a=0; a<maxa; a++)
 	{
-		isvalida[a] = (pot + mynode->need[a] < stacksize[mynode->playertoact]);
+		//they both need the money for it to be a valid action. All-in is always a valid action. (should have need 0).
+		isvalida[a] = ((pot + mynode->potcontrib[a] < stacksize[0]) && (pot + mynode->potcontrib[a] < stacksize[1]));
 		if (isvalida[a])
 			numa++;
 	}
@@ -172,55 +173,46 @@ float walker(int gr, int pot, int pastbeti[3], int beti, float prob0, float prob
 		if (!isvalida[a])
 			continue;
 
-
-		// CONTINUE WITHIN THIS GAME ROUND
-		if (mynode->result[a] == NA)
+		switch(mynode->result[a])
 		{
-			assert(mynode->child[a] != NA); //this would mean an error in the betting tree.
+		case NA:
+			REPORT("Invalid betting tree node action reached."); //will exit
 
-			if(mynode->playertoact==0)
-				utility[a] = walker(gr, pot, pastbeti, mynode->child[a], prob0*st, prob1);
-			else
-				utility[a] = walker(gr, pot, pastbeti, mynode->child[a], prob0, prob1*st);
-		}
-
-		// SHOWDOWN - from all-in call!
-		else if(mynode->result[a] == AI)
-		{   
-			assert(mynode->child[a] == NA); //this would mean an error in the betting tree.
-
+		case AI: // SHOWDOWN - from all-in call!
 			utility[a] = min(stacksize[0], stacksize[1]) * (2*prob0wins-1);
-		}
+			break;
 
-		// SHOWDOWN - from the river!
-		else if(mynode->result[a] == GO && gr == RIVER)
-		{
-			assert(mynode->child[a] == NA); //this would mean an error in the betting tree.
+		case GO: // CONTINUE AT NEXT GAME ROUND
 
-			utility[a] = (pot+mynode->potcontrib[a]) * (2*prob0wins-1);
-		}
+			//...which is an actual game round...
+			if(gr!=RIVER)
+			{
+				pastbeti[gr]=beti; //hitherto we have not needed pastbeti[gr], but now we do. Array access ok as gr != RIVER
 
-		// CONTINUE AT NEXT GAME ROUND
-		else if(mynode->result[a] == GO)
-		{
-			assert(mynode->child[a] == NA); //this would mean an error in the betting tree.
-			pastbeti[gr]=beti; //hitherto we have not needed pastbeti[gr], but now we do. Array access ok as gr != RIVER
-
-			if(mynode->playertoact==0)
-				utility[a] = walker(gr+1, pot+mynode->potcontrib[a], pastbeti, 0, prob0*st, prob1);
+				if(mynode->playertoact==0)
+					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], pastbeti, 0, prob0*st, prob1);
+				else
+					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], pastbeti, 0, prob0, prob1*st);
+			}
+			// ...or a SHOWDOWN - from the river!
 			else
-				utility[a] = walker(gr+1, pot+mynode->potcontrib[a], pastbeti, 0, prob0, prob1*st);
+				utility[a] = (pot+mynode->potcontrib[a]) * (2*prob0wins-1);
+
+			break;
+		
+		case FD: // FOLD
+
+			utility[a] = (pot+mynode->potcontrib[a]) * (2*mynode->playertoact - 1); //acting player is loser
+			break;
+
+		default: // CONTINUE WITHIN THIS GAME ROUND
+
+			//result is a child node!
+			if(mynode->playertoact==0)
+				utility[a] = walker(gr, pot, pastbeti, mynode->result[a], prob0*st, prob1);
+			else
+				utility[a] = walker(gr, pot, pastbeti, mynode->result[a], prob0, prob1*st);
 		}
-
-		// FOLD
-		else
-		{
-			assert(mynode->child[a] == NA); //this would mean an error in the betting tree.
-			assert(mynode->result[a]==0 || mynode->result[a]==1);
-
-			utility[a] = (pot+mynode->potcontrib[a]) * (1 - 2*mynode->result[a]);
-		}
-
 
 		//keep a running total of the EV of utility under current strat.
 		avgutility += st*utility[a];
@@ -250,38 +242,6 @@ float walker(int gr, int pot, int pastbeti[3], int beti, float prob0, float prob
 	//SO THAT THE CALLER CAN KNOW THE EXPECTED VALUE OF THIS PATH. GOD SPEED CALLER.
 
 	return avgutility;
-}
-
-
-
-//THIS IS A SIMPLE FUNCTION TO COMPUTE THE HANDID OF A PAIR OF HOLE CARDS.
-//THE RANGE OF THIS FUNCTION IS 0-168. THE DOMAIN OF THE INPUTS ARE 0-51.
-int computehandid(CardMask * hand)
-{
-	int bigrank, smlrank, cards[2];
-
-	//this function is from pokereval.
-	StdDeck.maskToCards(hand, cards);
-
-	//detect pairs by comparing ranks
-	if (cards[0]%13 == cards[1]%13)
-		return (cards[0]%13)*14; //this fills the diagonal of the table
-
-	if(cards[0]%13 > cards[1]%13)
-	{
-		bigrank = cards[0]%13;
-		smlrank = cards[1]%13;
-	}
-	else
-	{
-		bigrank = cards[1]%13;
-		smlrank = cards[0]%13;
-	}
-	
-	if (cards[0]/13 == cards[1]/13) //then it's suited, integer arithmetic
-		return bigrank*13+smlrank; //one off-diagonal triangle
-	else
-		return smlrank*13+bigrank; //the other off-diagonal triangle
 }
 
 
