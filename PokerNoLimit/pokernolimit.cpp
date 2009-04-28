@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "flopalyzer.h"
 using namespace std;
 
 //used in code below.
@@ -292,24 +293,23 @@ void dealcards()
 	CardMask usedcards;
 	CardMask_RESET(usedcards);
 
-	DECK_MONTECARLO_N_CARDS_D(Deck, hand[0], usedcards, 2, 1, );
+	MONTECARLO_N_CARDS_D(hand[0], usedcards, 2, 1, );
 	CardMask_OR(usedcards, usedcards, hand[0]);
 
-	DECK_MONTECARLO_N_CARDS_D(Deck, hand[1], usedcards, 2, 1, );
+	MONTECARLO_N_CARDS_D(hand[1], usedcards, 2, 1, );
 	CardMask_OR(usedcards, usedcards, hand[1]);
 
-	DECK_MONTECARLO_N_CARDS_D(Deck, flop, usedcards, 3, 1, );
+	MONTECARLO_N_CARDS_D(flop, usedcards, 3, 1, );
 	CardMask_OR(usedcards, usedcards, flop);
 
-	DECK_MONTECARLO_N_CARDS_D(Deck, turn, usedcards, 1, 1, );
+	MONTECARLO_N_CARDS_D(turn, usedcards, 1, 1, );
 	CardMask_OR(usedcards, usedcards, turn);
 
-	DECK_MONTECARLO_N_CARDS_D(Deck, river, usedcards, 1, 1, );
+	MONTECARLO_N_CARDS_D(river, usedcards, 1, 1, );
 }
 
-
-//------------------------ M A I N   F U N C T I O N -------------------------//
-int _tmain(int argc, _TCHAR* argv[])
+//------------------------ p l a y g a m e -------------------------//
+void playgame()
 {
 	//allocate memory!
 	strategy9       = new float[169*SCENI_MAX*BETI_MAX9*8];
@@ -342,6 +342,13 @@ int _tmain(int argc, _TCHAR* argv[])
 		handid[0] = computehandid(&(hand[0]));
 		handid[1] = computehandid(&(hand[1]));
 	}
+}
 
+int _tmain(int argc, _TCHAR* argv[])
+{
+	testflopalyzer();
+
+	system("PAUSE");
 	return 0;
 }
+

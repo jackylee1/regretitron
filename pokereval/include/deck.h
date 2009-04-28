@@ -85,6 +85,7 @@ GenericDeck_numCards(Deck *deck, void *cardMask);
 #define Deck_CardMask_XOR          CardMask_XOR
 #define Deck_CardMask_AND          CardMask_AND
 #define Deck_CardMask_RESET        CardMask_RESET
+#define Deck_CardMask_SET          CardMask_SET
 #define Deck_CardMask_ANY_SET      CardMask_ANY_SET
 #define Deck_CardMask_CARD_IS_SET  CardMask_CARD_IS_SET
 

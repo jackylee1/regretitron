@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="8.00"
-	Name="poker-eval"
+	Name="PokerEval"
 	ProjectGUID="{A4DEF05E-E072-493E-B282-84731D60BCF0}"
 	RootNamespace="poker-eval"
 	Keyword="AtlProj"
@@ -553,7 +553,35 @@
 				>
 			</File>
 			<File
+				RelativePath=".\include\inlines\eval.h"
+				>
+			</File>
+			<File
+				RelativePath=".\include\inlines\eval_low.h"
+				>
+			</File>
+			<File
+				RelativePath=".\include\inlines\eval_type.h"
+				>
+			</File>
+			<File
+				RelativePath=".\include\inlines\evx5.h"
+				>
+			</File>
+			<File
+				RelativePath=".\include\inlines\evx7.h"
+				>
+			</File>
+			<File
+				RelativePath=".\include\inlines\evx_action.h"
+				>
+			</File>
+			<File
 				RelativePath=".\include\evx_defs.h"
+				>
+			</File>
+			<File
+				RelativePath=".\include\inlines\evx_inlines.h"
 				>
 			</File>
 			<File

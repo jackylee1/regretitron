@@ -811,8 +811,8 @@ do {                                                    	\
 #define ENUMERATE_PERMUTATIONS_D(s, n, ss, dc, a) \
   DECK_ENUMERATE_PERMUTATIONS(Deck, s, n, ss, dc, a)
 
-#define MONTECARLO_N_CARDS_D(c,n,d,nc,ni,a) \
-  DECK_MONTECARLO_N_CARDS_D(Deck, c, n, d, nc, ni, a)
+#define MONTECARLO_N_CARDS_D(c,d,nc,ni,a) \
+  DECK_MONTECARLO_N_CARDS_D(Deck, c, d, nc, ni, a)
 
 #define MONTECARLO_PERMUTATIONS_D(s, n, ss, dc, ni, a) \
   DECK_MONTECARLO_PERMUTATIONS(Deck, s, n, ss, dc, ni, a)

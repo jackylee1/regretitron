@@ -12,14 +12,14 @@
 #include <iostream>
 #include <stdio.h>
 #include <tchar.h>
+#include <time.h> //needed for time() needed for srand.
 
-#include "../TreesBetting/treenolimit.h"
+#include "../TreesBetting/treenolimit.h" //for the no-limit betting tree n[]
+#include "../report.h" //my REPORT function
+
 // PokerEval
-#include "../pokereval/include/poker_defs.h"
-#include "../pokereval/include/pokereval_export.h"
-#include "../pokereval/include/evx_defs.h"
-#include "../pokereval/include/inlines/evx_inlines.h"
-#include "../pokereval/include/inlines/eval.h"
+#include "poker_defs.h"
+#include "inlines/eval.h"
 
 #include <assert.h>
 
