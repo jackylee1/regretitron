@@ -30,8 +30,8 @@ extern const betnode n[N_NODES] =
 	// {P#, #A, {result}, {potcontrib}}
 	
 	//0-1, 8 available actions, these are intitial node, and response to check.
-	{0,8, { 1, 2, 4, 6, 8, 10, 12, 98}, {0, B1, B2, B3, B4, B5, B6, 0}}, //0
-	{1,8, {GO, 3, 5, 7, 9, 11, 13, 99}, {0, B1, B2, B3, B4, B5, B6, 0}}, //1
+	{0,8, { 1, 2, 4, 6, 8, 10, 12, 98, NA}, {0, B1, B2, B3, B4, B5, B6, 0, NA}}, //0
+	{1,8, {GO, 3, 5, 7, 9, 11, 13, 99, NA}, {0, B1, B2, B3, B4, B5, B6, 0, NA}}, //1
 
 	//2-13, 9 available actions, responding to a first bet
 	{1,9, {FD, GO, 14, 15, 16, 17, 18, 19, 86}, {0, B1, R11, R12, R13, R14, R15, R16, 0}}, //2

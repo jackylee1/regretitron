@@ -296,12 +296,6 @@ void playgame()
 	//next, we want to read the showdown ev data from our precomputed file
 	prob0wins = 0.5;
 
-	for(int i=0; i<1000; i++)
-	{
-		dealcards();
-		handid[0] = computehandid(&(hand[0]));
-		handid[1] = computehandid(&(hand[1]));
-	}
 }
 
 int _tmain(int argc, _TCHAR* argv[])
