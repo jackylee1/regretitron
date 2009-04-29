@@ -113,7 +113,7 @@ float walker(int gr, int pot, int pastbeti[3], int beti, float prob0, float prob
 	for(int a=0; a<maxa; a++)
 	{
 		//they both need the money for it to be a valid action. All-in is always a valid action. (should have need 0).
-		isvalida[a] = ((pot + mynode->potcontrib[a] < stacksize[0]) && (pot + mynode->potcontrib[a] < stacksize[1]));
+		isvalida[a] = (pot + mynode->potcontrib[a] < stacksize);
 		if (isvalida[a])
 			numa++;
 	}
@@ -179,7 +179,7 @@ float walker(int gr, int pot, int pastbeti[3], int beti, float prob0, float prob
 			REPORT("Invalid betting tree node action reached."); //will exit
 
 		case AI: // SHOWDOWN - from all-in call!
-			utility[a] = min(stacksize[0], stacksize[1]) * (2*prob0wins-1);
+			utility[a] = stacksize * (2*prob0wins-1);
 			break;
 
 		case GO: // CONTINUE AT NEXT GAME ROUND
@@ -300,7 +300,7 @@ void playgame()
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	testflopalyzer();
+	initpfn();
 
 	system("PAUSE");
 	return 0;

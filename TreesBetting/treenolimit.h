@@ -35,8 +35,9 @@ struct betnode
 
 //THESE ARE THE GLOBAL VARIABLES THAT MAKE UP THE BETTING TREE.
 //ONE IS FOR POST FLOP, THE OTHER IS FOR PREFLOP.
-extern const int stacksize[2]; //stack size, in small blinds, of each player.
+extern const int stacksize; //stack size, in small blinds, of each player.
 extern const betnode n[N_NODES];
-//extern const betnode pfn[N_NODES];
+extern betnode pfn[N_NODES];
+extern void initpfn();
 
 #endif
