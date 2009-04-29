@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "treenolimit.h"
 
 // For extern vs static and const,

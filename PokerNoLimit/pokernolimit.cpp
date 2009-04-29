@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "treenolimit.h" //for the no-limit betting tree n[]
 #include "flopalyzer.h"
 using namespace std;
 

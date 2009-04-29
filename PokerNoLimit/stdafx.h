@@ -14,7 +14,6 @@
 #include <tchar.h>
 #include <time.h> //needed for time() needed for srand.
 
-#include "../TreesBetting/treenolimit.h" //for the no-limit betting tree n[]
 #include "../report.h" //my REPORT function
 
 // PokerEval
