@@ -3,6 +3,8 @@
 // are changed infrequently
 //
 
+//http://www.eventhelix.com/realtimemantra/HeaderFileIncludePatterns.htm
+
 #pragma once
 
 #ifndef _WIN32_WINNT		// Allow use of features specific to Windows XP or later.                   
@@ -14,12 +16,20 @@
 #include <tchar.h>
 #include <time.h> //needed for time() needed for srand.
 
-#include "../report.h" //my REPORT function
+// Needed for file mapping.
+#include <Windows.h>
+
+// The all essential indexing function.
+#include "../HandIndexingV1/getindex2N.h"
+
+// my REPORT function, and other thingsn
+#include "../report.h"
 
 // PokerEval
 #include "poker_defs.h"
 #include "inlines/eval.h"
 
+// Assert
 #include <assert.h>
 
 // TODO: reference additional headers your program requires here

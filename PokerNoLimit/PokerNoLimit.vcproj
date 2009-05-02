@@ -177,7 +177,15 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\determinebins.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\flopalyzer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\memorymgr.cpp"
 				>
 			</File>
 			<File
@@ -215,7 +223,15 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath=".\determinebins.h"
+				>
+			</File>
+			<File
 				RelativePath=".\flopalyzer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\memorymgr.h"
 				>
 			</File>
 			<File

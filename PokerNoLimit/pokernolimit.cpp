@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "treenolimit.h" //for the no-limit betting tree n[]
 #include "flopalyzer.h"
+#include "determinebins.h"
+#include "memorymgr.h"
 using namespace std;
 
 //used in code below.
@@ -23,15 +25,6 @@ CardMask hand[2], flop, turn, river;
 int handid[2]; //from 0-168
 int handstri[2][3]; // what we know about our hand at the flop, turn, and river
 
-//this will be a large array read from a precomputed file.
-float prob0wins;
-
-//Current strategy, Average strategy, Accumulated total regret:
-//separated based on max actions to save memory, allocated in main.
-float * strategy9, * strategy3;
-float * strategysumnum9, * strategysumnum3; 
-float * strategysumden9, * strategysumden3;
-float * regret9, * regret3;
 
 //takes history of beti's, with the gameround, combines it with the (global) 
 // hand information, and turns it all into a compact signature. The preflop 
@@ -272,28 +265,6 @@ void dealcards()
 //------------------------ p l a y g a m e -------------------------//
 void playgame()
 {
-	//allocate memory!
-	strategy9       = new float[169*SCENI_MAX*BETI_MAX9*8];
-	strategysumnum9 = new float[169*SCENI_MAX*BETI_MAX9*8];
-	strategysumden9 = new float[169*SCENI_MAX*BETI_MAX9*8];
-	regret9         = new float[169*SCENI_MAX*BETI_MAX9*9];
-
-	strategy3       = new float[169*SCENI_MAX*BETI_MAX3*2];
-	strategysumnum3 = new float[169*SCENI_MAX*BETI_MAX3*2];
-	strategysumden3 = new float[169*SCENI_MAX*BETI_MAX3*2];
-	regret3         = new float[169*SCENI_MAX*BETI_MAX3*3];
-
-	//and initialize to 0.
-	memset(strategy9,       0, 169*SCENI_MAX*BETI_MAX9*8*sizeof(float));
-	memset(strategysumnum9, 0, 169*SCENI_MAX*BETI_MAX9*8*sizeof(float));
-	memset(strategysumden9, 0, 169*SCENI_MAX*BETI_MAX9*8*sizeof(float));
-	memset(regret9,         0, 169*SCENI_MAX*BETI_MAX9*9*sizeof(float));
-
-	memset(strategy3,       0, 169*SCENI_MAX*BETI_MAX3*2*sizeof(float));
-	memset(strategysumnum3, 0, 169*SCENI_MAX*BETI_MAX3*2*sizeof(float));
-	memset(strategysumden3, 0, 169*SCENI_MAX*BETI_MAX3*2*sizeof(float));
-	memset(regret3,         0, 169*SCENI_MAX*BETI_MAX3*3*sizeof(float));
-	
 	//next, we want to read the showdown ev data from our precomputed file
 	prob0wins = 0.5;
 

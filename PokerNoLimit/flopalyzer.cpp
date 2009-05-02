@@ -361,7 +361,7 @@ int analyzeriver(const CardMask flop, const CardMask turn, const CardMask river)
 	}
 }
 
-#ifdef COMPILE_FLOPALYZER_TESTCODE
+#if COMPILE_FLOPALYZER_TESTCODE
 using namespace std;
 
 void testflopalyzer()
