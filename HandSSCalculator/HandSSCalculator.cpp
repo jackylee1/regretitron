@@ -2,9 +2,46 @@
 //
 
 #include "stdafx.h"
+#include "../HandIndexingV1/constants.h"
 using namespace std;
 
-#define N_BINS 32
+#define N_BINS 8
+const int BINSPERSTRUCT = 10;
+struct binstruct
+{
+	//30 bits
+	unsigned int bin0 : 3;
+	unsigned int bin1 : 3;
+	unsigned int bin2 : 3;
+	unsigned int bin3 : 3;
+	unsigned int bin4 : 3;
+
+	unsigned int bin5 : 3;
+	unsigned int bin6 : 3;
+	unsigned int bin7 : 3;
+	unsigned int bin8 : 3;
+	unsigned int bin9 : 3;
+}
+
+store(binstruct &word, int bin, int n)
+{
+	if(bin<0 || bin>=N_BINS)
+		REPORT("failed bin number in store");
+	switch(n)
+	{
+	case 0: word.bin0 = bin; break;
+	case 1: word.bin1 = bin; break;
+	case 2: word.bin2 = bin; break; 
+	case 3: word.bin3 = bin; break;
+	case 4: word.bin4 = bin; break;
+	case 5: word.bin5 = bin; break;
+	case 6: word.bin6 = bin; break;
+	case 7: word.bin7 = bin; break;
+	case 8: word.bin8 = bin; break;
+	case 9: word.bin9 = bin; break;
+	default: REPORT("failed n in store");
+	}
+}
 
 //this is absolutely rediculous
 #define tostring(x) #x
@@ -429,7 +466,7 @@ void calculatebins(int numboardcards, float * hssarr, char * binarr)
 
 //---------------- B i n   S t o r i n g ------------------
 
-
+/* There are no preflop bins...
 void savepreflopBINS()
 {
 	char * bins = new char[INDEX2_MAX];
@@ -453,18 +490,22 @@ void readpreflopBINS(char * arr)
 		REPORT("files/preflop" stringify(N_BINS) "BINS.dat could not be found, or is corrupted.");
 	f.close();
 }
-
+*/
 
 void saveflopBINS()
 {
 	char * bins = new char[INDEX23_MAX];
 	float * hss = new float[INDEX23_MAX];
+	binstruct * binstr = new binstruct[INDEX23_MAX/BINSPERSTRUCT+1];
 	ofstream f("files/flop" stringify(N_BINS) "BINS.dat",ofstream::binary);
 
 	readflopHSS(hss);
 	calculatebins(3, hss, bins);
 
-	f.write(bins, INDEX23_MAX);
+	for(int i=0; i<INDEX23_MAX; i++)
+		store(binstr[i/BINSPERSTRUCT], bins[i], i%BINSPERSTRUCT);
+
+	f.write((char*)binstr, (INDEX23_MAX/BINSPERSTRUCT+1)*sizeof(binstruct));
 	f.close();
 	delete [] bins;
 	delete [] hss;
@@ -484,12 +525,16 @@ void saveturnBINS()
 {
 	char * bins = new char[INDEX24_MAX];
 	float * hss = new float[INDEX24_MAX];
+	binstruct * binstr = new binstruct[INDEX24_MAX/BINSPERSTRUCT+1];
 	ofstream f("files/turn" stringify(N_BINS) "BINS.dat",ofstream::binary);
 
 	readturnHSS(hss);
 	calculatebins(4, hss, bins);
 
-	f.write(bins, INDEX24_MAX);
+	for(int i=0; i<INDEX24_MAX; i++)
+		store(binstr[i/BINSPERSTRUCT], bins[i], i%BINSPERSTRUCT);
+
+	f.write((char*)binstr, (INDEX24_MAX/BINSPERSTRUCT+1)*sizeof(binstruct));
 	f.close();
 	delete [] bins;
 	delete [] hss;
@@ -509,12 +554,16 @@ void saveriverBINS()
 {
 	char * bins = new char[INDEX25_MAX];
 	float * ev = new float[INDEX25_MAX];
+	binstruct * binstr = new binstruct[INDEX25_MAX/BINSPERSTRUCT+1];
 	ofstream f("files/river" stringify(N_BINS) "BINS.dat",ofstream::binary);
 
 	readriverEV(ev);
 	calculatebins(5, ev, bins);
 
-	f.write(bins, INDEX25_MAX);
+	for(int i=0; i<INDEX25_MAX; i++)
+		store(binstr[i/BINSPERSTRUCT], bins[i], i%BINSPERSTRUCT);
+
+	f.write((char*)binstr, (INDEX25_MAX/BINSPERSTRUCT+1)*sizeof(binstruct));
 	f.close();
 	delete [] bins;
 	delete [] ev;
@@ -535,8 +584,6 @@ void readriverBINS(char * arr)
 //where the magic happens
 int _tmain(int argc, _TCHAR* argv[])
 {
-	cout << "preflop bins..." << endl;
-	savepreflopBINS();
 	cout << "flop bins..." << endl;
 	saveflopBINS();
 	cout << "turn bins..." << endl;

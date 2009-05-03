@@ -1,0 +1,27 @@
+//http://msdn.microsoft.com/en-us/library/bb613473(VS.85).aspx
+//4-Gigabyte Tuning (4GT)
+//  On 32-bit windows, allows you to allocate 3GB virtual address space to each process
+//  instead of the default 2GB. System wide setting set at boot time.
+
+//http://msdn.microsoft.com/en-us/library/wz223b1z.aspx
+//IMAGE_FILE_LARGE_ADDRESS_AWARE value of the LOADED_IMAGE structure
+//  Set by passing an option to the linker when compiling a program. It allows 
+//  the program to access addresses larger than 2GB. Naturally, you must then 
+//  be sure not to use that most significant bit in a weird way. I think it is the
+//  default when compiling for 64-bit.
+
+//http://msdn.microsoft.com/en-us/library/aa366778(VS.85).aspx
+//Memory Limits for Windows Releases
+//  Virtual address space (assuming large address aware^^): 
+//       3GB for 32-bit windows with 4GTuning turned on
+//       8TB for 64-bit windows on x64.
+
+//http://msdn.microsoft.com/en-us/library/aa366796(VS.85).aspx
+//Physical Adress Extension (PAE)
+//  Allows >4GB physical memory in 32-bit editions of windows.
+
+//http://msdn.microsoft.com/en-us/library/aa366527(VS.85).aspx
+//Address Windowning Extensions (AWE)
+//  Do not understand how, but it allows a process to have direct control over mapping
+//  physical pages. This allows it access to memory > 4GB, and other perks?
+

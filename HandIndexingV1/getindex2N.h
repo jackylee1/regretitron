@@ -7,13 +7,6 @@
 //Controls whether the testcode is seen by the compiler
 #define COMPILE_TESTCODE 0
 
-//These are the maximum values of the indices returned by getindex2N,
-//for each value of N.
-extern const int INDEX25_MAX;
-extern const int INDEX24_MAX;
-extern const int INDEX23_MAX;
-extern const int INDEX2_MAX;
-
 //getindex2N
 // mine are the PokerEval CardMask containing my hole cards. Must be 2 cards.
 // board are the PokerEval CardMask containing the board cards. Must contain 3, 4, or 5 cards.

@@ -19,17 +19,14 @@
 // Needed for file mapping.
 #include <Windows.h>
 
-// The all essential indexing function.
-#include "../HandIndexingV1/getindex2N.h"
-
 // my REPORT function, and other thingsn
 #include "../report.h"
+
+// my all-important constants!
+#include "constants.h"
 
 // PokerEval
 #include "poker_defs.h"
 #include "inlines/eval.h"
-
-// Assert
-#include <assert.h>
 
 // TODO: reference additional headers your program requires here

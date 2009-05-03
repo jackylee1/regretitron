@@ -47,6 +47,7 @@
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
+				WarnAsError="true"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
 			/>
@@ -64,6 +65,7 @@
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
 				SubSystem="1"
+				LargeAddressAware="2"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -121,6 +123,7 @@
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
+				WarnAsError="true"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 			/>
@@ -185,6 +188,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\gamestate.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\memorymgr.cpp"
 				>
 			</File>
@@ -223,11 +230,19 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath=".\constants.h"
+				>
+			</File>
+			<File
 				RelativePath=".\determinebins.h"
 				>
 			</File>
 			<File
 				RelativePath=".\flopalyzer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\gamestate.h"
 				>
 			</File>
 			<File
@@ -250,6 +265,10 @@
 			>
 			<File
 				RelativePath=".\treenolimit.png"
+				>
+			</File>
+			<File
+				RelativePath=".\Windows mem info.txt"
 				>
 			</File>
 		</Filter>
