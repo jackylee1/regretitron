@@ -21,7 +21,7 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 	float stratmaxa=0; //this is the one that I do not store in the global data arrays.
 	int maxa; //just the size of the action arrays
 	int numa=0; //the number of actually possible actions
-	bool isvalida[9]; //if this action is possible (have enough money)
+	bool isvalid[9]={false,false,false,false,false,false,false,false,false}; //if this action is possible (have enough money)
 	
 	//FIRST LETS FIND THE DATA WE NEED FOR THIS INSTANCE OF WALKER
 
@@ -31,6 +31,31 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 
 	//obtain the correct maximum possible actions from this node.
 	maxa = mynode->numacts;
+
+
+	// DEPENDING ON STACKSIZE, AND GAME HISTORY, NOT ALL ACTIONS MAY BE POSSIBLE FROM
+	// THIS NODE! SINCE I AM NOT STORING THE ENTIRE GAME TREE, AND ONLY HAVE ONE INSTANCE
+	// OF THE BETTING TREE IN MEMORY FOR _ALL_ SITUATIONS, WE NEED TO DYNAMICALLY CHECK
+	// HERE TO SEE WHICH ACTIONS CAN BE AFFORDED.
+
+	switch(maxa)
+	{
+	default: REPORT("invalid maxa");
+	case 9:
+		if(isvalid[8] = (pot + mynode->potcontrib[8] < STACKSIZE)) numa++;
+	case 8:
+		if(isvalid[7] = (pot + mynode->potcontrib[7] < STACKSIZE)) numa++;
+		if(isvalid[6] = (pot + mynode->potcontrib[6] < STACKSIZE)) numa++;
+		if(isvalid[5] = (pot + mynode->potcontrib[5] < STACKSIZE)) numa++;
+		if(isvalid[4] = (pot + mynode->potcontrib[4] < STACKSIZE)) numa++;
+		if(isvalid[3] = (pot + mynode->potcontrib[3] < STACKSIZE)) numa++;
+	case 3:
+		if(isvalid[2] = (pot + mynode->potcontrib[2] < STACKSIZE)) numa++;
+	case 2:
+		if(isvalid[1] = (pot + mynode->potcontrib[1] < STACKSIZE)) numa++;
+		if(isvalid[0] = (pot + mynode->potcontrib[0] < STACKSIZE)) numa++;
+	}
+
 
 	//**************************
 	// need to obtain pointers to the relevant data
@@ -64,38 +89,62 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 	//***************************
 
 
-	// DEPENDING ON STACKSIZE, AND GAME HISTORY, NOT ALL ACTIONS MAY BE POSSIBLE FROM
-	// THIS NODE! SINCE I AM NOT STORING THE ENTIRE GAME TREE, AND ONLY HAVE ONE INSTANCE
-	// OF THE BETTING TREE IN MEMORY FOR _ALL_ SITUATIONS, WE NEED TO DYNAMICALLY CHECK
-	// HERE TO SEE WHICH ACTIONS CAN BE AFFORDED.
-
-	for(int a=0; a<maxa; a++)
-	{
-		//they both need the money for it to be a valid action. All-in is always a valid action. (should have need 0).
-		isvalida[a] = (pot + mynode->potcontrib[a] < STACKSIZE);
-		if (isvalida[a])
-			numa++;
-	}
-
-
 	// OK, NOW WE WILL APPLY EQUATION (8) FROM TECH REPORT, COMPUTE STRATEGY T+1
 	
-	for(int a=0; a<maxa; a++)
+	//we trust that regret[a] is zero always for non-valid actions
+	switch(maxa) //this switch alone gives a savings of about 1.5% total execution time
 	{
-		totalregret += max((float)0,regret[a]); //non-valid a's will simply have regret still at 0.
+		//so this won't do anything for non-valid acitons
+		//non-valid a's will simply have regret still at 0.
+	case 9:
+		if (regret[8]>0) totalregret += regret[8];
+	case 8:
+		if (regret[7]>0) totalregret += regret[7];
+		if (regret[6]>0) totalregret += regret[6];
+		if (regret[5]>0) totalregret += regret[5];
+		if (regret[4]>0) totalregret += regret[4];
+		if (regret[3]>0) totalregret += regret[3];
+	case 3:
+		if (regret[2]>0) totalregret += regret[2];
+	case 2:
+		if (regret[1]>0) totalregret += regret[1];
+		if (regret[0]>0) totalregret += regret[0];
 	}
 
 	if (totalregret > 0)
 	{
-		for(int a=0; a<maxa-1; a++) 
-			stratmaxa += stratt[a] = max((float)0,regret[a]) / totalregret;
+		//this won't do anything if regret[a] is zero
+		switch(maxa) //this switch gives 0.5% total savings
+		{
+		case 9:
+			(regret[7]>0) ? stratmaxa += stratt[7] = regret[7] / totalregret : stratt[7] = 0;
+		case 8:
+			(regret[6]>0) ? stratmaxa += stratt[6] = regret[6] / totalregret : stratt[6] = 0;
+			(regret[5]>0) ? stratmaxa += stratt[5] = regret[5] / totalregret : stratt[5] = 0;
+			(regret[4]>0) ? stratmaxa += stratt[4] = regret[4] / totalregret : stratt[4] = 0;
+			(regret[3]>0) ? stratmaxa += stratt[3] = regret[3] / totalregret : stratt[3] = 0;
+			(regret[2]>0) ? stratmaxa += stratt[2] = regret[2] / totalregret : stratt[2] = 0;
+		case 3:
+			(regret[1]>0) ? stratmaxa += stratt[1] = regret[1] / totalregret : stratt[1] = 0;
+		case 2:
+			(regret[0]>0) ? stratmaxa += stratt[0] = regret[0] / totalregret : stratt[0] = 0;
+		}
+
+		//this will naturally be zero if non-valid
 		stratmaxa = 1-stratmaxa;
 	}
 	else
 	{
-		for(int a=0; a<maxa-1; a++) 
-			stratt[a] = (float)1/numa;
-		stratmaxa = (float)1/numa;
+		int a;
+		for(a=0; a<maxa-1; a++) 
+		{
+			//but here we must check to make sure it's valid
+			if(isvalid[a])
+				stratt[a] = (float)1/numa;
+		}
+		//and here too
+		if(isvalid[a])
+			stratmaxa = (float)1/numa;
 	}
 
 
@@ -103,19 +152,31 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 
 	if(mynode->playertoact==0)
 	{
-		for(int a=0; a<maxa-1; a++)
-		{
-			stratn[a] += prob0 * stratt[a];
-			stratd[a] += prob0;
-		}
+		//shortcut, along with the related one below, speeds up by 10% or so.
+		if(prob0!=0)
+			for(int a=0; a<maxa-1; a++)
+			{
+				//this is just for performance, as these dont affect valid entries, they're only result
+				if(isvalid[a])
+				{
+					stratn[a] += prob0 * stratt[a];
+					stratd[a] += prob0;
+				}
+			}
 	}
 	else
 	{
-		for(int a=0; a<maxa-1; a++)
-		{
-			stratn[a] += prob1 * stratt[a];
-			stratd[a] += prob1;
-		}
+		//shortcut
+		if(prob1!=0)
+			for(int a=0; a<maxa-1; a++)
+			{
+				//this is just for performance
+				if(isvalid[a])
+				{
+					stratn[a] += prob1 * stratt[a];
+					stratd[a] += prob1;
+				}
+			}
 	}
 
 
@@ -129,7 +190,7 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 
 
 		//if we do not have enough money, we do not touch this action. It does not exist.
-		if (!isvalida[a])
+		if (!isvalid[a])
 			continue;
 
 		switch(mynode->result[a])
@@ -138,7 +199,7 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 			REPORT("Invalid betting tree node action reached."); //will exit
 
 		case AI: // SHOWDOWN - from all-in call!
-			utility[a] = STACKSIZE * (2*gs.getprob0wins()-1);
+			utility[a] = STACKSIZE * (gs.gettwoprob0wins()-1);
 			break;
 
 		// CONTINUE AT NEXT GAME ROUND
@@ -170,7 +231,7 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 			}
 			// ...or a SHOWDOWN - from the river!
 			else
-				utility[a] = (pot+mynode->potcontrib[a]) * (2*gs.getprob0wins()-1);
+				utility[a] = (pot+mynode->potcontrib[a]) * (gs.gettwoprob0wins()-1);
 
 			break;
 		
@@ -198,16 +259,26 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 
 	if (mynode->playertoact==0) //P0 playing, use prob1, proability of player 1 getting here.
 	{
+		//shortcut
+		if(prob1==0) return avgutility;
+
 		for(int a=0; a<maxa; a++)
 		{
-			regret[a] += prob1 * (utility[a] - avgutility);
+			//this was a major bug, only update when valid.
+			if(isvalid[a])
+				regret[a] += prob1 * (utility[a] - avgutility);
 		}
 	}
 	else // P1 playing, so his regret values are negative of P0's regret values.
 	{
+		//shortcut
+		if(prob0==0) return avgutility;
+
 		for(int a=0; a<maxa; a++)
 		{
-			regret[a] += - prob0 * (utility[a] - avgutility);
+			//this was a major bug, only update when valid.
+			if(isvalid[a])
+				regret[a] += - prob0 * (utility[a] - avgutility);
 		}
 	}
 
@@ -225,11 +296,15 @@ void playgame()
 	//bethist array for the whoooole walker recursive call-tree
 	int bethist[3] = {-1, -1, -1};
 
+	clock_t c1 = clock();
+
 	for(int i=0; i<10000; i++)
 	{
 		gs.dealnewgame();
 		walker(0,0,bethist,0,1,1);
 	}
+
+	BENCH(c1);
 }
 
 int _tmain(int argc, _TCHAR* argv[])

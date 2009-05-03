@@ -9,18 +9,18 @@ class GameState
 public:
 	void dealnewgame();
 	int getscenarioi(int gr, int playertoact, int pot, int bethist[3]);
-	float getprob0wins();
+	int gettwoprob0wins();
 
 private:
 	CardMask priv0, priv1, flop, turn, river;
 	int flopscore, turnscore, riverscore;
 	int binnumber[2][4];
-	int prob0wins;
+	int twoprob0wins;
 };
 
-inline float GameState::getprob0wins()
+inline int GameState::gettwoprob0wins()
 {
-	return prob0wins;
+	return twoprob0wins;
 }
 
 #endif

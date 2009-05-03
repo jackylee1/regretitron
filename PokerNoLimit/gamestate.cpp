@@ -100,9 +100,9 @@ void GameState::dealnewgame()
 	r1=Hand_EVAL_N(full1, 7);
 
 	if (r0>r1)
-		prob0wins = 1.0F;
+		twoprob0wins = 2;
 	else if(r1>r0)
-		prob0wins = 0.0F;
+		twoprob0wins = 0;
 	else
-		prob0wins = 0.5F;
+		twoprob0wins = 1;
 }

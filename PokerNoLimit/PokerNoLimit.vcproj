@@ -118,6 +118,11 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				Optimization="2"
+				InlineFunctionExpansion="0"
+				EnableIntrinsicFunctions="true"
+				FavorSizeOrSpeed="0"
+				OmitFramePointers="true"
 				AdditionalIncludeDirectories="../pokereval/include;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
@@ -247,6 +252,10 @@
 			</File>
 			<File
 				RelativePath=".\memorymgr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\report.h"
 				>
 			</File>
 			<File

@@ -5,5 +5,6 @@
 	exit(1); \
 }
 
+#define PRINTMASK(c) GenericDeck_maskString(&StdDeck, &c)
 
-#define printmask(c) GenericDeck_maskString(&StdDeck, &c)
+#define BENCH(c) std::cout << float(clock()-c)/CLOCKS_PER_SEC << " seconds elapsed." << endl;

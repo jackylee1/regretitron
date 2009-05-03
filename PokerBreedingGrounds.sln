@@ -71,4 +71,7 @@ Global
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		AMDCaProjectFile = C:\Documents and Settings\Scott\My Documents\PokerBreedingGrounds\trunk\CodeAnalyst\PokerBreedingGrounds.caw
+	EndGlobalSection
 EndGlobal

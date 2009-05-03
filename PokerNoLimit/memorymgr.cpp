@@ -6,15 +6,17 @@
 // action, beti, and sceni
 
 //these are pointers to chars because I want byte granularity.
-char *datapointers[N_CHUNKS];
+//char *datapointers[N_CHUNKS];
+char *datapointer;
 
 //returns pointers for the four data arrays within the correct 
 //datachunk for the correct sceni and beti
-void getpointers(int sceni, int beti, int maxa, 
+inline void getpointers(int sceni, int beti, int maxa, 
 				 float * &stratt, float * &stratn, float * &stratd, float * &regret)
 {
 	//since this is char pointer, addition adds in multiples of 1, and our units here are always bytes.
-	char * betiarray = datapointers[sceni/SCENIPERCHUNK] + (sceni%SCENIPERCHUNK)*SCENARIODATA_BYTES;
+	//char * betiarray = datapointers[sceni/SCENIPERCHUNK] + (sceni%SCENIPERCHUNK)*SCENARIODATA_BYTES;
+	char * betiarray = datapointer + sceni*SCENARIODATA_BYTES;
 
 	//set variables to pointers pointing into the data arrays, at the right spot
 	if (beti<BETI9_CUTOFF)
@@ -48,7 +50,9 @@ void initmem()
 {
 	for(int i=0; i<N_CHUNKS; i++)
 	{
-		datapointers[i] = new char[SCENIPERCHUNK*SCENARIODATA_BYTES];
-		memset(datapointers[i], 0, SCENIPERCHUNK*SCENARIODATA_BYTES);
+		//datapointers[i] = new char[SCENIPERCHUNK*SCENARIODATA_BYTES];
+		datapointer = new char[SCENIPERCHUNK*SCENARIODATA_BYTES];
+		//memset(datapointers[i], 0, SCENIPERCHUNK*SCENARIODATA_BYTES);
+		memset(datapointer, 0, SCENIPERCHUNK*SCENARIODATA_BYTES);
 	}
 }
