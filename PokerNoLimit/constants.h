@@ -73,8 +73,11 @@ const int SCENI_MAX = SCENI_PREFLOP_MAX + SCENI_FLOP_MAX + SCENI_TURN_MAX + SCEN
 //constants used for managing the memory, and the beti segmentation indexing
 //First, we segment the memory used into chunks, each covering an integral number of
 //scenario indices. Chunks overcome memory fragmentation I hope.
-const int N_CHUNKS = 1; //should be chosen to divide SCENI_MAX, otherwise, put a +1 below
-const int SCENIPERCHUNK = (SCENI_MAX / N_CHUNKS);
+#define N_CHUNKS 8
+
+#if N_CHUNKS > 1
+const int SCENIPERCHUNK = (SCENI_MAX / N_CHUNKS) + 1;
+#endif
 
 //Now, we can access a certain sceni number from above. The only thing missing is accessing
 //the particular parts that depend on beti. These numbers help allow that.
