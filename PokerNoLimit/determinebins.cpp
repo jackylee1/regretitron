@@ -42,15 +42,14 @@ inline int retrieve(binstruct word, int n)
 /**********************************************************************/
 
 //some global pointer to data
+HANDLE flopfile, turnfile, riverfile, flopfilemap, turnfilemap, riverfilemap;
 binstruct * flopbins;
 binstruct * turnbins;
 binstruct * riverbins;
 
-//I open the files here. note that i never close them.
+//I open the files here.
 void initbins()
 {
-	HANDLE flopfile, turnfile, riverfile, flopfilemap, turnfilemap, riverfilemap;
-
 	//open the files
 	flopfile = CreateFile(FLOPFILENAME, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	turnfile = CreateFile(TURNFILENAME, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -75,9 +74,21 @@ void initbins()
 		REPORT("could not open file with river bins and memory map it.");
 }
 
+void closebins()
+{
+	UnmapViewOfFile(flopbins);
+	UnmapViewOfFile(turnbins);
+	UnmapViewOfFile(riverbins);
+	CloseHandle(flopfilemap);
+	CloseHandle(turnfilemap);
+	CloseHandle(riverfilemap);
+	CloseHandle(flopfile);
+	CloseHandle(turnfile);
+	CloseHandle(riverfile);
+}
 
 //read the data in those files
-inline void determinebins(const CardMask &priv, 
+void determinebins(const CardMask &priv, 
 						  const CardMask &flop, const CardMask &turn, const CardMask &river,
 						  int &preflopbin, int &flopbin, int &turnbin, int &riverbin)
 {

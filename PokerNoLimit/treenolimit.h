@@ -28,6 +28,9 @@ struct betnode
 //to initialize the below variables
 void initpfn();
 
+//fills isvalid and returns num actions.
+extern inline int getvalidity(const int pot, betnode const * mynode, bool isvalid[9]);
+
 //returns index of a certain pot value
 int getpoti(int gr, int pot);
 

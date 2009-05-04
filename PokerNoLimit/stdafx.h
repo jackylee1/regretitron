@@ -12,6 +12,7 @@
 #endif						
 
 #include <iostream>
+#include <fstream> //needed for saving the strategy file.
 #include <stdio.h>
 #include <tchar.h>
 #include <time.h> //needed for time() needed for srand.

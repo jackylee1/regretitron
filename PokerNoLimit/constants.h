@@ -25,8 +25,8 @@ const LPCTSTR RIVERFILENAME = TEXT("files/river8BINS.dat");
 
 const int BINSPERSTRUCT = 10;
 
-//ensure INDEX2N_MAX is initialized by the time we get here, and that it knows what a binstruct is.
-const unsigned int FLOPFILESIZE = (INDEX23_MAX/BINSPERSTRUCT+1)*4;
+//ensure INDEX2N_MAX is initialized by the time we get here.
+const unsigned int FLOPFILESIZE = (INDEX23_MAX/BINSPERSTRUCT+1)*4; //binstructs must be 4 bytes.
 const unsigned int TURNFILESIZE = (INDEX24_MAX/BINSPERSTRUCT+1)*4;
 const unsigned int RIVERFILESIZE = (INDEX25_MAX/BINSPERSTRUCT+1)*4;
 
@@ -45,7 +45,7 @@ const int POTI_RIVER_MAX = 6;
 
 //stacksize of the smallest stack, in small blinds, 
 //as HU poker is only as good as its smaller stack.
-const int STACKSIZE = 26; //26 should match that paper, with 13 big blinds each.
+const int STACKSIZE = 8; //26 should match that paper, with 13 big blinds each.
 
 const unsigned char SB=1, BB=2;
 
@@ -91,14 +91,15 @@ const int SCENIPERCHUNK = (SCENI_MAX / N_CHUNKS);
 //Now, we can access a certain sceni number from above. The only thing missing is accessing
 //the particular parts that depend on beti. These numbers help allow that.
 //These allow determining the max actions we have stored for in memory from betting inde.
+const int BETI_MAX = N_NODES;
+
 const int BETI9_CUTOFF = 14;
 const int BETI3_CUTOFF = 86;
-const int BETI2_CUTOFF = 172;
+const int BETI2_CUTOFF = BETI_MAX;
 
 const int BETI9_MAX = BETI9_CUTOFF;
 const int BETI3_MAX = BETI3_CUTOFF-BETI9_CUTOFF;
 const int BETI2_MAX = BETI2_CUTOFF-BETI3_CUTOFF;
-const int BETI_MAX = BETI2_CUTOFF;
 
 //These are offsets in bytes. They may not always be word aligned.
 // a certain offset = the last offset  +  size of last offset

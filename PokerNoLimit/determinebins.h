@@ -5,8 +5,9 @@
 #include "../HandIndexingV1/getindex2N.h"
 
 void initbins();
+void closebins();
 
-extern inline void determinebins(const CardMask &priv, 
+void determinebins(const CardMask &priv, 
 						  const CardMask &flop, const CardMask &turn, const CardMask &river,
 						  int &preflopbin, int &flopbin, int &turnbin, int &riverbin);
 

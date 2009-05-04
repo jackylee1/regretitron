@@ -205,6 +205,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\savestrategy.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\stdafx.cpp"
 				>
 				<FileConfiguration
@@ -256,6 +260,10 @@
 			</File>
 			<File
 				RelativePath="..\report.h"
+				>
+			</File>
+			<File
+				RelativePath=".\savestrategy.h"
 				>
 			</File>
 			<File

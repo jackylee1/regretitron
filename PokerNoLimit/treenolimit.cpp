@@ -40,6 +40,33 @@ int getpoti(int gr, int pot)
 	}
 }
 
+//returns number valid actions
+inline int getvalidity(const int pot, betnode const * mynode, bool isvalid[9])
+{
+	int numa=0;
+
+	switch(mynode->numacts)
+	{
+	default: REPORT("invalid maxa");
+	case 9:
+		if(isvalid[8] = (pot + mynode->potcontrib[8] < STACKSIZE)) numa++;
+	case 8:
+		if(isvalid[7] = (pot + mynode->potcontrib[7] < STACKSIZE)) numa++;
+		if(isvalid[6] = (pot + mynode->potcontrib[6] < STACKSIZE)) numa++;
+		if(isvalid[5] = (pot + mynode->potcontrib[5] < STACKSIZE)) numa++;
+		if(isvalid[4] = (pot + mynode->potcontrib[4] < STACKSIZE)) numa++;
+		if(isvalid[3] = (pot + mynode->potcontrib[3] < STACKSIZE)) numa++;
+	case 3:
+		if(isvalid[2] = (pot + mynode->potcontrib[2] < STACKSIZE)) numa++;
+	case 2:
+		if(isvalid[1] = (pot + mynode->potcontrib[1] < STACKSIZE)) numa++;
+		if(isvalid[0] = (pot + mynode->potcontrib[0] < STACKSIZE)) numa++;
+	}
+
+	return numa;
+}
+
+
 //THESE ARE THE GLOBAL VARIABLES THAT MAKE UP THE BETTING TREE.
 //ONE IS FOR POST FLOP, THE OTHER IS FOR PREFLOP.
 

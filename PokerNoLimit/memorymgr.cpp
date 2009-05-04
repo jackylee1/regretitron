@@ -56,3 +56,8 @@ void initmem()
 		memset(datapointer, 0, SCENIPERCHUNK*SCENARIODATA_BYTES);
 	}
 }
+
+void closemem()
+{
+	delete [] datapointer;
+}

@@ -3,6 +3,7 @@
 #include "determinebins.h"
 #include "gamestate.h"
 #include "memorymgr.h"
+#include "savestrategy.h"
 using namespace std;
 
 //global gamestate class instance.
@@ -21,7 +22,7 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 	float stratmaxa=0; //this is the one that I do not store in the global data arrays.
 	int maxa; //just the size of the action arrays
 	int numa=0; //the number of actually possible actions
-	bool isvalid[9]={false,false,false,false,false,false,false,false,false}; //if this action is possible (have enough money)
+	bool isvalid[9]; //if this action is possible (have enough money)
 	
 	//FIRST LETS FIND THE DATA WE NEED FOR THIS INSTANCE OF WALKER
 
@@ -38,23 +39,7 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 	// OF THE BETTING TREE IN MEMORY FOR _ALL_ SITUATIONS, WE NEED TO DYNAMICALLY CHECK
 	// HERE TO SEE WHICH ACTIONS CAN BE AFFORDED.
 
-	switch(maxa)
-	{
-	default: REPORT("invalid maxa");
-	case 9:
-		if(isvalid[8] = (pot + mynode->potcontrib[8] < STACKSIZE)) numa++;
-	case 8:
-		if(isvalid[7] = (pot + mynode->potcontrib[7] < STACKSIZE)) numa++;
-		if(isvalid[6] = (pot + mynode->potcontrib[6] < STACKSIZE)) numa++;
-		if(isvalid[5] = (pot + mynode->potcontrib[5] < STACKSIZE)) numa++;
-		if(isvalid[4] = (pot + mynode->potcontrib[4] < STACKSIZE)) numa++;
-		if(isvalid[3] = (pot + mynode->potcontrib[3] < STACKSIZE)) numa++;
-	case 3:
-		if(isvalid[2] = (pot + mynode->potcontrib[2] < STACKSIZE)) numa++;
-	case 2:
-		if(isvalid[1] = (pot + mynode->potcontrib[1] < STACKSIZE)) numa++;
-		if(isvalid[0] = (pot + mynode->potcontrib[0] < STACKSIZE)) numa++;
-	}
+	numa=getvalidity(pot,mynode,isvalid);
 
 
 	//**************************
@@ -298,11 +283,19 @@ void playgame()
 
 	clock_t c1 = clock();
 
-	for(int i=0; i<10000; i++)
+	for(int i=0; i<60000000; i++)
 	{
 		gs.dealnewgame();
 		walker(0,0,bethist,0,1,1);
 	}
+	printfirstnodestrat("firstnode60M.txt");
+
+	for(int i=0; i<60000000; i++)
+	{
+		gs.dealnewgame();
+		walker(0,0,bethist,0,1,1);
+	}
+	printfirstnodestrat("firstnode120M.txt");
 
 	BENCH(c1);
 }
@@ -315,6 +308,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	playgame();
 
+	closemem();
+	closebins();
 	system("PAUSE");
 	return 0;
 }
