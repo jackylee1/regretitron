@@ -5,43 +5,9 @@
 #include "../HandIndexingV1/constants.h"
 using namespace std;
 
-#define N_BINS 8
-const int BINSPERSTRUCT = 10;
-struct binstruct
-{
-	//30 bits
-	unsigned int bin0 : 3;
-	unsigned int bin1 : 3;
-	unsigned int bin2 : 3;
-	unsigned int bin3 : 3;
-	unsigned int bin4 : 3;
+#define N_BINS 32 //must be same as below
+#include "../SharedCode/binstruct32.h"
 
-	unsigned int bin5 : 3;
-	unsigned int bin6 : 3;
-	unsigned int bin7 : 3;
-	unsigned int bin8 : 3;
-	unsigned int bin9 : 3;
-}
-
-store(binstruct &word, int bin, int n)
-{
-	if(bin<0 || bin>=N_BINS)
-		REPORT("failed bin number in store");
-	switch(n)
-	{
-	case 0: word.bin0 = bin; break;
-	case 1: word.bin1 = bin; break;
-	case 2: word.bin2 = bin; break; 
-	case 3: word.bin3 = bin; break;
-	case 4: word.bin4 = bin; break;
-	case 5: word.bin5 = bin; break;
-	case 6: word.bin6 = bin; break;
-	case 7: word.bin7 = bin; break;
-	case 8: word.bin8 = bin; break;
-	case 9: word.bin9 = bin; break;
-	default: REPORT("failed n in store");
-	}
-}
 
 //this is absolutely rediculous
 #define tostring(x) #x

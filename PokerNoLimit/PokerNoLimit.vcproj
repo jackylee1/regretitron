@@ -282,6 +282,18 @@
 				RelativePath=".\treenolimit.h"
 				>
 			</File>
+			<Filter
+				Name="binstructs"
+				>
+				<File
+					RelativePath="..\SharedCode\binstruct32.h"
+					>
+				</File>
+				<File
+					RelativePath="..\SharedCode\binstruct8.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Resource Files"

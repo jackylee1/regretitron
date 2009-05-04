@@ -1,46 +1,6 @@
 #include "stdafx.h"
 #include "determinebins.h"
 
-/*The following data and struct should be copied from HandSSCalculator.*/
-/*********************************************************************/
-
-struct binstruct
-{
-	//30 bits
-	unsigned int bin0 : 3;
-	unsigned int bin1 : 3;
-	unsigned int bin2 : 3;
-	unsigned int bin3 : 3;
-	unsigned int bin4 : 3;
-
-	unsigned int bin5 : 3;
-	unsigned int bin6 : 3;
-	unsigned int bin7 : 3;
-	unsigned int bin8 : 3;
-	unsigned int bin9 : 3;
-};
-
-inline int retrieve(binstruct word, int n)
-{
-	switch (n)
-	{
-	case 0: return word.bin0;
-	case 1: return word.bin1;
-	case 2: return word.bin2;
-	case 3: return word.bin3;
-	case 4: return word.bin4;
-	case 5: return word.bin5;
-	case 6: return word.bin6;
-	case 7: return word.bin7;
-	case 8: return word.bin8;
-	case 9: return word.bin9;
-	default:
-		REPORT("invalid piece of binstruct!");
-	}
-}
-
-/**********************************************************************/
-
 //some global pointer to data
 HANDLE flopfile, turnfile, riverfile, flopfilemap, turnfilemap, riverfilemap;
 binstruct * flopbins;

@@ -10,25 +10,12 @@ const int RIVER = 3;
 
 /***********************************************************************************/
 //constants for the binning of hands
+#include "../SharedCode/binstruct32.h"
+const int BIN_PREFLOP_MAX = INDEX2_MAX; //should be 169
+const int BIN_FLOP_MAX = BIN_MAX; //comes from from binstructN.h
+const int BIN_TURN_MAX = BIN_MAX;
+const int BIN_RIVER_MAX = BIN_MAX;
 
-/*****************************************/
-/*should be copied from HandSSCalculator.*/
-/*****************************************/
-const int BIN_PREFLOP_MAX = 169;
-const int BIN_FLOP_MAX = 8;
-const int BIN_TURN_MAX = 8;
-const int BIN_RIVER_MAX = 8;
-
-const LPCTSTR FLOPFILENAME = TEXT("files/flop8BINS.dat");
-const LPCTSTR TURNFILENAME = TEXT("files/turn8BINS.dat");
-const LPCTSTR RIVERFILENAME = TEXT("files/river8BINS.dat");
-
-const int BINSPERSTRUCT = 10;
-
-//ensure INDEX2N_MAX is initialized by the time we get here.
-const unsigned int FLOPFILESIZE = (INDEX23_MAX/BINSPERSTRUCT+1)*4; //binstructs must be 4 bytes.
-const unsigned int TURNFILESIZE = (INDEX24_MAX/BINSPERSTRUCT+1)*4;
-const unsigned int RIVERFILESIZE = (INDEX25_MAX/BINSPERSTRUCT+1)*4;
 
 /***********************************************************************************/
 //constants for the flopalyzer
