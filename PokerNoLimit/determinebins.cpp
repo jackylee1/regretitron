@@ -112,3 +112,34 @@ void determinebins(const CardMask &priv,
 	index = getindex2N(priv, board, 5);
 	riverbin = retrieve(riverbins[index / BINSPERSTRUCT], index % BINSPERSTRUCT);
 }
+
+int getpreflopbin(const CardMask &priv)
+{
+	return getindex2(priv);
+}
+
+int getflopbin(const CardMask &priv, const CardMask &flop)
+{
+	int index = getindex2N(priv, flop, 3);
+	return retrieve(flopbins[index / BINSPERSTRUCT], index % BINSPERSTRUCT);
+}
+
+int getturnbin(const CardMask &priv, const CardMask &flop, const CardMask &turn)
+{
+	CardMask board;
+	int index;
+	CardMask_OR(board, flop, turn);
+	index = getindex2N(priv, board, 4);
+	return retrieve(turnbins[index / BINSPERSTRUCT], index % BINSPERSTRUCT);
+}
+
+int getriverbin(const CardMask &priv, const CardMask &flop, const CardMask &turn, const CardMask &river)
+{
+	CardMask board;
+	int index;
+	CardMask_OR(board, flop, turn);
+	CardMask_OR(board, board, river);
+	index = getindex2N(priv, board, 5);
+	return retrieve(riverbins[index / BINSPERSTRUCT], index % BINSPERSTRUCT);
+}
+

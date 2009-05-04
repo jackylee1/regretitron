@@ -283,19 +283,19 @@ void playgame()
 
 	clock_t c1 = clock();
 
-	for(int i=0; i<60000000; i++)
+	for(long long int i=0; i<600000000; i++)
 	{
 		gs.dealnewgame();
 		walker(0,0,bethist,0,1,1);
 	}
-	printfirstnodestrat("firstnode60M.txt");
+	printfirstnodestrat("firstnode600M.txt");
 
-	for(int i=0; i<60000000; i++)
+	for(long long int i=0; i<600000000; i++)
 	{
 		gs.dealnewgame();
 		walker(0,0,bethist,0,1,1);
 	}
-	printfirstnodestrat("firstnode120M.txt");
+	printfirstnodestrat("firstnode1.2B.txt");
 
 	BENCH(c1);
 }

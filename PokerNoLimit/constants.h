@@ -39,22 +39,22 @@ const int RIVALYZER_MAX=37;
 
 /***********************************************************************************/
 //constants for the pot indexing, and those that define game parameters
-const int POTI_FLOP_MAX = 6;
-const int POTI_TURN_MAX = 6;
-const int POTI_RIVER_MAX = 6;
-
-//stacksize of the smallest stack, in small blinds, 
-//as HU poker is only as good as its smaller stack.
-const int STACKSIZE = 8; //26 should match that paper, with 13 big blinds each.
+const int POTI_FLOP_MAX = 3;
+const int POTI_TURN_MAX = 3;
+const int POTI_RIVER_MAX = 3;
 
 const unsigned char SB=1, BB=2;
 
-const unsigned char B1=4,  R11=8,  R12=12, R13=14, R14=18, R15=22, R16=26;
-const unsigned char B2=6,  R21=10, R22=14, R23=18, R24=22, R25=26, R26=30;
-const unsigned char B3=8,  R31=12, R32=16, R33=20, R34=24, R35=28, R36=32;
-const unsigned char B4=12, R41=16, R42=20, R43=24, R44=28, R45=32, R46=36;
+const unsigned char B1=2,  R11=4,  R12=6, R13=14, R14=18, R15=22, R16=26;
+const unsigned char B2=4,  R21=6, R22=14, R23=18, R24=22, R25=26, R26=30;
+const unsigned char B3=6,  R31=8, R32=16, R33=20, R34=24, R35=28, R36=32;
+const unsigned char B4=10, R41=16, R42=20, R43=24, R44=28, R45=32, R46=36;
 const unsigned char B5=16, R51=20, R52=24, R53=28, R54=32, R55=36, R56=40;
 const unsigned char B6=24, R61=28, R62=32, R63=36, R64=40, R65=44, R66=48;
+
+//stacksize of the smallest stack, in small blinds, 
+//as HU poker is only as good as its smaller stack.
+const int STACKSIZE = 4*BB; //26 should match that paper, with 13 big blinds each.
 
 /***********************************************************************************/
 //constants for the betting tree itself
@@ -70,6 +70,7 @@ const unsigned char GO4=0xFB; //bet-raise-call
 const unsigned char GO3=0xFA; //check-bet-call
 const unsigned char GO2=0xF9; //bet-call
 const unsigned char GO1=0xF8; //check-check
+const unsigned char GO_BASE=GO1;
 const int BETHIST_MAX = 5; // number of GO's we have
 
 /***********************************************************************************/

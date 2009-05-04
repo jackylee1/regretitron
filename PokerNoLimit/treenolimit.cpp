@@ -8,32 +8,18 @@
 //only even values are possible since we assume bets are size of big blind
 int getpoti(int gr, int pot)
 {
+	//they can only ever bet in multiples of the big blind, so all the numbers i'll ever
+	//have should be even, because they can not agree upon a small blind bet.
 	switch(pot)
 	{
-	case 2:
-	case 4:
+	case 1*BB:
 		return 0;
 
-	case 6:
-	case 8:
+	case 2*BB:
 		return 1;
 
-	case 10:
-	case 12:
+	case 3*BB:
 		return 2;
-		
-	case 14:
-	case 16:
-		return 3;
-
-	case 18:
-	case 20:
-		return 4;
-
-	case 22:
-	case 24:
-	case 26:
-		return 5;
 
 	default:
 		REPORT("invalid pot size in poti for flop");
@@ -313,12 +299,24 @@ betnode pfn[N_NODES];
 //Alas, you will have to initialize!
 void initpfn()
 {
+	//Step 0, copy the tree. fix player to act.
 	for(int i=0; i<N_NODES; i++)
 	{
 		//copy post-flop tree
 		pfn[i] = n[i];
 		//change player to act to reflect reversed order preflop.
 		pfn[i].playertoact = 1-n[i].playertoact;
+	}
+
+	//Step 1, bump up all non-NA or 0 (All in, or check/fold nothing) valiues to +BB, 
+	//to account for the betting floor
+	for(int i=0; i<N_NODES; i++)
+	{
+		for(int j=0; j<9; j++)
+		{
+			if(pfn[i].potcontrib[j] != NA && pfn[i].potcontrib[j] != 0)
+				pfn[i].potcontrib[j] += BB;
+		}
 	}
 
 	//FIX NODE ZERO

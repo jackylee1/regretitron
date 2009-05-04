@@ -6,7 +6,7 @@
 #define STRAIGHT4(s) ((s & (s<<1) & (s<<2) & (s<<3)) || (s & (s<<2) & (s<<3) & (s<<4)) || \
 						(s & (s<<1) & (s<<3) & (s<<4)) || (s & (s<<1) & (s<<2) & (s<<4)))
 
-int analyzeflop(const CardMask flop)
+int flopalyzer(const CardMask flop)
 {
 	int n_ranks;
 	uint32 sc, sd, sh, ss, ranks, s;
@@ -46,7 +46,7 @@ int analyzeflop(const CardMask flop)
 		return 5; //27.42%
 }
 
-int analyzeturn(const CardMask flop, const CardMask turn)
+int turnalyzer(const CardMask flop, const CardMask turn)
 {
 	int n_ranks;
 	uint32 sc, sd, sh, ss, ranks;
@@ -65,7 +65,7 @@ int analyzeturn(const CardMask flop, const CardMask turn)
 	uint32 s = (ranks<<1) | (ranks>>12); 
 	n_ranks = nBitsTable[ranks];
 
-	switch(analyzeflop(flop))
+	switch(flopalyzer(flop))
 	{
 	case 0://3 of a suit or 3 of a kind (5.42%)
 
@@ -149,12 +149,12 @@ int analyzeturn(const CardMask flop, const CardMask turn)
 			return 16;
 
 	default:
-		REPORT("invalid flop index in analyzeturn");
+		REPORT("invalid flop index in turnalyzer");
 	}
 }
 
 
-int analyzeriver(const CardMask flop, const CardMask turn, const CardMask river)
+int rivalyzer(const CardMask flop, const CardMask turn, const CardMask river)
 {
 	int n_ranks;
 	uint32 sc, sd, sh, ss, ranks, s;
@@ -174,7 +174,7 @@ int analyzeriver(const CardMask flop, const CardMask turn, const CardMask river)
 	s = (ranks<<1) | (ranks>>12); 
 	n_ranks = nBitsTable[ranks];
 
-	switch(analyzeturn(flop,turn))
+	switch(turnalyzer(flop,turn))
 	{
 //flop: 3 of a suit or 3 of a kind (5.42%)
 	case 0://4OAS or 4OAK or 3OAK (1.30%)
@@ -357,7 +357,7 @@ int analyzeriver(const CardMask flop, const CardMask turn, const CardMask river)
 			return 36;
 
 	default:
-		REPORT("invalid turn index in analyzeriver");
+		REPORT("invalid turn index in rivalyzer");
 	}
 }
 
@@ -383,7 +383,7 @@ void testflopalyzer()
 		CardMask_OR(d2,f,t);
 		MONTECARLO_N_CARDS_D(r, d2, 1, 1, );
 
-		x[analyzeriver(f,t,r)]++;
+		x[rivalyzer(f,t,r)]++;
 	});
 
 
@@ -398,7 +398,7 @@ void testflopalyzer()
 			CardMask_OR(d2,f,t);
 			MONTECARLO_N_CARDS_D(r, d2, 1, 1, );
 
-			if (analyzeriver(f,t,r)==i)
+			if (rivalyzer(f,t,r)==i)
 			{
 				cout << "  " << printmask(f) << " : ";
 				cout << printmask(t) << " : ";

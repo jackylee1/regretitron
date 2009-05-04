@@ -77,9 +77,9 @@ void GameState::dealnewgame()
 	MONTECARLO_N_CARDS_D(river, usedcards, 1, 1, );
 
 	//compute flopalyzer score
-	flopscore = analyzeflop(flop);
-	turnscore = analyzeturn(flop, turn);
-	riverscore = analyzeriver(flop, turn, river);
+	flopscore = flopalyzer(flop);
+	turnscore = turnalyzer(flop, turn);
+	riverscore = rivalyzer(flop, turn, river);
 
 	//compute binnumbers
 	determinebins(priv0, flop, turn, river, 

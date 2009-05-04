@@ -205,6 +205,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\rephands.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\savestrategy.cpp"
 				>
 			</File>
@@ -256,6 +260,10 @@
 			</File>
 			<File
 				RelativePath=".\memorymgr.h"
+				>
+			</File>
+			<File
+				RelativePath=".\rephands.h"
 				>
 			</File>
 			<File

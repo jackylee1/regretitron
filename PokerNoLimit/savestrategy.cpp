@@ -2,6 +2,7 @@
 #include "savestrategy.h"
 #include "treenolimit.h"
 #include "memorymgr.h"
+#include "rephands.h"
 
 using namespace std;
 
@@ -14,6 +15,8 @@ void printfirstnodestrat(char const * const filename)
 	float strataccum;
 	bool isvalid[9];
 
+	log << fixed << setprecision(2);
+
 	for(int i=0; i<SCENI_PREFLOP_MAX; i++)
 	{
 		getpointers(i, 0, maxa, stratt, stratn, stratd, regret);
@@ -21,6 +24,7 @@ void printfirstnodestrat(char const * const filename)
 		numa = getvalidity(0, &(pfn[0]), isvalid);
 
 		log << endl << "Scenario " << i << ":" << endl;
+		printrepinfo(log, i, 2);
 		//remember we only store max-1 strategies. the last must be found based on all adding to 1.
 		strataccum=0;
 		for (int a=0; a<maxa-1; a++)

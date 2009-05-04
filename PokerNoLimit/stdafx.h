@@ -15,6 +15,8 @@
 #include <fstream> //needed for saving the strategy file.
 #include <stdio.h>
 #include <tchar.h>
+#include <string> //needed for some of the rephands shenanigans
+#include <iomanip> //needed for formating the way floats are printed in cout's and the like
 #include <time.h> //needed for time() needed for srand.
 
 // Needed for file mapping.

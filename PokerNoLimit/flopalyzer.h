@@ -3,9 +3,9 @@
 
 #define COMPILE_FLOPALYZER_TESTCODE 0
 
-int analyzeflop(const CardMask flop);
-int analyzeturn(const CardMask flop, const CardMask turn);
-int analyzeriver(const CardMask flop, const CardMask turn, const CardMask river);
+int flopalyzer(const CardMask flop);
+int turnalyzer(const CardMask flop, const CardMask turn);
+int rivalyzer(const CardMask flop, const CardMask turn, const CardMask river);
 
 #if COMPILE_FLOPALYZER_TESTCODE
 void testflopalyzer();
