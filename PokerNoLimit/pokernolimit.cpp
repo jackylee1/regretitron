@@ -11,7 +11,7 @@ GameState gs;
 //global bool array hasbeenvisited
 bitset<WALKERI_MAX> hasbeenvisited;
 //bethist array for the whoooole walker recursive call-tree
-int bethist[3];
+int bethist[3]={-1,-1,-1};
 
 #define COMBINE(i3, i2, i1, n2, n1) ((i3)*(n2)*(n1) + (i2)*(n1) + (i1))
 inline int getwalkeri(int gr, int pot, int bethist[3], int beti)
@@ -188,6 +188,17 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 		//if we do not have enough money, we do not touch this action. It does not exist.
 		if (!isvalid[a])
 			continue;
+
+		//sometimes you feel like a nut! (cuts execution time many fold)
+		//both options work, though i don't understand why the second one does.
+		// and they yeild the same execution time, to within a tenth of a second after 1 trial
+		if( st==0 && ((mynode->playertoact==0 && prob1==0) || (mynode->playertoact==1 && prob0==0)) )
+		//if((mynode->playertoact==0 && prob1==0 && (st==0 || prob0==0)) || 
+	    //   (mynode->playertoact==1 && prob0==0 && (st==0 || prob1==0)))
+		{
+			utility[a] = 10000000000000000.0F; //that oughta do it.
+			continue;
+		}
 
 		switch(mynode->result[a])
 		{
