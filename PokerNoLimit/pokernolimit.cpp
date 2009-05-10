@@ -8,6 +8,9 @@ using namespace std;
 
 //global gamestate class instance.
 GameState gs;
+//global bool array hasbeenvisited
+bitset<SCENI_MAX*BETI_MAX> hasbeenvisited;
+#define VISITI(sceni, beti) ((sceni)*BETI_MAX+beti)
 
 //walker - Operates on a GIVEN game node, and then recursively walks the children nodes
 // Needs to know where the fuck it is.
@@ -23,7 +26,8 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 	int maxa; //just the size of the action arrays
 	int numa=0; //the number of actually possible actions
 	bool isvalid[9]; //if this action is possible (have enough money)
-	
+	int sceni;
+
 	//FIRST LETS FIND THE DATA WE NEED FOR THIS INSTANCE OF WALKER
 
 	//obtain pointer to correct betting node.
@@ -69,99 +73,75 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 
 	// THEN, i pass this scenario index in to the getpointers function, which handles memory
 	// and the special beti indexing.
-	getpointers(gs.getscenarioi(gr, mynode->playertoact, pot, bethist), beti, maxa, 
-		stratt, stratn, stratd, regret);
+	sceni = gs.getscenarioi(gr, mynode->playertoact, pot, bethist);
+	getpointers(sceni, beti, maxa, stratt, stratn, stratd, regret);
 	//***************************
 
 
-	// OK, NOW WE WILL APPLY EQUATION (8) FROM TECH REPORT, COMPUTE STRATEGY T+1
-	
-	//we trust that regret[a] is zero always for non-valid actions
-	switch(maxa) //this switch alone gives a savings of about 1.5% total execution time
-	{
-		//so this won't do anything for non-valid acitons
-		//non-valid a's will simply have regret still at 0.
-	case 9:
-		if (regret[8]>0) totalregret += regret[8];
-	case 8:
-		if (regret[7]>0) totalregret += regret[7];
-		if (regret[6]>0) totalregret += regret[6];
-		if (regret[5]>0) totalregret += regret[5];
-		if (regret[4]>0) totalregret += regret[4];
-		if (regret[3]>0) totalregret += regret[3];
-	case 3:
-		if (regret[2]>0) totalregret += regret[2];
-	case 2:
-		if (regret[1]>0) totalregret += regret[1];
-		if (regret[0]>0) totalregret += regret[0];
-	}
+	//HASBEENVISITED
 
-	if (totalregret > 0)
+	if(!hasbeenvisited.test(VISITI(sceni,beti)))
 	{
-		//this won't do anything if regret[a] is zero
-		switch(maxa) //this switch gives 0.5% total savings
+		hasbeenvisited.set(VISITI(sceni,beti));
+
+		// OK, NOW WE WILL APPLY EQUATION (8) FROM TECH REPORT, COMPUTE STRATEGY T+1
+		
+		//we trust that regret[a] is zero always for non-valid actions
+		switch(maxa) //this switch alone gives a savings of about 1.5% total execution time
 		{
+			//so this won't do anything for non-valid acitons
+			//non-valid a's will simply have regret still at 0.
 		case 9:
-			(regret[7]>0) ? stratmaxa += stratt[7] = regret[7] / totalregret : stratt[7] = 0;
+			if (regret[8]>0) totalregret += regret[8];
 		case 8:
-			(regret[6]>0) ? stratmaxa += stratt[6] = regret[6] / totalregret : stratt[6] = 0;
-			(regret[5]>0) ? stratmaxa += stratt[5] = regret[5] / totalregret : stratt[5] = 0;
-			(regret[4]>0) ? stratmaxa += stratt[4] = regret[4] / totalregret : stratt[4] = 0;
-			(regret[3]>0) ? stratmaxa += stratt[3] = regret[3] / totalregret : stratt[3] = 0;
-			(regret[2]>0) ? stratmaxa += stratt[2] = regret[2] / totalregret : stratt[2] = 0;
+			if (regret[7]>0) totalregret += regret[7];
+			if (regret[6]>0) totalregret += regret[6];
+			if (regret[5]>0) totalregret += regret[5];
+			if (regret[4]>0) totalregret += regret[4];
+			if (regret[3]>0) totalregret += regret[3];
 		case 3:
-			(regret[1]>0) ? stratmaxa += stratt[1] = regret[1] / totalregret : stratt[1] = 0;
+			if (regret[2]>0) totalregret += regret[2];
 		case 2:
-			(regret[0]>0) ? stratmaxa += stratt[0] = regret[0] / totalregret : stratt[0] = 0;
+			if (regret[1]>0) totalregret += regret[1];
+			if (regret[0]>0) totalregret += regret[0];
 		}
 
-		//this will naturally be zero if non-valid
-		stratmaxa = 1-stratmaxa;
-	}
-	else
-	{
-		int a;
-		for(a=0; a<maxa-1; a++) 
+		if (totalregret > 0)
 		{
-			//but here we must check to make sure it's valid
-			if(isvalid[a])
-				stratt[a] = (float)1/numa;
+			//this won't do anything if regret[a] is zero
+			switch(maxa) //this switch gives 0.5% total savings
+			{
+			case 9:
+				(regret[7]>0) ? stratmaxa += stratt[7] = regret[7] / totalregret : stratt[7] = 0;
+			case 8:
+				(regret[6]>0) ? stratmaxa += stratt[6] = regret[6] / totalregret : stratt[6] = 0;
+				(regret[5]>0) ? stratmaxa += stratt[5] = regret[5] / totalregret : stratt[5] = 0;
+				(regret[4]>0) ? stratmaxa += stratt[4] = regret[4] / totalregret : stratt[4] = 0;
+				(regret[3]>0) ? stratmaxa += stratt[3] = regret[3] / totalregret : stratt[3] = 0;
+				(regret[2]>0) ? stratmaxa += stratt[2] = regret[2] / totalregret : stratt[2] = 0;
+			case 3:
+				(regret[1]>0) ? stratmaxa += stratt[1] = regret[1] / totalregret : stratt[1] = 0;
+			case 2:
+				(regret[0]>0) ? stratmaxa += stratt[0] = regret[0] / totalregret : stratt[0] = 0;
+			}
+
+			//this will naturally be zero if non-valid
+			stratmaxa = 1-stratmaxa;
 		}
-		//and here too
-		if(isvalid[a])
-			stratmaxa = (float)1/numa;
-	}
-
-
-	//NOW WE WILL UPDATE THE AVERAGE STRATEGY, EQUATION (4) FROM TECH REPORT
-
-	if(mynode->playertoact==0)
-	{
-		//shortcut, along with the related one below, speeds up by 10% or so.
-		if(prob0!=0)
-			for(int a=0; a<maxa-1; a++)
+		else
+		{
+			int a;
+			for(a=0; a<maxa-1; a++) 
 			{
-				//this is just for performance, as these dont affect valid entries, they're only result
+				//but here we must check to make sure it's valid
 				if(isvalid[a])
-				{
-					stratn[a] += prob0 * stratt[a];
-					stratd[a] += prob0;
-				}
+					stratt[a] = (float)1/numa;
 			}
-	}
-	else
-	{
-		//shortcut
-		if(prob1!=0)
-			for(int a=0; a<maxa-1; a++)
-			{
-				//this is just for performance
-				if(isvalid[a])
-				{
-					stratn[a] += prob1 * stratt[a];
-					stratd[a] += prob1;
-				}
-			}
+			//and here too
+			if(isvalid[a])
+				stratmaxa = (float)1/numa;
+		}
+
 	}
 
 
@@ -241,9 +221,22 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 
 	//NOW, WE WISH TO UPDATE THE REGRET TOTALS. THIS IS DONE IN ACCORDANCE WITH
 	//EQUATION 3.5 (I THINK) FROM THE THESIS.
+	//WE WILL ALSO UPDATE THE AVERAGE STRATEGY, EQUATION (4) FROM TECH REPORT
 
 	if (mynode->playertoact==0) //P0 playing, use prob1, proability of player 1 getting here.
 	{
+		//shortcut, along with the related one below, speeds up by 10% or so.
+		if(prob0!=0)
+			for(int a=0; a<maxa-1; a++)
+			{
+				//this is just for performance, as these dont affect valid entries, they're only result
+				if(isvalid[a])
+				{
+					stratn[a] += prob0 * stratt[a];
+					stratd[a] += prob0;
+				}
+			}
+
 		//shortcut
 		if(prob1==0) return avgutility;
 
@@ -256,6 +249,18 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 	}
 	else // P1 playing, so his regret values are negative of P0's regret values.
 	{
+		//shortcut
+		if(prob1!=0)
+			for(int a=0; a<maxa-1; a++)
+			{
+				//this is just for performance
+				if(isvalid[a])
+				{
+					stratn[a] += prob1 * stratt[a];
+					stratd[a] += prob1;
+				}
+			}
+
 		//shortcut
 		if(prob0==0) return avgutility;
 
@@ -276,45 +281,35 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 
 
 //------------------------ p l a y g a m e -------------------------//
-void playgame()
+void simulate(unsigned long long int iter)
 {
 	//bethist array for the whoooole walker recursive call-tree
 	int bethist[3] = {-1, -1, -1};
+	for(unsigned long long int i=0; i<iter; i++)
+	{
+		gs.dealnewgame();
+		hasbeenvisited.reset(); //sets all to false
+		walker(0,0,bethist,0,1,1);
+	}
+}
+
+inline void playgame()
+{
 	clock_t c1;
 	c1 = clock();
 
 	cout << "starting work..." << endl;
-	//1st 10k
-	for(long long int i=0; i<1000; i++)
-	{
-		gs.dealnewgame();
-		walker(0,0,bethist,0,1,1);
-	}
+	simulate(1000000);
+	printfirstnodestrat("firstnode1Mnewalg8bin.txt");
 	BENCH(c1);
 
-	/*
-
-	//1st million
-	for(long long int i=0; i<1000000-10000; i++)
-	{
-		gs.dealnewgame();
-		walker(0,0,bethist,0,1,1);
-	}
+	simulate(1000000);
+	printfirstnodestrat("firstnode2Mnewalg8bin.txt");
 	BENCH(c1);
 
-	//next 200 million
-	for(long long int i=0; i<200000000-1000000; i++)
-	{
-		gs.dealnewgame();
-		walker(0,0,bethist,0,1,1);
-	}
-
-	*/
-
-	printfirstnodestrat("test.txt");
-
+	simulate(6000000);
+	printfirstnodestrat("firstnode8Mnewalg8bin.txt");
 	BENCH(c1);
-	
 }
 
 int _tmain(int argc, _TCHAR* argv[])

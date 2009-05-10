@@ -15,6 +15,7 @@
 #include <fstream> //needed for saving the strategy file.
 #include <stdio.h>
 #include <tchar.h>
+#include <bitset> //needed for bitsets!
 #include <sstream> //for formatting strings more easily
 #include <string> //needed for some of the rephands shenanigans
 #include <iomanip> //needed for formating the way floats are printed in cout's and the like

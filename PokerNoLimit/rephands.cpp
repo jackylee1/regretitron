@@ -308,6 +308,6 @@ string actionstring(int action, int gr, int beti)
 	}
 
 	ret = str.str();
-	ret.resize(15,' ');
+	ret.resize(13,' ');
 	return ret;
 }
