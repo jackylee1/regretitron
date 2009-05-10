@@ -9,8 +9,36 @@ using namespace std;
 //global gamestate class instance.
 GameState gs;
 //global bool array hasbeenvisited
-bitset<SCENI_MAX*BETI_MAX> hasbeenvisited;
-#define VISITI(sceni, beti) ((sceni)*BETI_MAX+beti)
+bitset<WALKERI_MAX> hasbeenvisited;
+
+#define COMBINE(i3, i2, i1, n2, n1) ((i3)*(n2)*(n1) + (i2)*(n1) + (i1))
+inline int getwalkeri(int gr, int pot, int bethist[3], int beti)
+{
+	switch(gr)
+	{
+	case PREFLOP:
+		return beti;
+
+	case FLOP:
+		return COMBINE(getpoti(gr,pot), beti,     bethist[0],
+			                            BETI_MAX, BETHIST_MAX)
+					+ WALKERI_PREFLOP_MAX;
+
+	case TURN:
+		return COMBINE(getpoti(gr,pot), beti,     bethist[1]*BETHIST_MAX + bethist[0],
+			                            BETI_MAX, BETHIST_MAX*BETHIST_MAX)
+					+ WALKERI_FLOP_MAX;
+
+	case RIVER:
+		return COMBINE(getpoti(gr,pot), beti,     bethist[2]*BETHIST_MAX*BETHIST_MAX + bethist[1]*BETHIST_MAX + bethist[0],
+			                            BETI_MAX, BETHIST_MAX*BETHIST_MAX*BETHIST_MAX)
+					+ WALKERI_TURN_MAX;
+
+	default:
+		REPORT("ivalid gameround encountered in walkeri");
+	}
+}
+
 
 //walker - Operates on a GIVEN game node, and then recursively walks the children nodes
 // Needs to know where the fuck it is.
@@ -26,7 +54,7 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 	int maxa; //just the size of the action arrays
 	int numa=0; //the number of actually possible actions
 	bool isvalid[9]; //if this action is possible (have enough money)
-	int sceni;
+	int walkeri;
 
 	//FIRST LETS FIND THE DATA WE NEED FOR THIS INSTANCE OF WALKER
 
@@ -73,16 +101,17 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 
 	// THEN, i pass this scenario index in to the getpointers function, which handles memory
 	// and the special beti indexing.
-	sceni = gs.getscenarioi(gr, mynode->playertoact, pot, bethist);
-	getpointers(sceni, beti, maxa, stratt, stratn, stratd, regret);
+	getpointers(gs.getscenarioi(gr, mynode->playertoact, pot, bethist), beti, maxa, 
+		stratt, stratn, stratd, regret);
 	//***************************
 
 
 	//HASBEENVISITED
 
-	if(!hasbeenvisited.test(VISITI(sceni,beti)))
+	walkeri = getwalkeri(gr, pot, bethist, beti);
+	if(!hasbeenvisited.test(walkeri))
 	{
-		hasbeenvisited.set(VISITI(sceni,beti));
+		hasbeenvisited.set(walkeri);
 
 		// OK, NOW WE WILL APPLY EQUATION (8) FROM TECH REPORT, COMPUTE STRATEGY T+1
 		
@@ -300,15 +329,7 @@ inline void playgame()
 
 	cout << "starting work..." << endl;
 	simulate(1000000);
-	printfirstnodestrat("firstnode1Mnewalg8bin.txt");
-	BENCH(c1);
-
-	simulate(1000000);
-	printfirstnodestrat("firstnode2Mnewalg8bin.txt");
-	BENCH(c1);
-
-	simulate(6000000);
-	printfirstnodestrat("firstnode8Mnewalg8bin.txt");
+	printfirstnodestrat("test 1M.txt");
 	BENCH(c1);
 }
 

@@ -16,7 +16,7 @@ void printfirstnodestrat(char const * const filename)
 	float strataccum;
 	bool isvalid[9];
 
-	log << fixed << setprecision(2);
+	log << fixed << setprecision(5);
 
 	for(int sceni=0; sceni<SCENI_PREFLOP_MAX; sceni++)
 	{
