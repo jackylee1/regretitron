@@ -1,3 +1,5 @@
+#ifndef __binstruct8_h__
+#define __binstruct8_h__
 
 const int BIN_MAX = 8;
 
@@ -30,6 +32,8 @@ const unsigned int FLOPFILESIZE = (INDEX23_MAX/BINSPERSTRUCT+1)*sizeof(binstruct
 const unsigned int TURNFILESIZE = (INDEX24_MAX/BINSPERSTRUCT+1)*sizeof(binstruct);
 const unsigned int RIVERFILESIZE = (INDEX25_MAX/BINSPERSTRUCT+1)*sizeof(binstruct);
 
+//these must be inline to avoid using a cpp file:
+
 inline int retrieve(binstruct word, int n)
 {
 	switch (n)
@@ -49,7 +53,7 @@ inline int retrieve(binstruct word, int n)
 	}
 }
 
-void store(binstruct &word, int bin, int n)
+inline void store(binstruct &word, int bin, int n)
 {
 	if(bin<0 || bin>=BIN_MAX)
 		REPORT("failed bin number in store");
@@ -68,3 +72,5 @@ void store(binstruct &word, int bin, int n)
 	default: REPORT("failed n in store");
 	}
 }
+
+#endif

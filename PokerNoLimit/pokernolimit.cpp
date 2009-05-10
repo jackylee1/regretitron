@@ -280,24 +280,41 @@ void playgame()
 {
 	//bethist array for the whoooole walker recursive call-tree
 	int bethist[3] = {-1, -1, -1};
+	clock_t c1;
+	c1 = clock();
 
-	clock_t c1 = clock();
-
-	for(long long int i=0; i<600000000; i++)
+	cout << "starting work..." << endl;
+	//1st 10k
+	for(long long int i=0; i<1000; i++)
 	{
 		gs.dealnewgame();
 		walker(0,0,bethist,0,1,1);
 	}
-	printfirstnodestrat("firstnode600M.txt");
+	BENCH(c1);
 
-	for(long long int i=0; i<600000000; i++)
+	/*
+
+	//1st million
+	for(long long int i=0; i<1000000-10000; i++)
 	{
 		gs.dealnewgame();
 		walker(0,0,bethist,0,1,1);
 	}
-	printfirstnodestrat("firstnode1.2B.txt");
+	BENCH(c1);
+
+	//next 200 million
+	for(long long int i=0; i<200000000-1000000; i++)
+	{
+		gs.dealnewgame();
+		walker(0,0,bethist,0,1,1);
+	}
+
+	*/
+
+	printfirstnodestrat("test.txt");
 
 	BENCH(c1);
+	
 }
 
 int _tmain(int argc, _TCHAR* argv[])

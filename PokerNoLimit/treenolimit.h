@@ -1,6 +1,8 @@
 #ifndef _treenolimit_h_
 #define _treenolimit_h_
 
+#include "constants.h"
+
 // For extern vs static and const,
 // see: http://www.gamedev.net/community/forums/topic.asp?topic_id=318620
 

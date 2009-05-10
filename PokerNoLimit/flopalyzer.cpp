@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "flopalyzer.h"
+#include "constants.h"
 
 #define SUITED(n) (nBitsTable[ss] == n || nBitsTable[sc] == n || nBitsTable[sd] == n || nBitsTable[sh] == n)
 #define STRAIGHT3(s) ((s & (s<<1) & (s<<2)) || (s & (s<<2) & (s<<3)) || (s & (s<<1) & (s<<3)))

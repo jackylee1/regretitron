@@ -10,7 +10,7 @@ const int RIVER = 3;
 
 /***********************************************************************************/
 //constants for the binning of hands
-#include "../SharedCode/binstruct32.h"
+#include "../SharedCode/binstruct8.h"
 const int BIN_PREFLOP_MAX = INDEX2_MAX; //should be 169
 const int BIN_FLOP_MAX = BIN_MAX; //comes from from binstructN.h
 const int BIN_TURN_MAX = BIN_MAX;

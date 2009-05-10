@@ -3,6 +3,8 @@
 #include "determinebins.h"
 #include "flopalyzer.h"
 #include "treenolimit.h"
+#include "constants.h"
+using namespace std;
 
 CardMask findpreflophand(int index)
 {
@@ -93,10 +95,21 @@ void findriverhand(int bin, int riverscore, CardMask &priv, CardMask &flop, Card
 	}
 }
 
-void printpreflophands(ostream &out, int index, int n)
+void printpreflophands(ostream &out, int index)
 {
-	for(int i=0; i<n; i++)
-		out << "  " << PRINTMASK(findpreflophand(index)) << endl;
+	char ret[4];
+	char * mask;
+	CardMask hand = findpreflophand(index);
+
+	mask = GenericDeck_maskString(&StdDeck, &hand);
+
+	ret[0] = mask[0]; //first rank
+	ret[1] = mask[3]; //second rank
+	if(ret[0] < ret[1]) std::swap(ret[0], ret[1]);
+	ret[2] = (mask[1] == mask[4]) ? 's' : ' '; //suited or not.
+	ret[3] = '\0';
+
+	out << "  " << ret << endl;
 }
 
 void printflophands(ostream &out, int bin, int flopscore, int n)
@@ -201,7 +214,7 @@ void printrepinfo(ostream &out, int sceni, int n_hands)
 {
 	if(sceni<SCENI_PREFLOP_MAX)
 	{
-		printpreflophands(out, sceni, n_hands);
+		printpreflophands(out, sceni);
 	}
 	else if(0<=sceni && sceni<SCENI_FLOP_MAX)
 	{
@@ -262,4 +275,39 @@ void printrepinfo(ostream &out, int sceni, int n_hands)
 	}
 	else 
 		out << "INVALID SCENI: " << sceni << endl << endl;
+}
+
+
+string actionstring(int action, int gr, int beti)
+{
+	const betnode * tree = (gr == PREFLOP) ? pfn+beti : n+beti;
+	stringstream str;
+	string ret;
+
+	switch(tree->result[action])
+	{
+	case FD:
+		str << "Fold";
+		break;
+	case GO1:
+	case GO2:
+	case GO3:
+	case GO4:
+	case GO5:
+		str << "Call " << (int)(tree->potcontrib[action]) << "sb:";
+		break;
+	case AI:
+		str << "Call All-In:";
+		break;
+	default:
+		if(tree->potcontrib[action]==0)
+			str << "Bet All-In:";
+		else
+			str << "Bet to " << (int)(tree->potcontrib[action]) << "sb:";
+		break;
+	}
+
+	ret = str.str();
+	ret.resize(15,' ');
+	return ret;
 }

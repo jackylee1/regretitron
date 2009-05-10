@@ -11,10 +11,11 @@
 #define _WIN32_WINNT 0x0501	// Change this to the appropriate value to target other versions of Windows.
 #endif						
 
-#include <iostream>
+#include <iostream> //cout
 #include <fstream> //needed for saving the strategy file.
 #include <stdio.h>
 #include <tchar.h>
+#include <sstream> //for formatting strings more easily
 #include <string> //needed for some of the rephands shenanigans
 #include <iomanip> //needed for formating the way floats are printed in cout's and the like
 #include <time.h> //needed for time() needed for srand.
@@ -24,9 +25,6 @@
 
 // my REPORT function, and other thingsn
 #include "../report.h"
-
-// my all-important constants!
-#include "constants.h"
 
 // PokerEval
 #include "poker_defs.h"

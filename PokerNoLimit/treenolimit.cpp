@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "treenolimit.h"
+#include "constants.h"
 
 // For extern vs static and const,
 // see: http://www.gamedev.net/community/forums/topic.asp?topic_id=318620

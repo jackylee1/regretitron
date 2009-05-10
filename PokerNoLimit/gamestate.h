@@ -1,9 +1,6 @@
 #ifndef _gamestate_h_
 #define _gamestate_h_
 
-#include "flopalyzer.h"
-#include "determinebins.h"
-
 class GameState 
 {
 public:

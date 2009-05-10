@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "memorymgr.h"
+#include "constants.h"
 
 //Idea: we need to store the current strategy, average strategy (numerator &
 // denominator), and accumulated total regret for each combination of 

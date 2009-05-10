@@ -3,6 +3,7 @@
 #include "treenolimit.h"
 #include "memorymgr.h"
 #include "rephands.h"
+#include "constants.h"
 
 using namespace std;
 
@@ -17,14 +18,15 @@ void printfirstnodestrat(char const * const filename)
 
 	log << fixed << setprecision(2);
 
-	for(int i=0; i<SCENI_PREFLOP_MAX; i++)
+	for(int sceni=0; sceni<SCENI_PREFLOP_MAX; sceni++)
 	{
-		getpointers(i, 0, maxa, stratt, stratn, stratd, regret);
-
+		getpointers(sceni, 0, maxa, stratt, stratn, stratd, regret);
 		numa = getvalidity(0, &(pfn[0]), isvalid);
 
-		log << endl << "Scenario " << i << ":" << endl;
-		printrepinfo(log, i, 2);
+		//print the scenario index and an example hand
+		log << endl << "Scenario " << sceni << ":";
+		printrepinfo(log, sceni, 5); //starts with spaces and ends with endl
+		
 		//remember we only store max-1 strategies. the last must be found based on all adding to 1.
 		strataccum=0;
 		for (int a=0; a<maxa-1; a++)
@@ -32,12 +34,12 @@ void printfirstnodestrat(char const * const filename)
 			if(isvalid[a])
 			{
 				strataccum+=stratn[a]/stratd[a];
-				log << "   Action " << a << ": " << 100*stratn[a]/stratd[a] << " %" << endl;
+				log << "   " << actionstring(a,PREFLOP,0) << 100*stratn[a]/stratd[a] << " %" << endl;
 			}
 		}
 		//finally, handle the last strat, if it is valid.
 		if(isvalid[maxa-1])
-			log << "   Action " << maxa-1 << ": " << 100*(1-strataccum) << " %" << endl;
+			log << "   " << actionstring(maxa-1,PREFLOP,0) << 100*(1-strataccum) << " %" << endl;
 	}
 	log.close();
 }

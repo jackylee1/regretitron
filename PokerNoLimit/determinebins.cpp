@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "determinebins.h"
+#include "../HandIndexingV1/getindex2N.h"
+#include "constants.h"
 
 //some global pointer to data
 HANDLE flopfile, turnfile, riverfile, flopfilemap, turnfilemap, riverfilemap;
