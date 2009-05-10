@@ -10,6 +10,8 @@ using namespace std;
 GameState gs;
 //global bool array hasbeenvisited
 bitset<WALKERI_MAX> hasbeenvisited;
+//bethist array for the whoooole walker recursive call-tree
+int bethist[3];
 
 #define COMBINE(i3, i2, i1, n2, n1) ((i3)*(n2)*(n1) + (i2)*(n1) + (i1))
 inline int getwalkeri(int gr, int pot, int bethist[3], int beti)
@@ -43,7 +45,7 @@ inline int getwalkeri(int gr, int pot, int bethist[3], int beti)
 //walker - Operates on a GIVEN game node, and then recursively walks the children nodes
 // Needs to know where the fuck it is.
 // beti[] contains the current betting node in beti[gr] and past ones in beti[x] for x < gr
-float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1)
+float walker(int gr, int pot, int beti, float prob0, float prob1)
 {
 	float totalregret=0;
 	float utility[9]; //where 9 is max actions for a node.
@@ -219,9 +221,9 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 				// are recalled (i.e. don't change in the future), i think it should work perfectly.
 
 				if(mynode->playertoact==0)
-					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], bethist, 0, prob0*st, prob1);
+					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], 0, prob0*st, prob1);
 				else
-					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], bethist, 0, prob0, prob1*st);
+					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], 0, prob0, prob1*st);
 			}
 			// ...or a SHOWDOWN - from the river!
 			else
@@ -238,9 +240,9 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 
 			//result is a child node!
 			if(mynode->playertoact==0)
-				utility[a] = walker(gr, pot, bethist, mynode->result[a], prob0*st, prob1);
+				utility[a] = walker(gr, pot, mynode->result[a], prob0*st, prob1);
 			else
-				utility[a] = walker(gr, pot, bethist, mynode->result[a], prob0, prob1*st);
+				utility[a] = walker(gr, pot, mynode->result[a], prob0, prob1*st);
 		}
 
 		//keep a running total of the EV of utility under current strat.
@@ -312,13 +314,11 @@ float walker(int gr, int pot, int bethist[3], int beti, float prob0, float prob1
 //------------------------ p l a y g a m e -------------------------//
 void simulate(unsigned long long int iter)
 {
-	//bethist array for the whoooole walker recursive call-tree
-	int bethist[3] = {-1, -1, -1};
 	for(unsigned long long int i=0; i<iter; i++)
 	{
 		gs.dealnewgame();
 		hasbeenvisited.reset(); //sets all to false
-		walker(0,0,bethist,0,1,1);
+		walker(0,0,0,1,1);
 	}
 }
 
