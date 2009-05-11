@@ -48,12 +48,12 @@ int GameState::getscenarioi(int gr, int player, int pot, int bethist[3])
 	case TURN:
 		return COMBINE(binnumber[player][TURN], turnscore,      getpoti(gr,pot), bethist[1]*BETHIST_MAX + bethist[0],
 			                                    TURNALYZER_MAX, POTI_TURN_MAX,   BETHIST_MAX*BETHIST_MAX)
-					+ SCENI_PREFLOP_MAX + SCENI_FLOP_MAX;
+					+ SCENI_FLOP_MAX;
 
 	case RIVER:
 		return COMBINE(binnumber[player][RIVER], riverscore,    getpoti(gr,pot), bethist[2]*BETHIST_MAX*BETHIST_MAX + bethist[1]*BETHIST_MAX + bethist[0],
 			                                     RIVALYZER_MAX, POTI_RIVER_MAX,  BETHIST_MAX*BETHIST_MAX*BETHIST_MAX)
-					+ SCENI_PREFLOP_MAX + SCENI_FLOP_MAX + SCENI_TURN_MAX;
+					+ SCENI_TURN_MAX;
 
 	default:
 		REPORT("ivalid gameround encountered in getscenarioi");

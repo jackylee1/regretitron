@@ -63,10 +63,10 @@ const int BETHIST_MAX = 5; // number of GO's we have
 /***********************************************************************************/
 //constants that help keep track of the indexing of the game state.
 const int SCENI_PREFLOP_MAX = BIN_PREFLOP_MAX;
-const int SCENI_FLOP_MAX = BIN_FLOP_MAX * FLOPALYZER_MAX * POTI_FLOP_MAX * BETHIST_MAX;
-const int SCENI_TURN_MAX = BIN_TURN_MAX * TURNALYZER_MAX * POTI_TURN_MAX * BETHIST_MAX*BETHIST_MAX;
-const int SCENI_RIVER_MAX = BIN_RIVER_MAX * RIVALYZER_MAX * POTI_RIVER_MAX * BETHIST_MAX*BETHIST_MAX*BETHIST_MAX;
-const int SCENI_MAX = SCENI_PREFLOP_MAX + SCENI_FLOP_MAX + SCENI_TURN_MAX + SCENI_RIVER_MAX;
+const int SCENI_FLOP_MAX =  SCENI_PREFLOP_MAX + BIN_FLOP_MAX * FLOPALYZER_MAX * POTI_FLOP_MAX * BETHIST_MAX;
+const int SCENI_TURN_MAX =  SCENI_FLOP_MAX    + BIN_TURN_MAX * TURNALYZER_MAX * POTI_TURN_MAX * BETHIST_MAX*BETHIST_MAX;
+const int SCENI_RIVER_MAX = SCENI_TURN_MAX    + BIN_RIVER_MAX * RIVALYZER_MAX * POTI_RIVER_MAX * BETHIST_MAX*BETHIST_MAX*BETHIST_MAX;
+const int SCENI_MAX = SCENI_RIVER_MAX;
 
 
 /***********************************************************************************/
