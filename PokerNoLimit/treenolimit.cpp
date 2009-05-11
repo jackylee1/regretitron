@@ -14,13 +14,64 @@ int getpoti(int gr, int pot)
 	switch(pot)
 	{
 	case 1*BB:
-		return 0;
-
 	case 2*BB:
-		return 1;
-
 	case 3*BB:
+		return 0;
+	case 4*BB:
+	case 5*BB:
+	case 6*BB:
+		return 1;
+	case 7*BB:
+	case 8*BB:
+	case 9*BB:
+	case 10*BB:
 		return 2;
+	case 11*BB:
+	case 12*BB:
+	case 13*BB:
+	case 14*BB:
+		return 3;
+	case 15*BB:
+	case 16*BB:
+	case 17*BB:
+	case 18*BB:
+	case 19*BB:
+		return 4;
+	case 20*BB:
+	case 21*BB:
+	case 22*BB:
+	case 23*BB:
+	case 24*BB:
+		return 5;
+	case 25*BB:
+	case 26*BB:
+	case 27*BB:
+	case 28*BB:
+	case 29*BB:
+	case 30*BB:
+		return 6;
+	case 31*BB:
+	case 32*BB:
+	case 33*BB:
+	case 34*BB:
+	case 35*BB:
+	case 36*BB:
+		return 7;
+	case 37*BB:
+	case 38*BB:
+	case 39*BB:
+	case 40*BB:
+	case 41*BB:
+	case 42*BB:
+		return 8;
+	case 43*BB:
+	case 44*BB:
+	case 45*BB:
+	case 46*BB:
+	case 47*BB:
+	case 48*BB:
+	case 49*BB:
+		return 9;
 
 	default:
 		REPORT("invalid pot size in poti for flop");

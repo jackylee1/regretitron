@@ -325,14 +325,17 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 
 
 //------------------------ p l a y g a m e -------------------------//
-void simulate(unsigned long long int iter)
+void simulate(unsigned int iter)
 {
-	for(unsigned long long int i=0; i<iter; i++)
+	clock_t c1;
+	c1 = clock();
+	for(unsigned int i=0; i<iter; i++)
 	{
 		gs.dealnewgame();
 		hasbeenvisited.reset(); //sets all to false
 		walker(0,0,0,1,1);
 	}
+	BENCH(c1,iter);
 }
 
 inline void playgame()
@@ -341,17 +344,14 @@ inline void playgame()
 	c1 = clock();
 
 	cout << "starting work..." << endl;
-	simulate(1000000);
-	printfirstnodestrat("output/test 1Mi8bin4ss v2.txt");
-	BENCH(c1);
+	simulate(1000);
+//	printfirstnodestrat("output/test 1Mi8bin4ss v2.txt");
 
-	simulate(1000000);
-	printfirstnodestrat("output/test 2Mi8bin4ss v2.txt");
-	BENCH(c1);
+//	simulate(1000000);
+//	printfirstnodestrat("output/test 2Mi8bin4ss v2.txt");
 
-	simulate(6000000);
-	printfirstnodestrat("output/test 8Mi8bin4ss v2.txt");
-	BENCH(c1);
+//	simulate(6000000);
+//	printfirstnodestrat("output/test 8Mi8bin4ss v2.txt");
 }
 
 int _tmain(int argc, _TCHAR* argv[])

@@ -26,22 +26,22 @@ const int RIVALYZER_MAX=37;
 
 /***********************************************************************************/
 //constants for the pot indexing, and those that define game parameters
-const int POTI_FLOP_MAX = 3;
-const int POTI_TURN_MAX = 3;
-const int POTI_RIVER_MAX = 3;
+const int POTI_FLOP_MAX = 10;
+const int POTI_TURN_MAX = 10;
+const int POTI_RIVER_MAX = 10;
 
 const unsigned char SB=1, BB=2;
 
-const unsigned char B1=2,  R11=4,  R12=6, R13=14, R14=18, R15=22, R16=26;
-const unsigned char B2=4,  R21=6, R22=14, R23=18, R24=22, R25=26, R26=30;
-const unsigned char B3=6,  R31=8, R32=16, R33=20, R34=24, R35=28, R36=32;
-const unsigned char B4=10, R41=16, R42=20, R43=24, R44=28, R45=32, R46=36;
-const unsigned char B5=16, R51=20, R52=24, R53=28, R54=32, R55=36, R56=40;
-const unsigned char B6=24, R61=28, R62=32, R63=36, R64=40, R65=44, R66=48;
+const unsigned char B1=2,  R11=4,  R12=8,  R13=14, R14=22, R15=32, R16=44;
+const unsigned char B2=4,  R21=8,  R22=14, R23=22, R24=32, R25=44, R26=58;
+const unsigned char B3=8,  R31=14, R32=22, R33=32, R34=44, R35=58, R36=74;
+const unsigned char B4=14, R41=22, R42=32, R43=44, R44=58, R45=74, R46=92;
+const unsigned char B5=22, R51=32, R52=44, R53=58, R54=74, R55=92,  R56=100;
+const unsigned char B6=32, R61=44, R62=58, R63=74, R64=92, R65=100, R66=100;
 
 //stacksize of the smallest stack, in small blinds, 
 //as HU poker is only as good as its smaller stack.
-const int STACKSIZE = 4*BB; //26 should match that paper, with 13 big blinds each.
+const int STACKSIZE = 50*BB; //26 should match that paper, with 13 big blinds each.
 
 /***********************************************************************************/
 //constants for the betting tree itself
@@ -73,7 +73,7 @@ const int SCENI_MAX = SCENI_PREFLOP_MAX + SCENI_FLOP_MAX + SCENI_TURN_MAX + SCEN
 //constants used for managing the memory, and the beti segmentation indexing
 //First, we segment the memory used into chunks, each covering an integral number of
 //scenario indices. Chunks overcome memory fragmentation I hope.
-#define N_CHUNKS 1
+#define N_CHUNKS 6
 
 #if N_CHUNKS > 1
 const int SCENIPERCHUNK = (SCENI_MAX / N_CHUNKS) + 1;
