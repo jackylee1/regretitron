@@ -9,35 +9,35 @@ using namespace std;
 //global gamestate class instance.
 GameState gs;
 //global bool array hasbeenvisited
-bitset<WALKERI_MAX> hasbeenvisited;
+bitset<WALKERI_MAX*BETI_MAX> hasbeenvisited;
 //bethist array for the whoooole walker recursive call-tree
 int bethist[3]={-1,-1,-1};
 
-#define COMBINE(i3, i2, i1, n2, n1) ((i3)*(n2)*(n1) + (i2)*(n1) + (i1))
-inline int getwalkeri(int gr, int pot, int bethist[3], int beti)
+#define COMBINE(i2, i1, n1) ((i2)*(n1) + (i1))
+inline int getwalkeri(int gr, int pot)
 {
 	switch(gr)
 	{
 	case PREFLOP:
-		return beti;
+		return 0;
 
 	case FLOP:
-		return COMBINE(getpoti(gr,pot), beti,     bethist[0],
-			                            BETI_MAX, BETHIST_MAX)
+		return COMBINE(getpoti(gr,pot), bethist[0],
+			                            BETHIST_MAX)
 					+ WALKERI_PREFLOP_MAX;
 
 	case TURN:
-		return COMBINE(getpoti(gr,pot), beti,     bethist[1]*BETHIST_MAX + bethist[0],
-			                            BETI_MAX, BETHIST_MAX*BETHIST_MAX)
+		return COMBINE(getpoti(gr,pot), bethist[1]*BETHIST_MAX + bethist[0],
+			                            BETHIST_MAX*BETHIST_MAX)
 					+ WALKERI_FLOP_MAX;
 
 	case RIVER:
-		return COMBINE(getpoti(gr,pot), beti,     bethist[2]*BETHIST_MAX*BETHIST_MAX + bethist[1]*BETHIST_MAX + bethist[0],
-			                            BETI_MAX, BETHIST_MAX*BETHIST_MAX*BETHIST_MAX)
+		return COMBINE(getpoti(gr,pot), bethist[2]*BETHIST_MAX*BETHIST_MAX + bethist[1]*BETHIST_MAX + bethist[0],
+			                            BETHIST_MAX*BETHIST_MAX*BETHIST_MAX)
 					+ WALKERI_TURN_MAX;
 
 	default:
-		REPORT("ivalid gameround encountered in walkeri");
+		REPORT("invalid gameround encountered in walkeri");
 	}
 }
 
@@ -103,17 +103,17 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 
 	// THEN, i pass this scenario index in to the getpointers function, which handles memory
 	// and the special beti indexing.
-	getpointers(gs.getscenarioi(gr, mynode->playertoact, pot, bethist), beti, maxa, 
+	walkeri = getwalkeri(gr, pot);
+	getpointers(gs.getscenarioi(gr, mynode->playertoact, pot, bethist), beti, maxa, walkeri,
 		stratt, stratn, stratd, regret);
 	//***************************
 
 
 	//HASBEENVISITED
 
-	walkeri = getwalkeri(gr, pot, bethist, beti);
-	if(!hasbeenvisited.test(walkeri))
+	if(!hasbeenvisited.test(COMBINE(walkeri, beti, BETI_MAX)))
 	{
-		hasbeenvisited.set(walkeri);
+		hasbeenvisited.set(COMBINE(walkeri, beti, BETI_MAX));
 
 		// OK, NOW WE WILL APPLY EQUATION (8) FROM TECH REPORT, COMPUTE STRATEGY T+1
 		
@@ -190,8 +190,10 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 			continue;
 
 		//sometimes you feel like a nut! (cuts execution time many fold)
-		//both options work, though i don't understand why the second one does.
-		// and they yeild the same execution time, to within a tenth of a second after 1 trial
+		//both options work, though i don't understand why the second one does. They each produce the
+		//same exact correct numbers, to 5 decimal places after 1, 2, and 8 million iterations at 4ss.
+		// and they yeild the same execution time, to within a tenth of a second.
+		// the second one may be *slightly* slower. it confounds me!
 		if( st==0 && ((mynode->playertoact==0 && prob1==0) || (mynode->playertoact==1 && prob0==0)) )
 		//if((mynode->playertoact==0 && prob1==0 && (st==0 || prob0==0)) || 
 	    //   (mynode->playertoact==1 && prob0==0 && (st==0 || prob1==0)))
@@ -221,8 +223,8 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 			{
 				//this is the only time we set bethist. array access okay as gr!=RIVER
 				//this should create an integer between 0 and 4
-				bethist[gr]=(mynode->result[a]-GO1); 
-				if(bethist[gr] >= BETHIST_MAX)
+				bethist[gr]=(mynode->result[a]-GO_BASE); 
+				if(bethist[gr] <0 || bethist[gr] >= BETHIST_MAX)
 					REPORT("invalid betting history encountered in walker");
 
 				//NOTE that bethist, being an array, is passed by reference. this is bad becasue
@@ -340,7 +342,15 @@ inline void playgame()
 
 	cout << "starting work..." << endl;
 	simulate(1000000);
-	printfirstnodestrat("test 1M.txt");
+	printfirstnodestrat("output/test 1Mi8bin4ss v2.txt");
+	BENCH(c1);
+
+	simulate(1000000);
+	printfirstnodestrat("output/test 2Mi8bin4ss v2.txt");
+	BENCH(c1);
+
+	simulate(6000000);
+	printfirstnodestrat("output/test 8Mi8bin4ss v2.txt");
 	BENCH(c1);
 }
 

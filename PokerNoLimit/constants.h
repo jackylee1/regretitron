@@ -73,7 +73,7 @@ const int SCENI_MAX = SCENI_PREFLOP_MAX + SCENI_FLOP_MAX + SCENI_TURN_MAX + SCEN
 //constants used for managing the memory, and the beti segmentation indexing
 //First, we segment the memory used into chunks, each covering an integral number of
 //scenario indices. Chunks overcome memory fragmentation I hope.
-#define N_CHUNKS 8
+#define N_CHUNKS 1
 
 #if N_CHUNKS > 1
 const int SCENIPERCHUNK = (SCENI_MAX / N_CHUNKS) + 1;
@@ -94,28 +94,36 @@ const int BETI2_MAX = BETI2_CUTOFF-BETI3_CUTOFF;
 
 //These are offsets in bytes. They may not always be word aligned.
 // a certain offset = the last offset  +  size of last offset
-const int STRATT9_OFFSET = 0;
-const int STRATN9_OFFSET = STRATT9_OFFSET + BETI9_MAX*8*sizeof(float);
+const int STRATN9_OFFSET = 0;
 const int STRATD9_OFFSET = STRATN9_OFFSET + BETI9_MAX*8*sizeof(float);
 const int REGRET9_OFFSET = STRATD9_OFFSET + BETI9_MAX*8*sizeof(float);
 
-const int STRATT3_OFFSET = REGRET9_OFFSET + BETI9_MAX*9*sizeof(float);
-const int STRATN3_OFFSET = STRATT3_OFFSET + BETI3_MAX*2*sizeof(float);
+const int STRATN3_OFFSET = REGRET9_OFFSET + BETI9_MAX*9*sizeof(float);
 const int STRATD3_OFFSET = STRATN3_OFFSET + BETI3_MAX*2*sizeof(float);
 const int REGRET3_OFFSET = STRATD3_OFFSET + BETI3_MAX*2*sizeof(float);
 
-const int STRATT2_OFFSET = REGRET3_OFFSET + BETI3_MAX*3*sizeof(float);
-const int STRATN2_OFFSET = STRATT2_OFFSET + BETI2_MAX*1*sizeof(float);
-const int STRATD2_OFFSET = STRATT2_OFFSET + BETI2_MAX*1*sizeof(float);
-const int REGRET2_OFFSET = STRATT2_OFFSET + BETI2_MAX*1*sizeof(float);
+const int STRATN2_OFFSET = REGRET3_OFFSET + BETI3_MAX*3*sizeof(float);
+#if 0 //to match old results, set to 1 to put this back the way it was before i fixed the bug.
+const int STRATD2_OFFSET = STRATN2_OFFSET;
+const int REGRET2_OFFSET = STRATN2_OFFSET;
+#else
+const int STRATD2_OFFSET = STRATN2_OFFSET + BETI2_MAX*1*sizeof(float);
+const int REGRET2_OFFSET = STRATD2_OFFSET + BETI2_MAX*1*sizeof(float);
+#endif
 const int SCENARIODATA_BYTES = REGRET2_OFFSET + BETI2_MAX*2*sizeof(float);
+
+//separate indexing for stratt, as it's really a cache.
+const int STRATT9_OFFSET = 0;
+const int STRATT3_OFFSET = STRATT9_OFFSET + BETI9_MAX*8*sizeof(float);
+const int STRATT2_OFFSET = STRATT3_OFFSET + BETI3_MAX*2*sizeof(float);
+const int STRATT_WALKERI_BYTES = STRATT2_OFFSET + BETI2_MAX*1*sizeof(float);
 
 /******************/
 //constants for walker indexing in pokernolimit
-const int WALKERI_PREFLOP_MAX = BETI_MAX;
-const int WALKERI_FLOP_MAX  = WALKERI_PREFLOP_MAX + BETI_MAX*BETHIST_MAX*POTI_FLOP_MAX;
-const int WALKERI_TURN_MAX  = WALKERI_FLOP_MAX    + BETI_MAX*BETHIST_MAX*BETHIST_MAX*POTI_TURN_MAX;
-const int WALKERI_RIVER_MAX = WALKERI_TURN_MAX    + BETI_MAX*BETHIST_MAX*BETHIST_MAX*BETHIST_MAX*POTI_RIVER_MAX;
+const int WALKERI_PREFLOP_MAX = 1;
+const int WALKERI_FLOP_MAX  = WALKERI_PREFLOP_MAX + BETHIST_MAX*POTI_FLOP_MAX;
+const int WALKERI_TURN_MAX  = WALKERI_FLOP_MAX    + BETHIST_MAX*BETHIST_MAX*POTI_TURN_MAX;
+const int WALKERI_RIVER_MAX = WALKERI_TURN_MAX    + BETHIST_MAX*BETHIST_MAX*BETHIST_MAX*POTI_RIVER_MAX;
 const int WALKERI_MAX = WALKERI_RIVER_MAX;
 
 #endif

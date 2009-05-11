@@ -20,7 +20,7 @@ void printfirstnodestrat(char const * const filename)
 
 	for(int sceni=0; sceni<SCENI_PREFLOP_MAX; sceni++)
 	{
-		getpointers(sceni, 0, maxa, stratt, stratn, stratd, regret);
+		getpointers(sceni, 0, maxa, 0, stratt, stratn, stratd, regret); //ignore walkeri
 		numa = getvalidity(0, &(pfn[0]), isvalid);
 
 		//print the scenario index and an example hand
@@ -57,7 +57,7 @@ void dumpstratresult(const char * const filename)
 		{
 			int maxa = (s<SCENI_PREFLOP_MAX) ? pfn[b].numacts : n[b].numacts;
 
-			getpointers(s,b,maxa,stratt,stratn,stratd,regret);
+			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
 
 			//we print all values, valid or not. 
 			for(int a=0; a<maxa-1; a++)
