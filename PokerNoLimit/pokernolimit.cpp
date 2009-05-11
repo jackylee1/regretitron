@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "../PokerLibrary/treenolimit.h" //for the no-limit betting tree n[]
 #include "../PokerLibrary/determinebins.h"
-#include "gamestate.h"
+#include "../PokerLibrary/gamestate.h"
 #include "memorymgr.h"
 #include "savestrategy.h"
 #include "../PokerLibrary/constants.h"

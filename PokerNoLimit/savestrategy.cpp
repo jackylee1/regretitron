@@ -53,19 +53,42 @@ void dumpstratresult(const char * const filename)
 	//dumps out the strategy result in it's own format.
 	for(int s=0; s<SCENI_MAX; s++)
 	{
-		for(int b=0; b<BETI_MAX; b++)
+		int b=0;
+
+		for(; b<BETI9_CUTOFF; b++)
 		{
 			int maxa = (s<SCENI_PREFLOP_MAX) ? pfn[b].numacts : n[b].numacts;
-
 			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
 
 			//we print all values, valid or not. 
-			for(int a=0; a<maxa-1; a++)
-			{
-				result[a] = stratn[a]/stratd[a];
-			}
+			memset(result, 0, 8*sizeof(float));
+			for(int a=0; a<maxa-1; a++) result[a] = stratn[a]/stratd[a];
 
-			f.write((char*)result, (maxa-1)*sizeof(float));
+			f.write((char*)result, 8*sizeof(float));
+		}
+		
+		for(; b<BETI3_CUTOFF; b++)
+		{
+			int maxa = (s<SCENI_PREFLOP_MAX) ? pfn[b].numacts : n[b].numacts;
+			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
+
+			//we print all values, valid or not. 
+			memset(result, 0, 8*sizeof(float));
+			for(int a=0; a<maxa-1; a++) result[a] = stratn[a]/stratd[a];
+
+			f.write((char*)result, 2*sizeof(float));
+		}
+		
+		for(; b<BETI2_CUTOFF; b++)
+		{
+			int maxa = (s<SCENI_PREFLOP_MAX) ? pfn[b].numacts : n[b].numacts;
+			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
+
+			//we print all values, valid or not. 
+			memset(result, 0, 8*sizeof(float));
+			for(int a=0; a<maxa-1; a++) result[a] = stratn[a]/stratd[a];
+
+			f.write((char*)result, 1*sizeof(float));
 		}
 	}
 	f.close();
