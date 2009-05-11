@@ -36,12 +36,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HandBinningV1", "HandSSCalc
 		{A4DEF05E-E072-493E-B282-84731D60BCF0} = {A4DEF05E-E072-493E-B282-84731D60BCF0}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerPlayer", "PokerPlayer\PokerPlayer.vcproj", "{ED168AD5-0538-491A-86C2-7605C089BF97}"
-	ProjectSection(WebsiteProperties) = preProject
-		Debug.AspNetCompiler.Debug = "True"
-		Release.AspNetCompiler.Debug = "False"
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerLibrary", "PokerLibrary\PokerLibrary.vcproj", "{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
@@ -82,12 +76,6 @@ Global
 		{304C7486-D5EC-4A19-86BE-AF5C3925DB2E}.profile|Win32.Build.0 = Release|Win32
 		{304C7486-D5EC-4A19-86BE-AF5C3925DB2E}.Release|Win32.ActiveCfg = Release|Win32
 		{304C7486-D5EC-4A19-86BE-AF5C3925DB2E}.Release|Win32.Build.0 = Release|Win32
-		{ED168AD5-0538-491A-86C2-7605C089BF97}.Debug|Win32.ActiveCfg = Debug|Win32
-		{ED168AD5-0538-491A-86C2-7605C089BF97}.Debug|Win32.Build.0 = Debug|Win32
-		{ED168AD5-0538-491A-86C2-7605C089BF97}.profile|Win32.ActiveCfg = Release|Win32
-		{ED168AD5-0538-491A-86C2-7605C089BF97}.profile|Win32.Build.0 = Release|Win32
-		{ED168AD5-0538-491A-86C2-7605C089BF97}.Release|Win32.ActiveCfg = Release|Win32
-		{ED168AD5-0538-491A-86C2-7605C089BF97}.Release|Win32.Build.0 = Release|Win32
 		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}.Debug|Win32.ActiveCfg = Debug|Win32
 		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}.Debug|Win32.Build.0 = Debug|Win32
 		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}.profile|Win32.ActiveCfg = Release|Win32
