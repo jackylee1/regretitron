@@ -5,7 +5,7 @@ class GameState
 {
 public:
 	void dealnewgame();
-	int getscenarioi(int gr, int playertoact, int pot, int bethist[3]);
+	int getscenarioi(int gr, int ptoact, int pot, int bethist[3]);
 	int gettwoprob0wins();
 
 private:

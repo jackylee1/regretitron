@@ -7,7 +7,7 @@
 
 #define COMBINE(i4, i3, i2, i1, n3, n2, n1) ((i4)*(n3)*(n2)*(n1) + (i3)*(n2)*(n1) + (i2)*(n1) + (i1))
 
-int GameState::getscenarioi(int gr, int player, int pot, int bethist[3])
+int GameState::getscenarioi(int gr, int ptoact, int pot, int bethist[3])
 {
 	//**************************
 	// sceni is created from;
@@ -35,23 +35,23 @@ int GameState::getscenarioi(int gr, int player, int pot, int bethist[3])
 		//pot size is non-existant
 		//betting history is non-existant
 		// so, just handscore, and offset is zero
-		return binnumber[player][PREFLOP];
+		return binnumber[ptoact][PREFLOP];
 
 	case FLOP:
 		//flop score and handscore are stored here.
 		//pot size index is defined from tree file
 		//betting history we have
-		return COMBINE(binnumber[player][FLOP], flopscore,      getpoti(gr,pot), bethist[0],
+		return COMBINE(binnumber[ptoact][FLOP], flopscore,      getpoti(gr,pot), bethist[0],
 			                                    FLOPALYZER_MAX, POTI_FLOP_MAX,   BETHIST_MAX)
 					+ SCENI_PREFLOP_MAX;
 
 	case TURN:
-		return COMBINE(binnumber[player][TURN], turnscore,      getpoti(gr,pot), bethist[1]*BETHIST_MAX + bethist[0],
+		return COMBINE(binnumber[ptoact][TURN], turnscore,      getpoti(gr,pot), bethist[1]*BETHIST_MAX + bethist[0],
 			                                    TURNALYZER_MAX, POTI_TURN_MAX,   BETHIST_MAX*BETHIST_MAX)
 					+ SCENI_FLOP_MAX;
 
 	case RIVER:
-		return COMBINE(binnumber[player][RIVER], riverscore,    getpoti(gr,pot), bethist[2]*BETHIST_MAX*BETHIST_MAX + bethist[1]*BETHIST_MAX + bethist[0],
+		return COMBINE(binnumber[ptoact][RIVER], riverscore,    getpoti(gr,pot), bethist[2]*BETHIST_MAX*BETHIST_MAX + bethist[1]*BETHIST_MAX + bethist[0],
 			                                     RIVALYZER_MAX, POTI_RIVER_MAX,  BETHIST_MAX*BETHIST_MAX*BETHIST_MAX)
 					+ SCENI_TURN_MAX;
 
