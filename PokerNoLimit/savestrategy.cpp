@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "savestrategy.h"
-#include "treenolimit.h"
+#include "../PokerLibrary/treenolimit.h"
 #include "memorymgr.h"
-#include "rephands.h"
-#include "constants.h"
+#include "../PokerLibrary/rephands.h"
+#include "../PokerLibrary/constants.h"
 
 using namespace std;
 

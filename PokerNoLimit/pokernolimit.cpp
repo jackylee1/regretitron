@@ -1,9 +1,10 @@
 #include "stdafx.h"
-#include "treenolimit.h" //for the no-limit betting tree n[]
-#include "determinebins.h"
+#include "../PokerLibrary/treenolimit.h" //for the no-limit betting tree n[]
+#include "../PokerLibrary/determinebins.h"
 #include "gamestate.h"
 #include "memorymgr.h"
 #include "savestrategy.h"
+#include "../PokerLibrary/constants.h"
 using namespace std;
 
 //global gamestate class instance.

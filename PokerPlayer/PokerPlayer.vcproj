@@ -2,9 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="8.00"
-	Name="PokerNoLimit"
-	ProjectGUID="{B7268F97-0540-4D2C-AB5F-88E155A2A4A6}"
-	RootNamespace="PokerNoLimit"
+	Name="PokerPlayer"
+	ProjectGUID="{ED168AD5-0538-491A-86C2-7605C089BF97}"
+	RootNamespace="PokerPlayer"
 	Keyword="Win32Proj"
 	>
 	<Platforms>
@@ -40,14 +40,12 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="../pokereval/include;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
-				WarnAsError="true"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
 			/>
@@ -62,11 +60,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalOptions="/NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcd.lib /NODEFAULTLIB:libcmtd.lib /NODEFAULTLIB:libc.lib"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
 				SubSystem="1"
-				LargeAddressAware="2"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -119,17 +115,10 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				InlineFunctionExpansion="0"
-				EnableIntrinsicFunctions="true"
-				FavorSizeOrSpeed="0"
-				OmitFramePointers="true"
-				AdditionalIncludeDirectories="../pokereval/include;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
-				WarnAsError="true"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 			/>
@@ -144,11 +133,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalOptions="/NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libc.lib /NODEFAULTLIB:libcd.lib /NODEFAULTLIB:libcmtd.lib /NODEFAULTLIB:msvcrtd.lib"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				SubSystem="1"
-				LargeAddressAware="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				TargetMachine="1"
@@ -188,19 +175,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\gamestate.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\memorymgr.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\PokerNoLimit.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\savestrategy.cpp"
+				RelativePath=".\PokerPlayer.cpp"
 				>
 			</File>
 			<File
@@ -230,22 +205,6 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\gamestate.h"
-				>
-			</File>
-			<File
-				RelativePath=".\memorymgr.h"
-				>
-			</File>
-			<File
-				RelativePath="..\SharedCode\report.h"
-				>
-			</File>
-			<File
-				RelativePath=".\savestrategy.h"
-				>
-			</File>
-			<File
 				RelativePath=".\stdafx.h"
 				>
 			</File>
@@ -255,10 +214,6 @@
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
-			<File
-				RelativePath=".\Windows mem info.txt"
-				>
-			</File>
 		</Filter>
 	</Files>
 	<Globals>

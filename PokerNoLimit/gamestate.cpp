@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "gamestate.h"
-#include "flopalyzer.h"
-#include "determinebins.h"
-#include "treenolimit.h"
-#include "constants.h"
+#include "../PokerLibrary/flopalyzer.h"
+#include "../PokerLibrary/determinebins.h"
+#include "../PokerLibrary/treenolimit.h"
+#include "../PokerLibrary/constants.h"
 
 #define COMBINE(i4, i3, i2, i1, n3, n2, n1) ((i4)*(n3)*(n2)*(n1) + (i3)*(n2)*(n1) + (i2)*(n1) + (i1))
 
