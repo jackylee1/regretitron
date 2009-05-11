@@ -157,6 +157,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\gamestate.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\rephands.cpp"
 				>
 			</File>
@@ -208,6 +212,10 @@
 			</File>
 			<File
 				RelativePath=".\flopalyzer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\gamestate.h"
 				>
 			</File>
 			<File
