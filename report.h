@@ -1,7 +1,7 @@
+#include <windows.h>
 #define REPORT(chars) { \
-	std::cout << chars << std::endl; \
+    MessageBox(NULL, TEXT(chars), TEXT("failure"), MB_OK);\
 	_asm {int 3}; \
-	system("PAUSE"); \
 	exit(1); \
 }
 

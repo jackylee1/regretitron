@@ -6,11 +6,33 @@
 #include "../PokerLibrary/flopalyzer.h"
 #include "../PokerLibrary/treenolimit.h"
 
-void BotAPI::setnewgame(int playernum, CardMask hand)
+BotAPI::BotAPI()
+{
+	initpfn();
+	initbins();
+}
+
+BotAPI::~BotAPI()
+{
+	closebins();
+}
+
+void BotAPI::setnewgame(int playernum, CardMask hand, float sblind, float bblind)
 {
 	//check the inputs
 	if(playernum != 0 && playernum != 1)
 		REPORT("invalid myplayer number in BotAPI::setmyhand()");
+
+	//set the multiplier
+	multiplier = bblind / BB; //so that our values * mult gives real values
+	//rescale inputs first
+	sblind /= multiplier;
+	bblind /= multiplier;
+	//reset the invested amount
+	invested[1] = sblind;
+	perceived[1] = SB;
+	invested[0] = bblind;
+	perceived[0] = BB;
 
 	//save the player number
 	myplayer = playernum;
@@ -24,9 +46,6 @@ void BotAPI::setnewgame(int playernum, CardMask hand)
 	bethist[0] = bethist[1] = bethist[2] = -1;
 	//reset the newpot value
 	currentpot = 0;
-	//reset the invested amount
-	invested[1] = perceived[1] = SB;
-	invested[0] = perceived[0] = BB;
 	//set the sceni
 	currentsceni = getscenarioi(PREFLOP, myplayer, 0, NULL);
 	//reset the betinode
@@ -37,6 +56,9 @@ void BotAPI::setnewgame(int playernum, CardMask hand)
 
 void BotAPI::setflop(CardMask theflop, float newpot)
 {
+	//adjust multiplier first
+	newpot/=multiplier;
+
 	//check usage: make sure we're at right gameround
 	if (++currentgr != FLOP) REPORT("you set the flop at the wrong time");
 	//check usage: make sure advancetree has moved us to a new round
@@ -62,6 +84,9 @@ void BotAPI::setflop(CardMask theflop, float newpot)
 
 void BotAPI::setturn(CardMask theturn, float newpot)
 {
+	//adjust multiplier first
+	newpot/=multiplier;
+
 	//check usage: make sure we're at right gameround
 	if (++currentgr != TURN) REPORT("you set the turn at the wrong time");
 	//check usage: make sure advancetree has moved us to a new round
@@ -87,6 +112,9 @@ void BotAPI::setturn(CardMask theturn, float newpot)
 
 void BotAPI::setriver(CardMask theriver, float newpot)
 {
+	//adjust multiplier first
+	newpot/=multiplier;
+
 	//check usage: make sure we're at right gameround
 	if (++currentgr != RIVER) REPORT("you set the river at the wrong time");
 	//check usage: make sure advancetree has moved us to a new round
@@ -113,6 +141,9 @@ void BotAPI::setriver(CardMask theriver, float newpot)
 
 void BotAPI::advancetree(int player, Action a, int amount)
 {
+	//adjust multiplier first
+	amount/=multiplier;
+
 	//the index of the other player
 	int otherplayer = 1-player;
 	//the index of the next action in the betting tree
@@ -199,8 +230,7 @@ void BotAPI::advancetree(int player, Action a, int amount)
 				//ok, let's accept the answer and do it.
 				currentbetinode = mynode->result[nextact];
 				perceived[player] = mynode->potcontrib[nextact];
-
-				break;
+				return;
 			}
 		}
 		REPORT("can't get here");
@@ -222,7 +252,7 @@ void BotAPI::advancetree(int player, Action a, int amount)
 
 			//ok, let's accept the answer and do it.
 			currentbetinode = mynode->result[nextact];
-			break;
+			return;
 		}
 		REPORT("can't get here");
 
@@ -302,7 +332,7 @@ int BotAPI::getbethist(betnode const * mynode)
 }
 
 
-Action BotAPI::getanswer(int &amount)
+Action BotAPI::getanswer(float &amount)
 {
 	//these are read from the file
 	float actionprobs[9]={0,0,0,0,0,0,0,0,0};
@@ -317,7 +347,7 @@ Action BotAPI::getanswer(int &amount)
 		REPORT("You asked for an answer when the bot thought action was on opp.")
 
 	//fill array with the current action probabilities
-	readstrategy(currentsceni, currentbetinode, actionprobs);
+	readstrategy(currentsceni, currentbetinode, actionprobs, mynode->numacts);
 
 	//go through actions and choose one randomly with correct likelyhood.
 	do{
@@ -348,7 +378,7 @@ Action BotAPI::getanswer(int &amount)
 	case GO3:
 	case GO4:
 	case GO5:
-		amount = mynode->potcontrib[answer] + invested[myplayer]-perceived[myplayer];
+		amount = multiplier * (mynode->potcontrib[answer] + invested[myplayer]-perceived[myplayer]);
 		return CALL;
 	case AI:
 		if(!offtreebetallins) //as it should be
@@ -370,7 +400,7 @@ Action BotAPI::getanswer(int &amount)
 		else
 		{
 			//so we actually bet or call the increment above what we really invested
-			amount = mynode->potcontrib[answer] + invested[myplayer]-perceived[myplayer];
+			amount = multiplier * (mynode->potcontrib[answer] + invested[myplayer]-perceived[myplayer]);
 			return BET;
 		}
 	}

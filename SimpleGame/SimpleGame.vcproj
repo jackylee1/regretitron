@@ -2,10 +2,10 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="8.00"
-	Name="PokerNoLimit"
-	ProjectGUID="{B7268F97-0540-4D2C-AB5F-88E155A2A4A6}"
-	RootNamespace="PokerNoLimit"
-	Keyword="Win32Proj"
+	Name="SimpleGame"
+	ProjectGUID="{1C9B2E00-EBAE-4183-9C66-650A1EE6FB2A}"
+	RootNamespace="SimpleGame"
+	Keyword="MFCProj"
 	>
 	<Platforms>
 		<Platform
@@ -20,6 +20,7 @@
 			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
+			UseOfMFC="2"
 			CharacterSet="1"
 			>
 			<Tool
@@ -36,18 +37,20 @@
 			/>
 			<Tool
 				Name="VCMIDLTool"
+				PreprocessorDefinitions="_DEBUG"
+				MkTypLibCompatible="false"
+				ValidateParameters="false"
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="../pokereval/include;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
+				PreprocessorDefinitions="WIN32;_WINDOWS;_DEBUG"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
-				WarnAsError="true"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
 			/>
@@ -56,18 +59,20 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
+				PreprocessorDefinitions="_DEBUG"
+				Culture="1033"
+				AdditionalIncludeDirectories="$(IntDir)"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalOptions="/NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcd.lib /NODEFAULTLIB:libcmtd.lib /NODEFAULTLIB:libc.lib"
+				AdditionalDependencies="GdiPlus.lib"
 				OutputFile="..\bin\$(ProjectName).exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
-				SubSystem="1"
-				LargeAddressAware="2"
+				SubSystem="2"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -100,6 +105,7 @@
 			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
+			UseOfMFC="2"
 			CharacterSet="1"
 			WholeProgramOptimization="1"
 			>
@@ -117,20 +123,18 @@
 			/>
 			<Tool
 				Name="VCMIDLTool"
+				PreprocessorDefinitions="NDEBUG"
+				MkTypLibCompatible="false"
+				ValidateParameters="false"
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				InlineFunctionExpansion="0"
-				EnableIntrinsicFunctions="true"
-				FavorSizeOrSpeed="0"
-				OmitFramePointers="true"
 				AdditionalIncludeDirectories="../pokereval/include;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				PreprocessorDefinitions="WIN32;_WINDOWS;NDEBUG"
+				MinimalRebuild="false"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
-				WarnAsError="true"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 			/>
@@ -139,18 +143,20 @@
 			/>
 			<Tool
 				Name="VCResourceCompilerTool"
+				PreprocessorDefinitions="NDEBUG"
+				Culture="1033"
+				AdditionalIncludeDirectories="$(IntDir)"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalOptions="/NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libc.lib /NODEFAULTLIB:libcd.lib /NODEFAULTLIB:libcmtd.lib /NODEFAULTLIB:msvcrtd.lib"
+				AdditionalDependencies="GdiPlus.lib"
 				OutputFile="..\bin\$(ProjectName).exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
-				SubSystem="1"
-				LargeAddressAware="2"
+				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				TargetMachine="1"
@@ -190,15 +196,15 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\memorymgr.cpp"
+				RelativePath=".\PictureCtrl.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\PokerNoLimit.cpp"
+				RelativePath=".\SimpleGame.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\savestrategy.cpp"
+				RelativePath=".\SimpleGameDlg.cpp"
 				>
 			</File>
 			<File
@@ -228,15 +234,19 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\memorymgr.h"
+				RelativePath=".\PictureCtrl.h"
 				>
 			</File>
 			<File
-				RelativePath="..\SharedCode\report.h"
+				RelativePath=".\Resource.h"
 				>
 			</File>
 			<File
-				RelativePath=".\savestrategy.h"
+				RelativePath=".\SimpleGame.h"
+				>
+			</File>
+			<File
+				RelativePath=".\SimpleGameDlg.h"
 				>
 			</File>
 			<File
@@ -250,11 +260,27 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 			<File
-				RelativePath=".\Windows mem info.txt"
+				RelativePath=".\res\SimpleGame.ico"
+				>
+			</File>
+			<File
+				RelativePath=".\SimpleGame.rc"
+				>
+			</File>
+			<File
+				RelativePath=".\res\SimpleGame.rc2"
 				>
 			</File>
 		</Filter>
+		<File
+			RelativePath=".\ReadMe.txt"
+			>
+		</File>
 	</Files>
 	<Globals>
+		<Global
+			Name="RESOURCE_FILE"
+			Value="SimpleGame.rc"
+		/>
 	</Globals>
 </VisualStudioProject>

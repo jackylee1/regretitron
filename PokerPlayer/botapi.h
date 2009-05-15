@@ -18,10 +18,12 @@ class BotAPI : private GameState
 {
 public:
 
+	BotAPI();
+	~BotAPI();
 	//these change sceni values and not beti
 	//there purpose is to reset the state that corresponds to starting a new
 	//betting round. i save a betting tree for each sceni.
-	void setnewgame(int playernum, CardMask hand); //resets the game to the preflop, can be called at any time
+	void setnewgame(int playernum, CardMask hand, float sblind, float bblind); //resets the game to the preflop, can be called at any time
 	//these error check the gameround, the bettingnode, and the invested
 	void setflop(CardMask theflop, float newpot); //these must be called in order, after preflop
 	void setturn(CardMask theturn, float newpot); //pots are always in units of SB
@@ -33,7 +35,7 @@ public:
 	void advancetree(int player, Action a, int amount);
 
 	//tell you what to do fool
-	Action getanswer(int &amount);
+	Action getanswer(float &amount);
 
 private:
 
@@ -50,6 +52,7 @@ private:
 	//it comes to keeping track of these things.
 	float currentpot;
 	float invested[2]; 
+	float multiplier;
 	//perceived invested amount, as determined by the steps in the betting tree
 	int perceived[2]; 
 	int currentsceni;
