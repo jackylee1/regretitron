@@ -118,13 +118,13 @@ HCURSOR CSimpleGameDlg::OnQueryDragIcon()
 
 
 
-CString CSimpleGameDlg::cardfilename(CardMask m)
+CString cardfilename(CardMask m)
 {
 	int i;
 	CString ret;
 	for(i=0; i<52; i++)
 		if (StdDeck_CardMask_CARD_IS_SET(m, i)) break;
-	i = (12-StdDeck_RANK(i))*4 + StdDeck_SUIT(i);
+	i = 1 + (12-StdDeck_RANK(i))*4 + StdDeck_SUIT(i);
 	ret.Format(TEXT("cards/%d.png"),i);
 	return ret;
 }
@@ -178,7 +178,7 @@ void CSimpleGameDlg::updatepot()
 {
 	//reprint the pot to the screen
 	CString val;
-	val.Format(TEXT("%.2f"), pot);
+	val.Format(TEXT("%.2f"), 2*pot);
 	PotTotal.SetWindowText(val);
 }
 void CSimpleGameDlg::updateinvested()

@@ -43,7 +43,6 @@ protected:
 	DECLARE_MESSAGE_MAP()
 private:
 	//functions
-	CString cardfilename(CardMask m);
 	void printbotcards();
 	void printbotcardbacks();
 	void printhumancards();

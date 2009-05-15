@@ -139,7 +139,19 @@ void BotAPI::setriver(CardMask theriver, float newpot)
 }
 
 
+//wrapper function to handle diagnostics
 void BotAPI::advancetree(int player, Action a, int amount)
+{
+	betnode const * mynode; //needed to check if i am next to act
+	_advancetree(player,a,amount);
+	mynode = (currentgr == PREFLOP ? pfn : n) + currentbetinode;
+	//if it's my turn and diagnostics are on:
+	if(isdiagnosticson && mynode->playertoact==myplayer)
+	{
+		//go crazy
+	}
+}
+void BotAPI::_advancetree(int player, Action a, int amount)
 {
 	//adjust multiplier first
 	amount/=multiplier;

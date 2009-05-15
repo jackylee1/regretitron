@@ -345,8 +345,35 @@ inline void playgame()
 	c1 = clock();
 
 	cout << "starting work..." << endl;
-	simulate(1000);
-//	printfirstnodestrat("output/test 1Mi8bin4ss v2.txt");
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	cout << "dumping strat..." << endl;
+	printfirstnodestrat("output/1M8bin13ss.txt");
+	dumpstratresult("strategy/1M8bin13ss.strat");
+
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	simulate(100000);
+	cout << "dumping strat..." << endl;
+	printfirstnodestrat("output/2M8bin13ss.txt");
+	dumpstratresult("strategy/2M8bin13ss.strat");
 
 //	simulate(1000000);
 //	printfirstnodestrat("output/test 2Mi8bin4ss v2.txt");

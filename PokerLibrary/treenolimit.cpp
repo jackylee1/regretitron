@@ -7,13 +7,15 @@
 
 //defines the granularity with which the engine sees the pot
 //only even values are possible since we assume bets are size of big blind
-#define ONE_POT_PER_BIN 0 //if we don't combine pots, we can avoid rounding up.
+
 int getpoti(int gr, int pot)
 {
 	//they can only ever bet in multiples of the big blind, so all the numbers i'll ever
 	//have should be even, because they can not agree upon a small blind bet.
 	switch(pot)
 	{
+#if SS==50
+#define ONE_POT_PER_BIN 0 //if we don't combine pots, we can avoid rounding up.
 	case 1*BB:
 	case 2*BB:
 	case 3*BB:
@@ -73,6 +75,21 @@ int getpoti(int gr, int pot)
 	case 48*BB:
 	case 49*BB:
 		return 9;
+#elif SS==13
+#define ONE_POT_PER_BIN 0 //if we don't combine pots, we can avoid rounding up.
+	case 1*BB:
+	case 2*BB: return 0;
+	case 3*BB:
+	case 4*BB: return 1;
+	case 5*BB:
+	case 6*BB: return 2;
+	case 7*BB:
+	case 8*BB: return 3;
+	case 9*BB:
+	case 10*BB: return 4;
+	case 11*BB:
+	case 12*BB: return 5;
+#endif
 
 	default:
 		REPORT("invalid pot size in poti for flop");
@@ -84,6 +101,8 @@ inline int roundup(const int &pot)
 {
 	switch(pot)
 	{
+#if SS==50
+	case 0: return 0; //needed for preflop
 	case 1*BB:
 	case 2*BB:
 	case 3*BB:
@@ -143,6 +162,21 @@ inline int roundup(const int &pot)
 	case 48*BB:
 	case 49*BB:
 		return 49*BB;
+#elif SS==13
+	case 0: return 0; //needed for preflop
+	case 1*BB:
+	case 2*BB: return 2*BB;
+	case 3*BB:
+	case 4*BB: return 4*BB;
+	case 5*BB:
+	case 6*BB: return 6*BB;
+	case 7*BB:
+	case 8*BB: return 8*BB;
+	case 9*BB:
+	case 10*BB: return 10*BB;
+	case 11*BB:
+	case 12*BB: return 12*BB;
+#endif
 
 	default:
 		REPORT("invalid pot size in roundup");

@@ -37,8 +37,13 @@ public:
 	//tell you what to do fool
 	Action getanswer(float &amount);
 
+	//Diagnostics
+	void setdiagnostics(bool onoff);
+
 private:
 
+	//public one is wrapper function for diagnostics
+	void _advancetree(int player, Action a, int amount);
 	//helperfunctions for advancetree
 	int getbestbetact(betnode const * mynode, int betsize);
 	int getallinact(betnode const * mynode);
@@ -62,6 +67,8 @@ private:
 
 	//for that sticky situation where they bet when i don't want them to
 	bool offtreebetallins;
+	//whether we show diagnostics or not
+	bool isdiagnosticson;
 };
 
 #endif
