@@ -274,7 +274,7 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 		if(prob0!=0)
 			for(int a=0; a<maxa-1; a++)
 			{
-				//this is just for performance, as these dont affect valid entries, they're only result
+				//invalid ones should be kept at zero
 				if(isvalid[a])
 				{
 					stratn[a] += prob0 * stratt[a];
@@ -298,7 +298,7 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 		if(prob1!=0)
 			for(int a=0; a<maxa-1; a++)
 			{
-				//this is just for performance
+				//invalid ones should be kept at zero
 				if(isvalid[a])
 				{
 					stratn[a] += prob1 * stratt[a];

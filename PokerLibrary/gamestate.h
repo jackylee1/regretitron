@@ -1,6 +1,8 @@
 #ifndef _gamestate_h_
 #define _gamestate_h_
 
+#include "poker_defs.h"
+
 class GameState 
 {
 public:
@@ -8,10 +10,13 @@ public:
 	int getscenarioi(int gr, int ptoact, int pot, int bethist[3]);
 	int gettwoprob0wins();
 
-private:
-	CardMask priv0, priv1, flop, turn, river;
+protected: //so TreeState can inherate access to these.
+	CardMask priv0, flop, turn, river;
 	int flopscore, turnscore, riverscore;
 	int binnumber[2][4];
+
+private: //but, for clarity, TreeState does not use these.
+	CardMask priv1;
 	int twoprob0wins;
 };
 

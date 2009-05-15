@@ -7,6 +7,7 @@
 
 //defines the granularity with which the engine sees the pot
 //only even values are possible since we assume bets are size of big blind
+#define ONE_POT_PER_BIN 0 //if we don't combine pots, we can avoid rounding up.
 int getpoti(int gr, int pot)
 {
 	//they can only ever bet in multiples of the big blind, so all the numbers i'll ever
@@ -78,27 +79,104 @@ int getpoti(int gr, int pot)
 	}
 }
 
+#if !ONE_POT_PER_BIN
+inline int roundup(const int &pot)
+{
+	switch(pot)
+	{
+	case 1*BB:
+	case 2*BB:
+	case 3*BB:
+		return 3*BB;
+	case 4*BB:
+	case 5*BB:
+	case 6*BB:
+		return 6*BB;
+	case 7*BB:
+	case 8*BB:
+	case 9*BB:
+	case 10*BB:
+		return 10*BB;
+	case 11*BB:
+	case 12*BB:
+	case 13*BB:
+	case 14*BB:
+		return 14*BB;
+	case 15*BB:
+	case 16*BB:
+	case 17*BB:
+	case 18*BB:
+	case 19*BB:
+		return 19*BB;
+	case 20*BB:
+	case 21*BB:
+	case 22*BB:
+	case 23*BB:
+	case 24*BB:
+		return 24*BB;
+	case 25*BB:
+	case 26*BB:
+	case 27*BB:
+	case 28*BB:
+	case 29*BB:
+	case 30*BB:
+		return 30*BB;
+	case 31*BB:
+	case 32*BB:
+	case 33*BB:
+	case 34*BB:
+	case 35*BB:
+	case 36*BB:
+		return 36*BB;
+	case 37*BB:
+	case 38*BB:
+	case 39*BB:
+	case 40*BB:
+	case 41*BB:
+	case 42*BB:
+		return 42*BB;
+	case 43*BB:
+	case 44*BB:
+	case 45*BB:
+	case 46*BB:
+	case 47*BB:
+	case 48*BB:
+	case 49*BB:
+		return 49*BB;
+
+	default:
+		REPORT("invalid pot size in roundup");
+	}
+}
+#endif
+
 //returns number valid actions
-inline int getvalidity(const int pot, betnode const * mynode, bool isvalid[9])
+inline int getvalidity(const int &pot, betnode const * mynode, bool isvalid[9])
 {
 	int numa=0;
+#if ONE_POT_PER_BIN
+	int maxpot = pot;
+#else
+	//in this case do not allow to be invalid if maximum pot in this poti is invalid
+	int maxpot = roundup(pot);
+#endif
 
 	switch(mynode->numacts)
 	{
 	default: REPORT("invalid maxa");
 	case 9:
-		if(isvalid[8] = (pot + mynode->potcontrib[8] < STACKSIZE)) numa++;
+		if(isvalid[8] = (maxpot + mynode->potcontrib[8] < STACKSIZE)) numa++;
 	case 8:
-		if(isvalid[7] = (pot + mynode->potcontrib[7] < STACKSIZE)) numa++;
-		if(isvalid[6] = (pot + mynode->potcontrib[6] < STACKSIZE)) numa++;
-		if(isvalid[5] = (pot + mynode->potcontrib[5] < STACKSIZE)) numa++;
-		if(isvalid[4] = (pot + mynode->potcontrib[4] < STACKSIZE)) numa++;
-		if(isvalid[3] = (pot + mynode->potcontrib[3] < STACKSIZE)) numa++;
+		if(isvalid[7] = (maxpot + mynode->potcontrib[7] < STACKSIZE)) numa++;
+		if(isvalid[6] = (maxpot + mynode->potcontrib[6] < STACKSIZE)) numa++;
+		if(isvalid[5] = (maxpot + mynode->potcontrib[5] < STACKSIZE)) numa++;
+		if(isvalid[4] = (maxpot + mynode->potcontrib[4] < STACKSIZE)) numa++;
+		if(isvalid[3] = (maxpot + mynode->potcontrib[3] < STACKSIZE)) numa++;
 	case 3:
-		if(isvalid[2] = (pot + mynode->potcontrib[2] < STACKSIZE)) numa++;
+		if(isvalid[2] = (maxpot + mynode->potcontrib[2] < STACKSIZE)) numa++;
 	case 2:
-		if(isvalid[1] = (pot + mynode->potcontrib[1] < STACKSIZE)) numa++;
-		if(isvalid[0] = (pot + mynode->potcontrib[0] < STACKSIZE)) numa++;
+		if(isvalid[1] = (maxpot + mynode->potcontrib[1] < STACKSIZE)) numa++;
+		if(isvalid[0] = (maxpot + mynode->potcontrib[0] < STACKSIZE)) numa++;
 	}
 
 	return numa;

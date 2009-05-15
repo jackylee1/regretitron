@@ -7,6 +7,16 @@
 
 using namespace std;
 
+inline float safedivide(float n, float d)
+{
+	if (d==0 && n!=0) //if we just didn't get there, then the numerator would also be zero
+		REPORT("zero denominator!")
+	else if(d==0 && n==0) //could have just never gotten there, or could be invalid action
+		return 0; //zero probability either way.
+	else //d!=0
+		return n/d;
+}
+
 void printfirstnodestrat(char const * const filename)
 {
 	ofstream log(filename);
@@ -34,7 +44,7 @@ void printfirstnodestrat(char const * const filename)
 			if(isvalid[a])
 			{
 				strataccum+=stratn[a]/stratd[a];
-				log << "   " << actionstring(a,PREFLOP,0) << 100*stratn[a]/stratd[a] << "%" << endl;
+				log << "   " << actionstring(a,PREFLOP,0) << 100*safedivide(stratn[a],stratd[a]) << "%" << endl;
 			}
 		}
 		//finally, handle the last strat, if it is valid.
@@ -62,7 +72,7 @@ void dumpstratresult(const char * const filename)
 
 			//we print all values, valid or not. 
 			memset(result, 0, 8*sizeof(float));
-			for(int a=0; a<maxa-1; a++) result[a] = stratn[a]/stratd[a];
+			for(int a=0; a<maxa-1; a++) result[a] = safedivide(stratn[a],stratd[a]);
 
 			f.write((char*)result, 8*sizeof(float));
 		}
@@ -74,7 +84,7 @@ void dumpstratresult(const char * const filename)
 
 			//we print all values, valid or not. 
 			memset(result, 0, 8*sizeof(float));
-			for(int a=0; a<maxa-1; a++) result[a] = stratn[a]/stratd[a];
+			for(int a=0; a<maxa-1; a++) result[a] = safedivide(stratn[a],stratd[a]);
 
 			f.write((char*)result, 2*sizeof(float));
 		}
@@ -86,7 +96,7 @@ void dumpstratresult(const char * const filename)
 
 			//we print all values, valid or not. 
 			memset(result, 0, 8*sizeof(float));
-			for(int a=0; a<maxa-1; a++) result[a] = stratn[a]/stratd[a];
+			for(int a=0; a<maxa-1; a++) result[a] = safedivide(stratn[a],stratd[a]);
 
 			f.write((char*)result, 1*sizeof(float));
 		}
