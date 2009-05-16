@@ -69,6 +69,8 @@ private:
 	bool offtreebetallins;
 	//whether we show diagnostics or not
 	bool isdiagnosticson;
+	//if we've ever played anything yet
+	bool startedgame;
 };
 
 #endif

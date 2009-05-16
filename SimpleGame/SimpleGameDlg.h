@@ -76,6 +76,8 @@ private:
 	afx_msg void OnBnClickedButton5();
 	afx_msg void OnBnClickedCheck1();
 	afx_msg void OnBnClickedButton6();
+	afx_msg void OnBnClickedButton4();
+	afx_msg void OnBnClickedCheck2();
 	// card images
 	CPictureCtrl hCard0;
 	CPictureCtrl hCard1;
@@ -87,11 +89,10 @@ private:
 	CPictureCtrl bCard0;
 	CPictureCtrl bCard1;
 	CButton ShowBotCards;
+	CButton ShowDiagnostics;
 	CEdit PotTotal;
 	CEdit TotalWon;
 	CEdit InvestedHum;
 	CEdit InvestedBot;
 	CEdit BetAmount;
-public:
-	afx_msg void OnBnClickedButton4();
 };

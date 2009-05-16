@@ -8,7 +8,7 @@
 #include "dodiagnostics.h"
 
 BotAPI::BotAPI(bool diagon)
-   : isdiagnosticson(diagon)
+   : isdiagnosticson(diagon), startedgame(false)
 {
 	initpfn();
 	initbins();
@@ -22,6 +22,8 @@ BotAPI::~BotAPI()
 
 void BotAPI::setnewgame(int playernum, CardMask hand, float sblind, float bblind)
 {
+	//now we have started the game
+	startedgame = true;
 	//check the inputs
 	if(playernum != 0 && playernum != 1)
 		REPORT("invalid myplayer number in BotAPI::setmyhand()");
@@ -164,7 +166,8 @@ void BotAPI::setdiagnostics(bool onoff)
 	//update state
 	isdiagnosticson = onoff;
 	//handle new state
-	if(isdiagnosticson && mynode->playertoact==myplayer)
+	//but if !startedgame, mynode pointer is garbage, watch out!
+	if(startedgame && isdiagnosticson && mynode->playertoact==myplayer)
 		populatewindow(); //will create window if not there
 	else if(!isdiagnosticson)
 		destroywindow(); //will do nothing if window not there

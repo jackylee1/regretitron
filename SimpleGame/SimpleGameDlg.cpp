@@ -18,7 +18,7 @@
 CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSimpleGameDlg::IDD, pParent),
 	  totalhumanwon(0), human(P0), bot(P1),
-	  MyBot(true) //turns on diagnostics.
+	  MyBot(false) //turns off diagnostics (default state of checkbox)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	Create(CSimpleGameDlg::IDD, NULL);
@@ -51,6 +51,7 @@ void CSimpleGameDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT2, InvestedHum);
 	DDX_Control(pDX, IDC_EDIT3, InvestedBot);
 	DDX_Control(pDX, IDC_EDIT1, BetAmount);
+	DDX_Control(pDX, IDC_CHECK2, ShowDiagnostics);
 }
 
 BEGIN_MESSAGE_MAP(CSimpleGameDlg, CDialog)
@@ -64,6 +65,7 @@ BEGIN_MESSAGE_MAP(CSimpleGameDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON6, &CSimpleGameDlg::OnBnClickedButton6)
 	ON_BN_CLICKED(IDC_BUTTON3, &CSimpleGameDlg::OnBnClickedButton3)
 	ON_BN_CLICKED(IDC_BUTTON4, &CSimpleGameDlg::OnBnClickedButton4)
+	ON_BN_CLICKED(IDC_CHECK2, &CSimpleGameDlg::OnBnClickedCheck2)
 END_MESSAGE_MAP()
 
 
@@ -471,4 +473,13 @@ void CSimpleGameDlg::OnBnClickedButton4()
 	//inform the bot
 	MyBot.advancetree(human, ALLIN, 0);
 	isallin=true;
+}
+
+void CSimpleGameDlg::OnBnClickedCheck2()
+{
+	//clicked show diagnostics button
+	if(ShowDiagnostics.GetCheck())
+		MyBot.setdiagnostics(true);
+	else
+		MyBot.setdiagnostics(false);
 }

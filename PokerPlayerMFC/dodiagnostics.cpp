@@ -13,5 +13,9 @@ void populatewindow()
 void destroywindow()
 {
 	if(MyWindow != NULL)
+	{
+		MyWindow->DestroyWindow();
 		delete MyWindow;
+		MyWindow = NULL;
+	}
 }
