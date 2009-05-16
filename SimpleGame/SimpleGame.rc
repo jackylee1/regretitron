@@ -7,8 +7,7 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-#include "afxres.h"
-
+#include "afxres.h"
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
 
@@ -85,18 +84,18 @@ BEGIN
     PUSHBUTTON      "New Game",IDC_BUTTON5,7,7,62,26
     CONTROL         "Show Bot Cards",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,225,7,69,12
     PUSHBUTTON      "Make Bot Go",IDC_BUTTON6,217,44,84,23
-    EDITTEXT        IDC_EDIT2,135,201,77,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER,WS_EX_TRANSPARENT
+    EDITTEXT        IDC_EDIT2,134,198,77,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER,WS_EX_TRANSPARENT
     EDITTEXT        IDC_EDIT3,129,78,94,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER,WS_EX_TRANSPARENT
     LTEXT           "Common Pot:",IDC_STATIC,63,161,53,14
-    LTEXT           "Static",IDC_HCARD0,97,216,54,60
-    LTEXT           "Static",IDC_HCARD1,166,215,54,61
-    LTEXT           "Static",IDC_CCARD0,15,95,50,57
-    LTEXT           "Static",IDC_CCARD1,75,95,53,60
-    LTEXT           "Static",IDC_CCARD2,132,94,52,60
-    LTEXT           "Static",IDC_CCARD3,193,94,47,66
-    LTEXT           "Static",IDC_CCARD4,245,97,57,65
-    LTEXT           "Static",IDC_BCARD0,83,7,55,64
-    LTEXT           "Static",IDC_BCARD1,145,7,54,66
+    LTEXT           "Static",IDC_HCARD0,105,215,48,59
+    LTEXT           "Static",IDC_HCARD1,165,215,48,59
+    LTEXT           "Static",IDC_CCARD0,16,95,48,59
+    LTEXT           "Static",IDC_CCARD1,76,95,48,59
+    LTEXT           "Static",IDC_CCARD2,136,95,48,59
+    LTEXT           "Static",IDC_CCARD3,196,95,48,59
+    LTEXT           "Static",IDC_CCARD4,256,95,48,59
+    LTEXT           "Static",IDC_BCARD0,105,13,48,59
+    LTEXT           "Static",IDC_BCARD1,165,13,48,59
     EDITTEXT        IDC_EDIT4,125,162,80,13,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER,WS_EX_TRANSPARENT
     LTEXT           "Total Won:",IDC_STATIC,7,286,38,14
     EDITTEXT        IDC_EDIT5,49,288,81,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
@@ -183,8 +182,7 @@ LANGUAGE 9, 1
 #pragma code_page(1252)
 #include "res\SimpleGame.rc2"  // non-Microsoft Visual C++ edited resources
 #include "afxres.rc"     // Standard components
-#endif
-
+#endif
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
 
