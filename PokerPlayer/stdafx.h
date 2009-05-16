@@ -21,9 +21,8 @@
 #include "poker_defs.h"
 #include "inlines/eval.h"
 
-// my REPORT function, and other thingsn
-#include "../report.h"
-
-
-
-// TODO: reference additional headers your program requires here
+#define REPORT(chars) { \
+    MessageBox(NULL, TEXT(chars), TEXT("failure"), MB_OK);\
+	_asm {int 3}; \
+	exit(1); \
+}

@@ -42,6 +42,7 @@
 #include "inlines/eval.h"
 #include "../mymersenne.h"
 
+//pop up message box on error
 #define REPORT(chars) { \
     MessageBox(TEXT(chars), TEXT("failure"), MB_OK);\
 	_asm {int 3}; \

@@ -39,15 +39,10 @@
 #include <numeric> //has accumulate
 
 #include "../mymersenne.h"
-#include "../report.h"
-/*
+
+//pop up message box on error
 #define REPORT(chars) { \
     MessageBox(NULL, TEXT(chars), TEXT("failure"), MB_OK);\
 	_asm {int 3}; \
 	exit(1); \
 }
-*/
-
-
-
-// TODO: reference additional headers your program requires here

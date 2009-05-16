@@ -15,6 +15,11 @@
 #include <algorithm> //required for sort
 #include <assert.h> //required for assert
 #include "poker_defs.h" //required to use PokerEval tables and datatypes
-#include "../report.h"
+#include <windows.h> //needed for below and for binstruct filenames and such
 
-// TODO: reference additional headers your program requires here
+//pop up a message box on error
+#define REPORT(chars) { \
+    MessageBox(NULL, TEXT(chars), TEXT("failure"), MB_OK);\
+	_asm {int 3}; \
+	exit(1); \
+}

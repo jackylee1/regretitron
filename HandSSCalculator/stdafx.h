@@ -16,12 +16,17 @@
 #include <fstream> //required for files
 #include <algorithm> //required for sort
 #include <assert.h>
+#include <windows.h> //needed for binstruct includes
 
 #include "poker_defs.h" // PokerEval
 #include "inlines/eval.h"
 
-#include "../report.h" //my error reporting function
 #include "../HandIndexingV1/getindex2N.h" //contains my fancy getindex2N function
 
-
-// TODO: reference additional headers your program requires here
+//needs to be simple cout as I concatenating strings with preprocessor values
+//and send them to REPORT. No need for messagebox
+#define REPORT(chars) { \
+	std::cout << chars << std::endl << std::flush; \
+	_asm {int 3}; \
+	exit(1); \
+}
