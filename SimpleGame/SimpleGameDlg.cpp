@@ -25,12 +25,31 @@ CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	ShowWindow(SW_SHOW);
 }
 
-/*
-CSimpleGameDlg::~CSimpleGameDlg()
-{
-	CWinThread::m_pMainWnd = NULL;
+//http://www.codeproject.com/KB/dialog/gettingmodeless.aspx
+//http://msdn.microsoft.com/en-us/library/sk933a19(VS.80).aspx
+//both say to use this function:
+//Due to the following, this only frees C++ memory. Not neccesary, but nice.
+void CSimpleGameDlg::PostNcDestroy() 
+{	
+    CDialog::PostNcDestroy();
+    delete this;
 }
-*/
+//but then more digging makes me realize that the problem was that
+//the window was being "cancelled" not "closed". Closed would have
+//destroyed the window, but cancelled does nothing.
+//http://msdn.microsoft.com/en-us/library/kw3wtttf.aspx
+//"If you implement the Cancel button in a modeless dialog box, 
+// you must override the OnCancel method and call DestroyWindow 
+// inside it. Do not call the base-class method, because it calls 
+// EndDialog, which will make the dialog box invisible but not 
+// destroy it."
+//Okay.
+void CSimpleGameDlg::OnCancel()
+{
+	MyBot.setdiagnostics(false); //this will DestroyWindow the diagnostics page if it exists.
+	DestroyWindow();
+}
+
 
 
 void CSimpleGameDlg::DoDataExchange(CDataExchange* pDX)

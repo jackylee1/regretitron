@@ -42,6 +42,13 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
+
+	//needed to fully delete memory, which is nice.
+	void PostNcDestroy();
+	//needed to call DestroyWindow on this window and any others (diagnosticswindow), 
+	//which actually exists app
+	void OnCancel();
+
 private:
 	//functions
 	void printbotcards();
