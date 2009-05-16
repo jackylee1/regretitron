@@ -57,10 +57,13 @@ private:
 	void printflop();
 	void printturn();
 	void printriver();
-	void updatetotal();
+	void recalctotal();
 	void updatepot();
     void updateinvested();
-	void advanceround();
+	void dofold(Player pl);
+	void docall(Player pl);
+	void dobet(Player pl, double amount);
+	void doallin(Player pl);
 	//variables
 	static const int SBLIND = 5;
 	static const int BBLIND = 10;
