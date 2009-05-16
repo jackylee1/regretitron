@@ -94,10 +94,6 @@ them (with replacement).
 #include <stdlib.h>
 #include "pokereval_export.h"
 
-#ifndef RANDOM
-#define RANDOM rand
-#endif
-
 #define DECK_ENUMERATE_1_CARDS(deck, cards_var, action) \
 do {                                                    \
   int _i1;                                              \
@@ -747,6 +743,7 @@ do {                                                                      \
   };                                                                      \
 } while (0)
 
+//this is a macro, so we assume that caller has created: MTRand mersenne;
 #define DECK_MONTECARLO_N_CARDS_D(deck, cards_var, dead_cards,	\
                                   num_cards, num_iter, action)	\
 do {                                                    	\
@@ -758,7 +755,7 @@ do {                                                    	\
     deck##_CardMask_RESET(cards_var);				\
     for (_j=0; _j<num_cards; _j++) {				\
       do {							\
-        _c = RANDOM() % deck##_N_CARDS;				\
+        _c = mersenne.randInt(deck##_N_CARDS-1);				\
       } while (deck##_CardMask_CARD_IS_SET(_used, _c));		\
       deck##_CardMask_SET(cards_var, _c);			\
       deck##_CardMask_SET(_used, _c);				\
@@ -767,6 +764,7 @@ do {                                                    	\
   };                                                    	\
 } while (0)
 
+//this is a macro, so we assume that caller has created: MTRand mersenne;
 #define DECK_MONTECARLO_PERMUTATIONS_D(deck, set_var, num_sets, set_sizes, \
                                        dead_cards, num_iter, action)	\
 do {                                                    	\
@@ -779,7 +777,7 @@ do {                                                    	\
       deck##_CardMask_RESET(set_var[_j]);			\
       for (_k=0; _k<set_sizes[_j]; _k++) {			\
         do {							\
-          _c = RANDOM() % deck##_N_CARDS;			\
+          _c = mersenne.randInt(deck##_N_CARDS-1);\
         } while (deck##_CardMask_CARD_IS_SET(_used, _c));	\
         deck##_CardMask_SET(set_var[_j], _c);			\
         deck##_CardMask_SET(_used, _c);				\

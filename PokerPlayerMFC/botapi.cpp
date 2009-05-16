@@ -386,7 +386,7 @@ Action BotAPI::getanswer(float &amount)
 	//go through actions and choose one randomly with correct likelyhood.
 	do{
 		float cumulativeprob = 0;
-		float randomprob = (float) rand()/RAND_MAX; //generates the answer!
+		double randomprob = mersenne.randExc(); //generates the answer!
 		for(int a=0; a<mynode->numacts; a++)
 		{
 			cumulativeprob += actionprobs[a];

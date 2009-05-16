@@ -47,7 +47,7 @@
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
-				WarnAsError="true"
+				WarnAsError="false"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
 			/>
@@ -130,7 +130,7 @@
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
-				WarnAsError="true"
+				WarnAsError="false"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 			/>
@@ -194,6 +194,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\mymersenne.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\PokerNoLimit.cpp"
 				>
 			</File>
@@ -229,6 +233,10 @@
 			>
 			<File
 				RelativePath=".\memorymgr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\mymersenne.h"
 				>
 			</File>
 			<File

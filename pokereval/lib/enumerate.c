@@ -369,6 +369,8 @@ enumExhaustive(enum_game_t game, StdDeck_CardMask pockets[],
   return 0;  
 }
 
+/* Removed due to not bothering to create MTRand object for it.
+
 int 
 enumSample(enum_game_t game, StdDeck_CardMask pockets[],
            StdDeck_CardMask board, StdDeck_CardMask dead,
@@ -429,6 +431,7 @@ enumSample(enum_game_t game, StdDeck_CardMask pockets[],
   result->sampleType = ENUM_SAMPLE;
   return 0;  
 }
+*/
 
 void
 enumResultClear(enum_result_t *result) {

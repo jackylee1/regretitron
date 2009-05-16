@@ -6,7 +6,7 @@
 using namespace std;
 
 #define N_BINS 32 //must be same as below
-#include "../SharedCode/binstruct32.h"
+#include "../PokerLibrary/binstruct32.h"
 
 
 //this is absolutely rediculous

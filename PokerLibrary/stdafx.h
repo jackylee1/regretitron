@@ -26,4 +26,7 @@
 #include "poker_defs.h"
 #include "inlines/eval.h"
 
+// So all files get nice random numbers
+#include "../mymersenne.h"
+
 // TODO: reference additional headers your program requires here

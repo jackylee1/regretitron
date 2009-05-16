@@ -40,6 +40,7 @@
 #include <algorithm>
 #include "poker_defs.h"
 #include "inlines/eval.h"
+#include "../mymersenne.h"
 
 #define REPORT(chars) { \
     MessageBox(TEXT(chars), TEXT("failure"), MB_OK);\

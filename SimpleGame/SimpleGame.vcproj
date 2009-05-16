@@ -196,6 +196,10 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath="..\mymersenne.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\PictureCtrl.cpp"
 				>
 			</File>
@@ -233,6 +237,10 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath="..\mymersenne.h"
+				>
+			</File>
 			<File
 				RelativePath="..\PictureCtrl.h"
 				>

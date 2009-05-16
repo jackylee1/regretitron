@@ -38,6 +38,7 @@
 #include <algorithm> //has min_element
 #include <numeric> //has accumulate
 
+#include "../mymersenne.h"
 #include "../report.h"
 /*
 #define REPORT(chars) { \
@@ -46,6 +47,7 @@
 	exit(1); \
 }
 */
+
 
 
 // TODO: reference additional headers your program requires here

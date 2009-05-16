@@ -19,7 +19,7 @@
 #include <sstream> //for formatting strings more easily
 #include <string> //needed for some of the rephands shenanigans
 #include <iomanip> //needed for formating the way floats are printed in cout's and the like
-#include <time.h> //needed for time() needed for srand.
+#include <time.h> //needed benchmark timing
 
 // Needed for file mapping.
 #include <Windows.h>

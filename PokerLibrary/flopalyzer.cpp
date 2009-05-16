@@ -373,8 +373,6 @@ void testflopalyzer()
 	int found=0;
 	
 	memset(x, 0, RIVER_MAX*4);
-	srand ( time(NULL) );
-
 
 	//count the statistics
 	MONTECARLO_N_CARDS_D(f, d1, 3, 10000000, 
