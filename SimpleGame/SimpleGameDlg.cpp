@@ -38,6 +38,11 @@ void CSimpleGameDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT3, InvestedBot);
 	DDX_Control(pDX, IDC_EDIT1, BetAmount);
 	DDX_Control(pDX, IDC_CHECK2, ShowDiagnostics);
+	DDX_Control(pDX, IDC_BUTTON1, FoldCheckButton);
+	DDX_Control(pDX, IDC_BUTTON2, CallButton);
+	DDX_Control(pDX, IDC_BUTTON3, BetRaiseButton);
+	DDX_Control(pDX, IDC_BUTTON4, AllInButton);
+	DDX_Control(pDX, IDC_BUTTON6, MakeBotGoButton);
 }
 
 BEGIN_MESSAGE_MAP(CSimpleGameDlg, CDialog)
@@ -92,6 +97,7 @@ BOOL CSimpleGameDlg::OnInitDialog()
 
 	// TODO: Add extra initialization here
 	TotalWon.SetWindowText(TEXT("$0.00"));
+	graygameover();
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -180,7 +186,7 @@ void CSimpleGameDlg::printriver()
 
 
 
-// ---------------- functions to Update on-screen Values -------------------
+// ---------------- On-screen Update Functions -------------------
 
 void CSimpleGameDlg::recalctotal()
 {
@@ -188,7 +194,7 @@ void CSimpleGameDlg::recalctotal()
 	if (winner==human)
 		totalhumanwon += (pot + invested[bot]);
 	else if (winner==bot)
-		totalhumanwon -= (pot + invested[bot]);
+		totalhumanwon -= (pot + invested[human]);
 	//reprint the total to the screen
 	CString val;
 	val.Format(TEXT("$%.2f"), totalhumanwon);
@@ -215,12 +221,22 @@ void CSimpleGameDlg::updateinvested()
 
 // ------------------------- Game Logic --------------------------------
 
+double CSimpleGameDlg::mintotalwager(Player acting)
+{
+	//calling from the SBLIND is a special case of how much we can wager
+	if(gameround == PREFLOP && invested[acting]==SBLIND)
+		return BBLIND;
+	
+	//otherwise, this is the standard formula that FullTilt seems to follow
+	double prevwager = invested[acting]-invested[1-acting];
+	return invested[acting] + max(BBLIND, prevwager);
+}
 void CSimpleGameDlg::dofold(Player pl)
 {
 	//set the winner to the other player and then recalctotal will handle it
 	winner = 1-pl; //1-pl returns the other player, since they are 0 and 1
 	recalctotal();
-	//gray out all buttons but 'new game' button
+	graygameover();
 }
 void CSimpleGameDlg::docall(Player pl)
 {
@@ -253,23 +269,26 @@ void CSimpleGameDlg::docall(Player pl)
 	case PREFLOP: 
 		MyBot.setflop(flop, pot); 
 		printflop();
+		graypostact(P0); //P0 is first to act post flop
 		break;
 
 	case FLOP: 
 		MyBot.setturn(turn, pot); 
 		printturn();
+		graypostact(P0);
 		break;
 
 	case TURN: 
 		MyBot.setriver(river, pot); 
 		printriver();
+		graypostact(P0);
 		break;
 
 	case RIVER:
 		//game over
 		printbotcards();
 		recalctotal();
-		//gray out all buttons but new game
+		graygameover();
 		break;
 
 	default:
@@ -283,7 +302,7 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 {
 	//we can check the amount for validity. This is important since we
 	//will be getting values from the bot here.
-	if (amount < invested[1-pl] || amount + pot >= STACKSIZE) 
+	if (amount < mintotalwager(pl) || amount + pot >= STACKSIZE)
 		REPORT("someone bet an illegal amount.");
 
 	//inform the bot
@@ -291,6 +310,8 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 	//set our invested amount
 	invested[pl] = amount;
 	updateinvested();
+	//other players turn now
+	graypostact(Player(1-pl));
 }
 void CSimpleGameDlg::doallin(Player pl)
 {
@@ -300,8 +321,68 @@ void CSimpleGameDlg::doallin(Player pl)
 	//set our invested amount
 	invested[pl]=STACKSIZE-pot;
 	updateinvested();
+	//other players turn now
+	graypostact(Player(1-pl));
 }
 
+// ---------------------------- Setting grayness -----------------------------
+
+void CSimpleGameDlg::graygameover()
+{
+	//gray out all but newgame
+	FoldCheckButton.SetWindowText(TEXT("Fold/Check"));
+	FoldCheckButton.EnableWindow(FALSE);
+	CallButton.EnableWindow(FALSE);
+	BetRaiseButton.EnableWindow(FALSE);
+	AllInButton.EnableWindow(FALSE);
+	MakeBotGoButton.EnableWindow(FALSE);
+}
+
+void CSimpleGameDlg::graypostact(Player nexttoact)
+{
+	//new game is NEVER grayed out
+
+	if(nexttoact == bot)
+	{
+		FoldCheckButton.SetWindowText(TEXT("Fold/Check"));
+		FoldCheckButton.EnableWindow(FALSE);
+		CallButton.EnableWindow(FALSE);
+		BetRaiseButton.EnableWindow(FALSE);
+		AllInButton.EnableWindow(FALSE);
+		MakeBotGoButton.EnableWindow(TRUE);
+	}
+	else //next to act is human
+	{
+		//gray out makebotgo
+		MakeBotGoButton.EnableWindow(FALSE);
+		//allin active
+		AllInButton.EnableWindow(TRUE);
+
+		if(invested[bot]==0 || (gameround == PREFLOP && 
+			        invested[bot]==BBLIND && invested[human]==BBLIND))
+		{
+			//set fold/check to check, not grayed
+			FoldCheckButton.SetWindowText(TEXT("Check"));
+			FoldCheckButton.EnableWindow(TRUE);
+			//gray out call
+			CallButton.EnableWindow(FALSE);
+		}
+		else
+		{
+			//set fold/check to fold, not grayed
+			FoldCheckButton.SetWindowText(TEXT("Fold"));
+			FoldCheckButton.EnableWindow(TRUE);
+			//call active
+			CallButton.EnableWindow(TRUE);
+		}
+
+		//if min bet + our pot share < STACKSIZE
+		if(mintotalwager(human) + pot < STACKSIZE)
+			BetRaiseButton.EnableWindow(TRUE);
+		else
+			BetRaiseButton.EnableWindow(FALSE);
+	}
+}
 
 // ------------------------- Button/Event Handlers ---------------------------
 
@@ -373,7 +454,7 @@ void CSimpleGameDlg::OnBnClickedButton3()
 	val = wcstod(valstr, NULL); //converts string to double
 
 	//input checking: make sure it's not too small or too big, then do it.
-	if (val > invested[human] && val + pot < STACKSIZE)
+	if(val >= mintotalwager(human) && val + pot < STACKSIZE)
 		dobet(human, val);
 }
 
@@ -454,6 +535,9 @@ void CSimpleGameDlg::OnBnClickedButton5()
 		printbotcards();
 	else
 		printbotcardbacks();
+
+	//finally set grayness
+	graypostact(P1); //we'll just call the blinds an action as far as the name of that function goes
 }
 
 //This is the "make bot go" button.

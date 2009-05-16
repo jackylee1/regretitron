@@ -60,10 +60,13 @@ private:
 	void recalctotal();
 	void updatepot();
     void updateinvested();
+	double mintotalwager(Player acting);
 	void dofold(Player pl);
 	void docall(Player pl);
 	void dobet(Player pl, double amount);
 	void doallin(Player pl);
+	void graygameover();
+	void graypostact(Player nexttoact);
 	//variables
 	static const int SBLIND = 5;
 	static const int BBLIND = 10;
@@ -105,4 +108,9 @@ private:
 	CEdit InvestedHum;
 	CEdit InvestedBot;
 	CEdit BetAmount;
+	CButton FoldCheckButton;
+	CButton CallButton;
+	CButton BetRaiseButton;
+	CButton AllInButton;
+	CButton MakeBotGoButton;
 };
