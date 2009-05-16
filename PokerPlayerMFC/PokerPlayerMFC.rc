@@ -52,12 +52,12 @@ END
 // Dialog
 //
 
-IDD_PROPPAGE_LARGE DIALOGEX 0, 0, 583, 431
-STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD | WS_DISABLED | WS_CAPTION
+IDD_PROPPAGE_LARGE DIALOGEX 0, 0, 585, 431
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_CAPTION
 CAPTION "Property Page"
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
-    PUSHBUTTON      "Refresh",IDC_BUTTON1,479,42,64,25
+    PUSHBUTTON      "Refresh",IDC_REFRESH,479,42,64,25
     LTEXT           "Static",IDC_CARD01,102,30,44,51
     LTEXT           "Static",IDC_CARD00,49,30,44,51
     LTEXT           "Static",IDC_CARD02,153,31,44,51
@@ -84,15 +84,15 @@ BEGIN
     LTEXT           "Static",IDC_ACT2,130,387,64,16
     LTEXT           "Static",IDC_ACT1,68,388,64,16
     LTEXT           "Static",IDC_ACT8,519,388,64,16
-    LTEXT           "Static",IDC_PROB3,193,406,64,16
-    LTEXT           "Static",IDC_PROB4,257,406,64,16
-    LTEXT           "Static",IDC_PROB5,323,406,64,16
-    LTEXT           "Static",IDC_PROB6,389,406,64,16
-    LTEXT           "Static",IDC_PROB7,457,406,64,16
+    LTEXT           "Static",IDC_PROB3,193,408,64,16
+    LTEXT           "Static",IDC_PROB4,257,408,64,16
+    LTEXT           "Static",IDC_PROB5,323,408,64,16
+    LTEXT           "Static",IDC_PROB6,389,408,64,16
+    LTEXT           "Static",IDC_PROB7,457,408,64,16
     LTEXT           "Static",IDC_PROB2,129,405,64,16
-    LTEXT           "Static",IDC_PROB1,67,406,64,16
-    LTEXT           "Static",IDC_PROB8,519,406,64,16
-    LTEXT           "Static",IDC_PROB0,7,405,50,17
+    LTEXT           "Static",IDC_PROB1,67,408,64,16
+    LTEXT           "Static",IDC_PROB8,519,408,64,16
+    LTEXT           "Static",IDC_PROB0,7,407,50,17
     LTEXT           "Example Representative Hands:",IDC_STATIC,17,11,178,17
 END
 
@@ -108,7 +108,7 @@ BEGIN
     IDD_PROPPAGE_LARGE, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 576
+        RIGHTMARGIN, 578
         TOPMARGIN, 7
         BOTTOMMARGIN, 424
     END

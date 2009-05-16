@@ -41,6 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				AdditionalIncludeDirectories="../pokereval/include;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_LIB"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -104,6 +105,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalIncludeDirectories="../pokereval/include;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="2"
@@ -149,7 +151,23 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\botapi.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\DiagnosticsPage.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\dodiagnostics.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\lookupanswer.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\PictureCtrl.cpp"
 				>
 			</File>
 			<File
@@ -179,7 +197,23 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath=".\botapi.h"
+				>
+			</File>
+			<File
 				RelativePath=".\DiagnosticsPage.h"
+				>
+			</File>
+			<File
+				RelativePath=".\dodiagnostics.h"
+				>
+			</File>
+			<File
+				RelativePath=".\lookupanswer.h"
+				>
+			</File>
+			<File
+				RelativePath="..\PictureCtrl.h"
 				>
 			</File>
 			<File

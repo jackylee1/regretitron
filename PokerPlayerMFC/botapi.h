@@ -18,7 +18,7 @@ class BotAPI : private GameState
 {
 public:
 
-	BotAPI();
+	BotAPI(bool diagon);
 	~BotAPI();
 	//these change sceni values and not beti
 	//there purpose is to reset the state that corresponds to starting a new

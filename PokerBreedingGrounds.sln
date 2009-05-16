@@ -69,13 +69,16 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SimpleGameMFC", "SimpleGame
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 	ProjectSection(ProjectDependencies) = postProject
-		{283B17C9-68E4-470E-BEC5-D8A0057E8650} = {283B17C9-68E4-470E-BEC5-D8A0057E8650}
+		{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A} = {4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerPlayerMFC", "PokerPlayerMFC\PokerPlayerMFC.vcproj", "{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.Debug = "False"
+	EndProjectSection
+	ProjectSection(ProjectDependencies) = postProject
+		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0} = {6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}
 	EndProjectSection
 EndProject
 Global

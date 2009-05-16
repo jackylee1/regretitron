@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "../PokerPlayer/botapi.h"
-#include "picturectrl.h"
+#include "../PokerPlayerMFC/botapi.h"
+#include "../picturectrl.h"
 #include "afxwin.h"
 
 enum Player
@@ -24,6 +24,7 @@ class CSimpleGameDlg : public CDialog
 // Construction
 public:
 	CSimpleGameDlg(CWnd* pParent = NULL);	// standard constructor
+	//~CSimpleGameDlg();
 
 // Dialog Data
 	enum { IDD = IDD_SIMPLEGAME_DIALOG };

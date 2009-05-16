@@ -5,8 +5,10 @@
 #include "../PokerLibrary/constants.h"
 #include "../PokerLibrary/flopalyzer.h"
 #include "../PokerLibrary/treenolimit.h"
+#include "dodiagnostics.h"
 
-BotAPI::BotAPI()
+BotAPI::BotAPI(bool diagon)
+   : isdiagnosticson(diagon)
 {
 	initpfn();
 	initbins();
@@ -15,6 +17,7 @@ BotAPI::BotAPI()
 BotAPI::~BotAPI()
 {
 	closebins();
+	destroywindow();
 }
 
 void BotAPI::setnewgame(int playernum, CardMask hand, float sblind, float bblind)
@@ -148,9 +151,25 @@ void BotAPI::advancetree(int player, Action a, int amount)
 	//if it's my turn and diagnostics are on:
 	if(isdiagnosticson && mynode->playertoact==myplayer)
 	{
-		//go crazy
+		populatewindow();
 	}
 }
+//turns diagnostics window on or off;
+void BotAPI::setdiagnostics(bool onoff)
+{
+	//need mynode to see if we are to act
+	betnode const * mynode = (currentgr == PREFLOP ? pfn : n) + currentbetinode;
+	//if state hasn't changed, don't care
+	if(isdiagnosticson == onoff) return;
+	//update state
+	isdiagnosticson = onoff;
+	//handle new state
+	if(isdiagnosticson && mynode->playertoact==myplayer)
+		populatewindow(); //will create window if not there
+	else if(!isdiagnosticson)
+		destroywindow(); //will do nothing if window not there
+}
+
 void BotAPI::_advancetree(int player, Action a, int amount)
 {
 	//adjust multiplier first

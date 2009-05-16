@@ -34,12 +34,13 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""afxres.h""\r\n"
-    "\0"
+    "#include ""afxres.h""\r\0"
 END
 
 3 TEXTINCLUDE 
 BEGIN
+    "#include ""../PokerPlayerMFC/PokerPlayerMFC.rc""\r\n"
+    "\r\n"
     "#define _AFX_NO_SPLITTER_RESOURCES\r\n"
     "#define _AFX_NO_OLE_RESOURCES\r\n"
     "#define _AFX_NO_TRACKER_RESOURCES\r\n"
@@ -50,8 +51,7 @@ BEGIN
     "#pragma code_page(1252)\r\n"
     "#include ""res\\SimpleGame.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
     "#include ""afxres.rc""     // Standard components\r\n"
-    "#endif\r\n"
-    "\0"
+    "#endif\r\0"
 END
 
 #endif    // APSTUDIO_INVOKED
@@ -170,6 +170,8 @@ END
 //
 // Generated from the TEXTINCLUDE 3 resource.
 //
+#include "../PokerPlayerMFC/PokerPlayerMFC.rc"
+
 #define _AFX_NO_SPLITTER_RESOURCES
 #define _AFX_NO_OLE_RESOURCES
 #define _AFX_NO_TRACKER_RESOURCES

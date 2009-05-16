@@ -17,10 +17,21 @@
 
 CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSimpleGameDlg::IDD, pParent),
-	  totalhumanwon(0), human(P0), bot(P1)
+	  totalhumanwon(0), human(P0), bot(P1),
+	  MyBot(true) //turns on diagnostics.
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	Create(CSimpleGameDlg::IDD, NULL);
+	ShowWindow(SW_SHOW);
 }
+
+/*
+CSimpleGameDlg::~CSimpleGameDlg()
+{
+	CWinThread::m_pMainWnd = NULL;
+}
+*/
+
 
 void CSimpleGameDlg::DoDataExchange(CDataExchange* pDX)
 {

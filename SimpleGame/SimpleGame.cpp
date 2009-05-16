@@ -56,21 +56,18 @@ BOOL CSimpleGameApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	CSimpleGameDlg dlg;
-	m_pMainWnd = &dlg;
-	INT_PTR nResponse = dlg.DoModal();
-	if (nResponse == IDOK)
-	{
-		// TODO: Place code here to handle when the dialog is
-		//  dismissed with OK
-	}
-	else if (nResponse == IDCANCEL)
-	{
-		// TODO: Place code here to handle when the dialog is
-		//  dismissed with Cancel
-	}
-
-	// Since the dialog has been closed, return FALSE so that we exit the
-	//  application, rather than start the application's message pump.
-	return FALSE;
+	
+	//CWinThread::m_pMainWnd
+	//http://msdn.microsoft.com/en-us/library/f3ddxzww(VS.80).aspx
+	//InitInstanc()
+	//http://msdn.microsoft.com/en-us/library/ae6yx0z0.aspx
+	//basically, the application will terminate as soon as the m_pMainWnd
+	//is null. Before, the SimpleGameDlg was displayed as modal. But that
+	//blocked the diagnostics page. So I displayed it as modeless, by calling
+	//create and show in CSimpleGameDlg's constructor. But then, the application
+	//was exiting right away, as it thought there was no main window. So now
+	//we save the main window straight to this variable here. And all should 
+	//work well.
+	CWinThread::m_pMainWnd = new CSimpleGameDlg;
+	return TRUE;
 }

@@ -1,12 +1,7 @@
 #pragma once
 #include "afxwin.h"
-#include "c:\documents and settings\scott\my documents\pokerbreedinggrounds\trunk\simplegame\picturectrl.h"
-#include "c:\documents and settings\scott\my documents\pokerbreedinggrounds\trunk\simplegame\picturectrl.h"
-#include "c:\documents and settings\scott\my documents\pokerbreedinggrounds\trunk\simplegame\picturectrl.h"
-#include "c:\documents and settings\scott\my documents\pokerbreedinggrounds\trunk\simplegame\picturectrl.h"
-#include "c:\documents and settings\scott\my documents\pokerbreedinggrounds\trunk\simplegame\picturectrl.h"
-#include "c:\documents and settings\scott\my documents\pokerbreedinggrounds\trunk\simplegame\picturectrl.h"
-#include "c:\documents and settings\scott\my documents\pokerbreedinggrounds\trunk\simplegame\picturectrl.h"
+#include "..\picturectrl.h"
+#include "resource.h"
 
 
 // DiagnosticsPage dialog

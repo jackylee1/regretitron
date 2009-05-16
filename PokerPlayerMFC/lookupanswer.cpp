@@ -18,7 +18,7 @@ void readstrategy(int sceni, int beti, float * const probabilities, int n_acts)
 		offset += STRATDUMP2_OFFSET + (beti-BETI3_CUTOFF)*1*sizeof(float);
 
 	//open file, read nbytes, set probabilities[nbytes]=1-sum(rest)
-	f.open("my data", std::ifstream::binary);
+	f.open("strategy/2M8bin13ss.strat", std::ifstream::binary);
 	f.read((char*const)probabilities, (n_acts-1)*sizeof(float));
 	if(!f.good())
 	{
@@ -28,7 +28,7 @@ void readstrategy(int sceni, int beti, float * const probabilities, int n_acts)
 	f.close();
 
 	//fill in that last one here.
-	probabilities[n_acts-1] = 1-std::accumulate(probabilities, probabilities + n_acts-1, 0.0);
+	probabilities[n_acts-1] = 1-std::accumulate(probabilities, probabilities + n_acts-1, 0.0F);
 }
 	
 

@@ -33,6 +33,19 @@
 #include <afx.h>
 #include <afxwin.h>         // MFC core and standard components
 
+//#include <iostream>
+#include <fstream>
+#include <algorithm> //has min_element
+#include <numeric> //has accumulate
+
+#include "../report.h"
+/*
+#define REPORT(chars) { \
+    MessageBox(NULL, TEXT(chars), TEXT("failure"), MB_OK);\
+	_asm {int 3}; \
+	exit(1); \
+}
+*/
 
 
 // TODO: reference additional headers your program requires here

@@ -12,7 +12,13 @@ IMPLEMENT_DYNAMIC(DiagnosticsPage, CDialog)
 DiagnosticsPage::DiagnosticsPage(CWnd* pParent /*=NULL*/)
 	: CDialog(DiagnosticsPage::IDD, pParent)
 {
-
+	//Boom: http://www.codeproject.com/KB/dialog/gettingmodeless.aspx
+	Create(DiagnosticsPage::IDD, GetDesktopWindow());
+	ShowWindow(SW_SHOW);
+	//and see this thread on how to include a resource from
+	//a static library in order to have it be found in an
+	//application. See post 20 or last post.
+	//http://www.codeguru.com/forum/showthread.php?t=203209&page=2
 }
 
 DiagnosticsPage::~DiagnosticsPage()
