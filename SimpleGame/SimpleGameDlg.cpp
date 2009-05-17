@@ -183,6 +183,15 @@ void CSimpleGameDlg::printriver()
 {
 	cCard4.LoadFromFile(cardfilename(river));
 }
+void CSimpleGameDlg::eraseboard()
+{
+	cCard0.FreeData();
+	cCard1.FreeData();
+	cCard2.FreeData();
+	cCard3.FreeData();
+	cCard4.FreeData();
+	this->RedrawWindow();
+}
 
 
 
@@ -227,8 +236,12 @@ double CSimpleGameDlg::mintotalwager(Player acting)
 	if(gameround == PREFLOP && invested[acting]==SBLIND)
 		return BBLIND;
 	
+	//we're going first and nothing's been bet yet
+	if(gameround != PREFLOP && acting==P0 && invested[1-acting]==0)
+		return 0;
+
 	//otherwise, this is the standard formula that FullTilt seems to follow
-	double prevwager = invested[acting]-invested[1-acting];
+	double prevwager = invested[1-acting]-invested[acting];
 	return invested[acting] + max(BBLIND, prevwager);
 }
 void CSimpleGameDlg::dofold(Player pl)
@@ -356,8 +369,11 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 	{
 		//gray out makebotgo
 		MakeBotGoButton.EnableWindow(FALSE);
-		//allin active
-		AllInButton.EnableWindow(TRUE);
+
+		if(isallin) //can't go all in twice
+			AllInButton.EnableWindow(FALSE);
+		else
+			AllInButton.EnableWindow(TRUE);
 
 		if(invested[bot]==0 || (gameround == PREFLOP && 
 			        invested[bot]==BBLIND && invested[human]==BBLIND))
@@ -415,19 +431,22 @@ void CSimpleGameDlg::OnBnClickedCheck2()
 // This is the fold/check button.
 void CSimpleGameDlg::OnBnClickedButton1()
 {
-	//if the bot has invested nothing, then we are checking
-	if(invested[bot]==0)
+	//if this is true, we are checking
+	if(invested[bot]==invested[human])
 	{
 		//if we are first to act, then this is a "bet" as the gr continues
-		if(human == P0)
+		if((gameround == PREFLOP && human==P1) ||
+			(gameround !=PREFLOP && human == P0))
 			dobet(human, 0);
 		//otherwise we are second to act. then we are calling a check and the gr ends.
 		else
 			docall(human);
 	}
-	//the bot has something invested. we must be folding.
-	else
+	//there is a difference in invested which we are unwilling to reconcile
+	else if (invested[bot] > invested[human])
 		dofold(human);
+	else
+		REPORT("inconsistant invested amounts");
 }
 
 // This is the call button.
@@ -530,7 +549,8 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	//inform bot of the new game
 	MyBot.setnewgame(bot, botcards, SBLIND, BBLIND, STACKSIZE);
 
-	//display the cards
+	//display the cards pics
+	eraseboard();
 	printhumancards();
 	if(ShowBotCards.GetCheck())
 		printbotcards();

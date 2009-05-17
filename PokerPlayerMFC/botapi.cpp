@@ -495,7 +495,11 @@ double BotAPI::mintotalwager()
 	if(currentgr == PREFLOP && invested[acting]<(double)BB)
 		return (double)BB;
 	
+	//we're going first and nothing's been bet yet
+	if(currentgr != PREFLOP && acting==P0 && invested[1-acting]==0)
+		return 0;
+
 	//otherwise, this is the standard formula that FullTilt seems to follow
-	double prevwager = invested[acting]-invested[1-acting];
+	double prevwager = invested[1-acting]-invested[acting];
 	return invested[acting] + max((double)BB, prevwager);
 }

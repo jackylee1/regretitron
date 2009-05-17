@@ -51,6 +51,7 @@ private:
 	void printflop();
 	void printturn();
 	void printriver();
+	void eraseboard();
 	void recalctotal();
 	void updatepot();
     void updateinvested();
