@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="8.00"
-	Name="PokerPlayerMFC"
+	Name="PokerPlayer"
 	ProjectGUID="{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}"
 	RootNamespace="PokerPlayerMFC"
 	Keyword="Win32Proj"

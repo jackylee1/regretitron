@@ -15,7 +15,7 @@ protected: //so TreeState can inherate access to these.
 	int flopscore, turnscore, riverscore;
 	int binnumber[2][4];
 
-private: //but, for clarity, TreeState does not use these.
+private: //but, for clarity, BotAPI does not use these.
 	CardMask priv1;
 	int twoprob0wins;
 };

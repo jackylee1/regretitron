@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="8.00"
-	Name="SimpleGameMFC"
+	Name="SimpleGame"
 	ProjectGUID="{1C9B2E00-EBAE-4183-9C66-650A1EE6FB2A}"
 	RootNamespace="SimpleGame"
 	Keyword="MFCProj"

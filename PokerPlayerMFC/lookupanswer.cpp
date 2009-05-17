@@ -3,13 +3,14 @@
 #include "../PokerLibrary/constants.h"
 
 
-void readstrategy(int sceni, int beti, float * const probabilities, int n_acts)
+void readstrategy(int sceni, int beti, double * const probabilities, int n_acts)
 {
-	//calculate offset in bytes
 	unsigned long long int offset;//64 bit just in case
+	float floatprobs[9]; //the strategy is stored as floats, not doubles
 	std::ifstream f;
-	offset = sceni * SCENI_STRATDUMP_BYTES;
 
+	//calculate offset in bytes, values all stored as floats
+	offset = sceni * SCENI_STRATDUMP_BYTES;
 	if(beti < BETI9_CUTOFF)
 		offset += STRATDUMP9_OFFSET + beti*8*sizeof(float);
 	else if(beti < BETI3_CUTOFF)
@@ -17,18 +18,25 @@ void readstrategy(int sceni, int beti, float * const probabilities, int n_acts)
 	else if(beti < BETI2_CUTOFF)
 		offset += STRATDUMP2_OFFSET + (beti-BETI3_CUTOFF)*1*sizeof(float);
 
-	//open file, read nbytes, set probabilities[nbytes]=1-sum(rest)
+	//n_acts is the actual number of actions for this node from the betting
+	//tree itself. we have stored exactly that many - 1 actions here
+	//the last one is determined from those initial n - 1 actions.
 	f.open("strategy/2M8bin13ss.strat", std::ifstream::binary);
-	f.read((char*const)probabilities, (n_acts-1)*sizeof(float));
-	if(!f.good())
+	f.seekg((std::streamoff)offset);
+	f.read((char*)floatprobs, (n_acts-1)*sizeof(float));
+	if(!f.good() || offset > 0x7fffffffUL)
 	{
-		MessageBox(NULL,TEXT("Strategy files not found/working. Using random."),TEXT("PokerPlayer"),MB_ICONSTOP|MB_OK);
-		for(int a=0; a<n_acts-1; a++) probabilities[a] = 1.0F/n_acts;
+		MessageBox(NULL,TEXT("Strategy files not found/working. Using random. Could choose invalid actions."),TEXT("PokerPlayer"),MB_ICONSTOP|MB_OK);
+		for(int a=0; a<n_acts-1; a++) floatprobs[a] = 1.0F/n_acts;
 	}
 	f.close();
 
-	//fill in that last one here.
-	probabilities[n_acts-1] = 1-std::accumulate(probabilities, probabilities + n_acts-1, 0.0F);
+	//now convert to doubles
+	for(int a=0; a<n_acts-1; a++)
+		probabilities[a] = (double)floatprobs[a];
+
+	//finally, calculate the last element
+	probabilities[n_acts-1] = 1-std::accumulate(probabilities, probabilities + n_acts-1, 0.0);
 }
 	
 

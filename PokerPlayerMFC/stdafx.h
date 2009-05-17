@@ -37,6 +37,7 @@
 #include <fstream>
 #include <algorithm> //has min_element
 #include <numeric> //has accumulate
+#include <limits> //has infinity
 
 #include "../mymersenne.h"
 

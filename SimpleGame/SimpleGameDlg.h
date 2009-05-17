@@ -7,12 +7,6 @@
 #include "../picturectrl.h"
 #include "afxwin.h"
 
-enum Player
-{
-	P0 = 0,
-	P1 = 1
-};
-
 #define PREFLOP 0
 #define FLOP 1
 #define TURN 2

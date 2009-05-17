@@ -527,7 +527,7 @@ void CSimpleGameDlg::OnBnClickedButton5()
 		winner = -1;
 
 	//inform bot of the new game
-	MyBot.setnewgame(bot, botcards, SBLIND, BBLIND);
+	MyBot.setnewgame(bot, botcards, SBLIND, BBLIND, STACKSIZE);
 
 	//display the cards
 	printhumancards();
@@ -543,7 +543,7 @@ void CSimpleGameDlg::OnBnClickedButton5()
 //This is the "make bot go" button.
 void CSimpleGameDlg::OnBnClickedButton6()
 {
-	float val;
+	double val;
 	Action act;
 	//get answer from bot
 	act = MyBot.getanswer(val);
