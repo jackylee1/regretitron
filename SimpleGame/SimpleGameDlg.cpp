@@ -86,6 +86,16 @@ void CSimpleGameDlg::OnCancel()
 	DestroyWindow();
 }
 
+//this is a hack to make the enter key call the raise button
+//handler and do nothing else (like close the window).
+//fixes everything in one fell swoop.
+//http://www.flounder.com/dialogapp.htm
+void CSimpleGameDlg::OnOK()
+{
+	if(BetRaiseButton.IsWindowEnabled())
+		OnBnClickedButton3();
+}
+
 BOOL CSimpleGameDlg::OnInitDialog()
 {
 	CDialog::OnInitDialog();

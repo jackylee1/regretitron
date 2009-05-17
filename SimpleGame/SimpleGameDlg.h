@@ -42,6 +42,7 @@ protected:
 	//needed to call DestroyWindow on this window and any others (diagnosticswindow), 
 	//which actually exists app
 	void OnCancel();
+	void OnOK();
 
 private:
 	//functions
