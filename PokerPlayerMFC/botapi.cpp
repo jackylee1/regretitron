@@ -254,7 +254,7 @@ void BotAPI::dobet(Player pl, double amount)
 		REPORT("we expected a betting action");
 	}
 
-	if (mynode->potcontrib[nextact] == 0)
+	if (isallin(nextact))
 		REPORT("we expected a betting action but got all-in");
 
 	//ok, let's accept the answer and do it.
@@ -324,8 +324,8 @@ int BotAPI::getbestbetact(double betsize)
 		case FD: case GO1: case GO2: case GO3: case GO4: case GO5: case AI: case NA:
 			continue;
 		default:
-			if(mynode->potcontrib[a]==0)
-				continue; //this is a bet-all-in then
+			if(isallin(a))
+				continue;
 
 			double error = abs( (double)(mynode->potcontrib[a]) - betsize );
 			if(error < besterror)
@@ -433,7 +433,7 @@ Action BotAPI::getanswer(double &amount)
 		break;
 
 	default:
-		if (mynode->potcontrib[answer] == 0)
+		if (isallin(answer))
 		{
 			amount = 0;
 			myact = ALLIN;

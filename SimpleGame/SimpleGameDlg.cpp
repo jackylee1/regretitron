@@ -43,6 +43,9 @@ void CSimpleGameDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_BUTTON3, BetRaiseButton);
 	DDX_Control(pDX, IDC_BUTTON4, AllInButton);
 	DDX_Control(pDX, IDC_BUTTON6, MakeBotGoButton);
+	DDX_Control(pDX, IDC_BSTACK, BotStack);
+	DDX_Control(pDX, IDC_HSTACK, HumanStack);
+	DDX_Control(pDX, IDC_BUTTON5, NewGameButton);
 }
 
 BEGIN_MESSAGE_MAP(CSimpleGameDlg, CDialog)
@@ -207,18 +210,6 @@ void CSimpleGameDlg::eraseboard()
 
 // ---------------- On-screen Update Functions -------------------
 
-void CSimpleGameDlg::recalctotal()
-{
-	//we assume this function updates totalhumanwon as well as print it
-	if (winner==human)
-		totalhumanwon += (pot + invested[bot]);
-	else if (winner==bot)
-		totalhumanwon -= (pot + invested[human]);
-	//reprint the total to the screen
-	CString val;
-	val.Format(TEXT("$%.2f"), totalhumanwon);
-	TotalWon.SetWindowText(val);
-}
 void CSimpleGameDlg::updatepot()
 {
 	//reprint the pot to the screen
@@ -234,6 +225,10 @@ void CSimpleGameDlg::updateinvested()
 	InvestedHum.SetWindowText(val);
 	val.Format(TEXT("$%.2f"), invested[bot]);
 	InvestedBot.SetWindowText(val);
+	val.Format(TEXT("You: $%.2f"), STACKSIZE-invested[human]-pot);
+	HumanStack.SetWindowText(val);
+	val.Format(TEXT("Bot: $%.2f"), STACKSIZE-invested[bot]-pot);
+	BotStack.SetWindowText(val);
 }
 
 
@@ -256,10 +251,9 @@ double CSimpleGameDlg::mintotalwager(Player acting)
 }
 void CSimpleGameDlg::dofold(Player pl)
 {
-	//set the winner to the other player and then recalctotal will handle it
+	//set the winner to the other player
 	winner = 1-pl; //1-pl returns the other player, since they are 0 and 1
-	recalctotal();
-	graygameover();
+	dogameover(true);
 }
 void CSimpleGameDlg::docall(Player pl)
 {
@@ -311,8 +305,7 @@ void CSimpleGameDlg::docall(Player pl)
 	case RIVER:
 		//game over
 		printbotcards();
-		recalctotal();
-		graygameover();
+		dogameover(false);
 		break;
 
 	default:
@@ -349,11 +342,54 @@ void CSimpleGameDlg::doallin(Player pl)
 	graypostact(Player(1-pl));
 }
 
+void CSimpleGameDlg::dogameover(bool fold)
+{
+	//Update the total amount won and print to screeen
+
+	if (winner==human)
+		totalhumanwon += (pot + invested[bot]);
+	else if (winner==bot)
+		totalhumanwon -= (pot + invested[human]);
+	//reprint the total to the screen
+	CString val;
+	val.Format(TEXT("$%.2f"), totalhumanwon);
+	TotalWon.SetWindowText(val);
+
+	//Set grayness values
+
+	graygameover();
+
+	//print user friendly hints to invested amounts
+	if(fold)
+	{
+		if (winner==human)
+			InvestedBot.SetWindowText(TEXT("FOLD"));
+		else if(winner==bot)
+			InvestedHum.SetWindowText(TEXT("FOLD"));
+	}
+	else if(winner==human)
+	{
+		InvestedBot.SetWindowText(TEXT("LOSE"));
+		InvestedHum.SetWindowText(TEXT("WIN"));
+	}
+	else if(winner==bot)
+	{
+		InvestedHum.SetWindowText(TEXT("LOSE"));
+		InvestedBot.SetWindowText(TEXT("WIN"));
+	}
+	else
+	{
+		InvestedHum.SetWindowText(TEXT("TIE"));
+		InvestedBot.SetWindowText(TEXT("TIE"));
+	}
+}
+
 // ---------------------------- Setting grayness -----------------------------
 
 void CSimpleGameDlg::graygameover()
 {
 	//gray out all but newgame
+	NewGameButton.EnableWindow(TRUE);
 	FoldCheckButton.SetWindowText(TEXT("Fold/Check"));
 	FoldCheckButton.EnableWindow(FALSE);
 	CallButton.EnableWindow(FALSE);
@@ -364,7 +400,7 @@ void CSimpleGameDlg::graygameover()
 
 void CSimpleGameDlg::graypostact(Player nexttoact)
 {
-	//new game is NEVER grayed out
+	NewGameButton.EnableWindow(FALSE);
 
 	if(nexttoact == bot)
 	{
@@ -481,6 +517,7 @@ void CSimpleGameDlg::OnBnClickedButton3()
 	CString valstr;
 	double val;
 	BetAmount.GetWindowText(valstr);
+	BetAmount.SetWindowText(TEXT(""));
 	val = wcstod(valstr, NULL); //converts string to double
 
 	//input checking: make sure it's not too small or too big, then do it.

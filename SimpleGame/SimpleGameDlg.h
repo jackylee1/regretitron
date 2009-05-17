@@ -53,13 +53,13 @@ private:
 	void printturn();
 	void printriver();
 	void eraseboard();
-	void recalctotal();
 	void updatepot();
     void updateinvested();
 	double mintotalwager(Player acting);
 	void dofold(Player pl);
 	void docall(Player pl);
 	void dobet(Player pl, double amount);
+	void dogameover(bool fold);
 	void doallin(Player pl);
 	void graygameover();
 	void graypostact(Player nexttoact);
@@ -109,4 +109,7 @@ private:
 	CButton BetRaiseButton;
 	CButton AllInButton;
 	CButton MakeBotGoButton;
+	CStatic BotStack;
+	CStatic HumanStack;
+	CButton NewGameButton;
 };
