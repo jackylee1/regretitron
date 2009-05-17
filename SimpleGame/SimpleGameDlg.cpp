@@ -240,8 +240,9 @@ void CSimpleGameDlg::dofold(Player pl)
 }
 void CSimpleGameDlg::docall(Player pl)
 {
-	//inform bot (should be okay even if all-in or river)
-	MyBot.advancetree(pl,CALL,invested[1-pl]);
+	//inform bot unless game is over
+	if(!isallin && gameround != RIVER)
+		MyBot.advancetree(pl,CALL,invested[1-pl]);
 	//increase pot
 	pot += invested[1-pl];
 	updatepot();

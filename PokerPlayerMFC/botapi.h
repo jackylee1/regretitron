@@ -62,6 +62,7 @@ private:
 	void docall(Player pl, double amount);
 	void dobet(Player pl, double amount);
 	void doallin(Player pl);
+	bool isallin(int a);
 	int getbestbetact(double betsize);
 	int getallinact();
 	int getbethist();

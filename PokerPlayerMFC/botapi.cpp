@@ -272,19 +272,12 @@ void BotAPI::doallin(Player pl)
 	int nextact = getallinact();
 
 	if(nextact < 0 || nextact >=9) REPORT("could not find all-in node.");
-
-	switch(mynode->result[nextact])
-	{
-	case FD: case GO1: case GO2: case GO3: case GO4: case GO5: case AI: case NA:
+	if(!isallin(nextact))
 		REPORT("we did not find a BET all-in");
-	}
-
-	if (mynode->potcontrib[nextact] != 0)
-		REPORT("that is still not a BET all-in");
 
 	//ok, let's accept the answer and do it.
-	invested[pl] = STACKSIZE;
-	perceived[pl] = STACKSIZE;
+	invested[pl] = STACKSIZE-currentpot;
+	perceived[pl] = STACKSIZE-currentpot;
 	currentbetinode = mynode->result[nextact];
 	mynode = (currentgr == PREFLOP ? pfn : n) + currentbetinode;
 }
@@ -292,6 +285,33 @@ void BotAPI::doallin(Player pl)
 // ----------------------------------------------------------------------------
 // ---- Private helper functions for advancing the tree on betting actions ----
 		
+bool BotAPI::isallin(int a)
+{
+	switch(mynode->result[a])
+	{
+	case FD:
+	case GO1: 
+	case GO2: 
+	case GO3: 
+	case GO4: 
+	case GO5: 
+	case AI: 
+	case NA:
+		return false;
+	}
+
+	if(mynode->potcontrib[a] != 0)
+		return false;
+
+	//must check to see if child node has 2 actions
+	betnode const * child;
+	child = (currentgr==PREFLOP) ? pfn : n;
+	if(child[mynode->result[a]].numacts == 2)
+		return true;
+	else
+		return false;
+}
+
 int BotAPI::getbestbetact(double betsize)
 {
 	int bestaction=-1;
@@ -330,17 +350,10 @@ int BotAPI::getallinact()
 
 	for(int a=0; a<mynode->numacts; a++)
 	{
-		switch(mynode->result[a])
+		if(isallin(a))
 		{
-		case FD: case GO1: case GO2: case GO3: case GO4: case GO5: case AI: case NA:
-			continue;
-		default:
-			if(mynode->potcontrib[a]==0)//then it's all-in!
-			{
-				//save the action index
-				allinaction = a;
-				total++;
-			}
+			allinaction = a;
+			total++;
 		}
 	}
 	if (total != 1)
