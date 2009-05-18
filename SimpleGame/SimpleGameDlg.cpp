@@ -1,12 +1,16 @@
 #include "stdafx.h"
 #include "SimpleGame.h"
 #include "SimpleGameDlg.h"
+#include "../PokerLibrary/rephands.h" //has card filename getter
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
 // --------------------- MFC Class, window stuff ---------------------------
+
+//converts from std::string to Cstring
+#define CSTR(stdstr) CString((stdstr).c_str())
 
 // CSimpleGameDlg dialog
 CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
@@ -156,21 +160,10 @@ HCURSOR CSimpleGameDlg::OnQueryDragIcon()
 
 // -------------------------- Card Printing Functions -------------------------
 
-CString cardfilename(CardMask m)
-{
-	int i;
-	CString ret;
-	for(i=0; i<52; i++)
-		if (StdDeck_CardMask_CARD_IS_SET(m, i)) break;
-	i = 1 + (12-StdDeck_RANK(i))*4 + StdDeck_SUIT(i);
-	ret.Format(TEXT("cards/%d.png"),i);
-	return ret;
-}
-	
 void CSimpleGameDlg::printbotcards()
 {
-	bCard0.LoadFromFile(cardfilename(botcm0));
-	bCard1.LoadFromFile(cardfilename(botcm1));
+	bCard0.LoadFromFile(CSTR(cardfilename(botcm0)));
+	bCard1.LoadFromFile(CSTR(cardfilename(botcm1)));
 }
 void CSimpleGameDlg::printbotcardbacks()
 {
@@ -179,22 +172,22 @@ void CSimpleGameDlg::printbotcardbacks()
 }
 void CSimpleGameDlg::printhumancards()
 {
-	hCard0.LoadFromFile(cardfilename(humancm0));
-	hCard1.LoadFromFile(cardfilename(humancm1));
+	hCard0.LoadFromFile(CSTR(cardfilename(humancm0)));
+	hCard1.LoadFromFile(CSTR(cardfilename(humancm1)));
 }
 void CSimpleGameDlg::printflop()
 {
-	cCard0.LoadFromFile(cardfilename(flop0));
-	cCard1.LoadFromFile(cardfilename(flop1));
-	cCard2.LoadFromFile(cardfilename(flop2));
+	cCard0.LoadFromFile(CSTR(cardfilename(flop0)));
+	cCard1.LoadFromFile(CSTR(cardfilename(flop1)));
+	cCard2.LoadFromFile(CSTR(cardfilename(flop2)));
 }
 void CSimpleGameDlg::printturn()
 {
-	cCard3.LoadFromFile(cardfilename(turn));
+	cCard3.LoadFromFile(CSTR(cardfilename(turn)));
 }
 void CSimpleGameDlg::printriver()
 {
-	cCard4.LoadFromFile(cardfilename(river));
+	cCard4.LoadFromFile(CSTR(cardfilename(river)));
 }
 void CSimpleGameDlg::eraseboard()
 {
@@ -247,7 +240,7 @@ double CSimpleGameDlg::mintotalwager(Player acting)
 
 	//otherwise, this is the standard formula that FullTilt seems to follow
 	double prevwager = invested[1-acting]-invested[acting];
-	return invested[acting] + max(BBLIND, prevwager);
+	return invested[1-acting] + max(BBLIND, prevwager);
 }
 void CSimpleGameDlg::dofold(Player pl)
 {

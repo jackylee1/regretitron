@@ -35,7 +35,7 @@ void printfirstnodestrat(char const * const filename)
 
 		//print the scenario index and an example hand
 		log << endl << "Scenario " << sceni << ":";
-		printrepinfo(log, sceni, 5); //starts with spaces and ends with endl
+		printsceniinfo(log, sceni, 5); //starts with spaces and ends with endl
 		
 		//remember we only store max-1 strategies. the last must be found based on all adding to 1.
 		strataccum=0;
@@ -44,12 +44,13 @@ void printfirstnodestrat(char const * const filename)
 			if(isvalid[a])
 			{
 				strataccum+=stratn[a]/stratd[a];
-				log << "   " << actionstring(a,PREFLOP,0) << 100*safedivide(stratn[a],stratd[a]) << "%" << endl;
+				log << "   " << actionstring(a,PREFLOP,pfn,1.0) << 100*safedivide(stratn[a],stratd[a]) << "%" << endl;
+				log << "   " << actionstring(a,PREFLOP,pfn,1.0) << 100*safedivide(stratn[a],stratd[a]) << "%" << endl;
 			}
 		}
 		//finally, handle the last strat, if it is valid.
 		if(isvalid[maxa-1])
-			log << "   " << actionstring(maxa-1,PREFLOP,0) << 100*(1-strataccum) << "%" << endl;
+			log << "   " << actionstring(maxa-1,PREFLOP,pfn,1.0) << 100*(1-strataccum) << "%" << endl;
 	}
 	log.close();
 }

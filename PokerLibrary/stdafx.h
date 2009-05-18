@@ -15,6 +15,7 @@
 #include <fstream> //needed for saving the strategy file.
 #include <string> //needed for some of the rephands shenanigans
 #include <sstream> //for formatting strings more easily
+#include <iomanip> //needed for formating the way floats are printed in cout's and the like
 
 // Needed for file mapping.
 #include <Windows.h>

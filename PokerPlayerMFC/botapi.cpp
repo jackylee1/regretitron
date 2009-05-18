@@ -5,14 +5,15 @@
 #include "../PokerLibrary/constants.h"
 #include "../PokerLibrary/flopalyzer.h"
 #include "../PokerLibrary/treenolimit.h"
-#include "dodiagnostics.h"
+#include "../PokerLibrary/rephands.h" // for isallin and roundtobb
+#include "DiagnosticsPage.h" //to access radios for answer
 
 // -----------------------------------------------------------------------
 // -----------------------------------------------------------------------
 // ----------------- Class Constructors and Destructors ------------------
 
 BotAPI::BotAPI(bool diagon)
-   : isdiagnosticson(diagon), mynode(NULL), answer(-1)
+   : isdiagnosticson(diagon), mynode(NULL), answer(-1), MyWindow(NULL)
 {
 	//init the preflop tree
 	initpfn();
@@ -120,7 +121,7 @@ void BotAPI::setflop(CardMask theflop, double newpot)
 	invested[1] = 0;
 	perceived[0] = 0;
 	perceived[1] = 0;
-	currentsceni = getscenarioi(FLOP, myplayer, (int)(newpot/multiplier+0.5), bethist);
+	currentsceni = getscenarioi(FLOP, myplayer, roundtobb(newpot/multiplier), bethist);
 	currentbetinode = 0; //ready for P0 to act
 	mynode = n;
 	processmyturn();
@@ -151,7 +152,7 @@ void BotAPI::setturn(CardMask theturn, double newpot)
 	invested[1] = 0;
 	perceived[0] = 0;
 	perceived[1] = 0;
-	currentsceni = getscenarioi(TURN, myplayer, (int)(newpot/multiplier+0.5), bethist);
+	currentsceni = getscenarioi(TURN, myplayer, roundtobb(newpot/multiplier), bethist);
 	currentbetinode = 0; //ready for P0 to act
 	mynode = n;
 	processmyturn();
@@ -182,7 +183,7 @@ void BotAPI::setriver(CardMask theriver, double newpot)
 	invested[1] = 0;
 	perceived[0] = 0;
 	perceived[1] = 0;
-	currentsceni = getscenarioi(RIVER, myplayer, (int)(newpot/multiplier+0.5), bethist);
+	currentsceni = getscenarioi(RIVER, myplayer, roundtobb(newpot/multiplier), bethist);
 	currentbetinode = 0; //ready for P0 to act
 	mynode = n;
 	processmyturn();
@@ -196,12 +197,16 @@ void BotAPI::setriver(CardMask theriver, double newpot)
 //wrapper function to simplify logic
 void BotAPI::advancetree(Player pl, Action a, double amount)
 {
+	//in this case there would be no all-in node to find
+	if(a == ALLIN && pl == myplayer && offtreebetallins) 
+		return;
+
 	switch(a)
 	{
 	case FOLD:  REPORT("The bot does not need to know about folds");
 	case CALL:  docall (pl, amount/multiplier); break;
 	case BET:   dobet  (pl, amount/multiplier); break;
-	case ALLIN: doallin(pl);         break;
+	case ALLIN: doallin(pl);   break;
 	default:    REPORT("You advanced tree with an invalid action.");
 	}
 
@@ -254,7 +259,7 @@ void BotAPI::dobet(Player pl, double amount)
 		REPORT("we expected a betting action");
 	}
 
-	if (isallin(nextact))
+	if (isallin(mynode,currentgr,nextact))
 		REPORT("we expected a betting action but got all-in");
 
 	//ok, let's accept the answer and do it.
@@ -272,7 +277,7 @@ void BotAPI::doallin(Player pl)
 	int nextact = getallinact();
 
 	if(nextact < 0 || nextact >=9) REPORT("could not find all-in node.");
-	if(!isallin(nextact))
+	if(!isallin(mynode,currentgr,nextact))
 		REPORT("we did not find a BET all-in");
 
 	//ok, let's accept the answer and do it.
@@ -285,33 +290,6 @@ void BotAPI::doallin(Player pl)
 // ----------------------------------------------------------------------------
 // ---- Private helper functions for advancing the tree on betting actions ----
 		
-bool BotAPI::isallin(int a)
-{
-	switch(mynode->result[a])
-	{
-	case FD:
-	case GO1: 
-	case GO2: 
-	case GO3: 
-	case GO4: 
-	case GO5: 
-	case AI: 
-	case NA:
-		return false;
-	}
-
-	if(mynode->potcontrib[a] != 0)
-		return false;
-
-	//must check to see if child node has 2 actions
-	betnode const * child;
-	child = (currentgr==PREFLOP) ? pfn : n;
-	if(child[mynode->result[a]].numacts == 2)
-		return true;
-	else
-		return false;
-}
-
 int BotAPI::getbestbetact(double betsize)
 {
 	int bestaction=-1;
@@ -324,7 +302,7 @@ int BotAPI::getbestbetact(double betsize)
 		case FD: case GO1: case GO2: case GO3: case GO4: case GO5: case AI: case NA:
 			continue;
 		default:
-			if(isallin(a))
+			if(isallin(mynode,currentgr,a))
 				continue;
 
 			double error = abs( (double)(mynode->potcontrib[a]) - betsize );
@@ -350,7 +328,7 @@ int BotAPI::getallinact()
 
 	for(int a=0; a<mynode->numacts; a++)
 	{
-		if(isallin(a))
+		if(isallin(mynode,currentgr,a))
 		{
 			allinaction = a;
 			total++;
@@ -396,6 +374,9 @@ Action BotAPI::getanswer(double &amount)
 	if(myplayer != mynode->playertoact) REPORT("You asked for an answer when the bot thought action was on opp.");
 	if(answer<0 || answer>=9) REPORT("Inconsistant BotAPI state.");
 
+	if(MyWindow!=NULL)
+		answer = MyWindow->GetCheckedRadioButton(IDC_RADIO1, IDC_RADIO9)-IDC_RADIO1;
+	if(answer<0 || answer>=9) REPORT("Failure of buttons.");
 
 	//pass back the correct numbers to communicate our answer
 	switch(mynode->result[answer])
@@ -433,7 +414,7 @@ Action BotAPI::getanswer(double &amount)
 		break;
 
 	default:
-		if (isallin(answer))
+		if (isallin(mynode,currentgr,answer))
 		{
 			amount = 0;
 			myact = ALLIN;
@@ -501,5 +482,5 @@ double BotAPI::mintotalwager()
 
 	//otherwise, this is the standard formula that FullTilt seems to follow
 	double prevwager = invested[1-acting]-invested[acting];
-	return invested[acting] + max((double)BB, prevwager);
+	return invested[1-acting] + max((double)BB, prevwager);
 }

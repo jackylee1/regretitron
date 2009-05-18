@@ -41,9 +41,12 @@
 
 #include "../mymersenne.h"
 
+//Pokereval
+#include "poker_defs.h"
+
 //pop up message box on error
 #define REPORT(chars) { \
-    MessageBox(NULL, TEXT(chars), TEXT("failure"), MB_OK);\
+    AfxMessageBox(TEXT(chars));\
 	_asm {int 3}; \
 	exit(1); \
 }

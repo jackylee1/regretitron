@@ -6,6 +6,11 @@
 #include "constants.h"
 using namespace std;
 
+//this function takes the hand index (which is the bin number) of a
+//preflop hand (preflop bins are same as 2-card index: 0-168) and 
+//returns a single random hand that fits that.
+//this and the 3 below are used by the diagnostic window in 
+//PokerPlayer and printpreflophand (below).
 CardMask findpreflophand(int index)
 {
 	CardMask priv, usedcards;
@@ -20,6 +25,10 @@ CardMask findpreflophand(int index)
 	}
 }
 
+//these 3 functions take a boardi and a handi (boardalyzer and bin number, 
+//that is) and returns a single random hole cards and board that fit it
+//these and the one above are used by the diagnostic window in 
+//PokerPlayer and printxxxxhands (below).
 void findflophand(int bin, int flopscore, CardMask &priv, CardMask &flop)
 {
 	CardMask usedcards;
@@ -95,7 +104,12 @@ void findriverhand(int bin, int riverscore, CardMask &priv, CardMask &flop, Card
 	}
 }
 
-void printpreflophands(ostream &out, int index)
+//this function takes a handi for preflop (so that's the raw 2-card-index)
+//calls findpreflophand (above) to get a random matching hand,
+//and prints the hand in common 2 character plus 's' for suited
+//format, to the given stream
+//this and the next three are only used by printsceniinfo in this file.
+void printpreflophand(ostream &out, int index)
 {
 	char ret[4];
 	char * mask;
@@ -112,6 +126,10 @@ void printpreflophands(ostream &out, int index)
 	out << "  " << ret << endl;
 }
 
+//the following functions take a handi and boardi (bin number and 
+//boardalyzer score) calls findxxxxhand (above), and prints out the hand
+//it does that the given n number of times to the given stream.
+//they and the one above are only used by printsceniinfo in this file.
 void printflophands(ostream &out, int bin, int flopscore, int n)
 {
 	CardMask priv, flop;
@@ -148,13 +166,74 @@ void printriverhands(ostream &out, int bin, int riverscore, int n)
 	}
 }
 
-//this function assumes that a contiguous region of BB-multiple pot values are assigned
-//to a single pot index. The lowest matching pot will be set to lower, and the highest
-//matching pot will be set to upper. Each are guaranteed to produce the given pot index 
-//for this gr.
+//this function takes a scenario index.
+//it outputs the gameround, the pot index, the board index (boardalyzer 
+//score), the hand index (the bin number), and the bet history.
+//if any of these values are not used, as they may be depending on the
+//gameround, it sets them to -1.
+//used by the diagnostics window (in PokerPlayer) and by printsceniinfo (this file)
+void getindices(int sceni, int &gr, int &poti, int &boardi, int &handi, int bethist[3])
+{
+	//default value if not used.
+	bethist[0]=bethist[1]=bethist[2]=-1;
+
+	if(sceni<0)
+	{
+		REPORT("Invalid sceni given to getindices");
+	}
+	if(sceni<SCENI_PREFLOP_MAX)
+	{
+		gr = PREFLOP;
+		poti=-1;
+		boardi=-1;
+		handi=sceni;
+	}
+	else if(sceni<SCENI_FLOP_MAX)
+	{
+		gr = FLOP;
+		sceni-=SCENI_PREFLOP_MAX;
+		bethist[0] = sceni % BETHIST_MAX;
+		poti       =(sceni/BETHIST_MAX) % POTI_FLOP_MAX;
+		boardi     =(sceni/BETHIST_MAX/POTI_FLOP_MAX) % FLOPALYZER_MAX;
+		handi      = sceni/BETHIST_MAX/POTI_FLOP_MAX/FLOPALYZER_MAX;
+	}
+	else if(sceni<SCENI_TURN_MAX)
+	{
+		gr = TURN;
+		sceni-=SCENI_FLOP_MAX;
+		bethist[0] = sceni % BETHIST_MAX;
+		bethist[1] =(sceni/BETHIST_MAX) % BETHIST_MAX;
+		poti       =(sceni/BETHIST_MAX/BETHIST_MAX) % POTI_TURN_MAX;
+		boardi     =(sceni/BETHIST_MAX/BETHIST_MAX/POTI_TURN_MAX) % TURNALYZER_MAX;
+		handi      = sceni/BETHIST_MAX/BETHIST_MAX/POTI_TURN_MAX/TURNALYZER_MAX;
+	}
+	else if(sceni<SCENI_RIVER_MAX)
+	{
+		gr = RIVER;
+		sceni-=SCENI_TURN_MAX;
+		bethist[0] = sceni % BETHIST_MAX;
+		bethist[1] =(sceni/BETHIST_MAX) % BETHIST_MAX;
+		bethist[2] =(sceni/BETHIST_MAX/BETHIST_MAX) % BETHIST_MAX;
+		poti       =(sceni/BETHIST_MAX/BETHIST_MAX/BETHIST_MAX) % POTI_RIVER_MAX;
+		boardi     =(sceni/BETHIST_MAX/BETHIST_MAX/BETHIST_MAX/POTI_RIVER_MAX) % RIVALYZER_MAX;
+		handi      = sceni/BETHIST_MAX/BETHIST_MAX/BETHIST_MAX/POTI_RIVER_MAX/RIVALYZER_MAX;
+	}
+	else 
+	{
+		REPORT("Invalid sceni given to getindices");
+	}
+}
+
+//this function takes the current gameround and the pot index for that round,
+//and returns the lowest and the highest pots that the engine
+//would match to that pot index.
+//it does that by assuming that a contiguous region of BB-multiple 
+//pot values are assigned to a single pot index, and calling 
+//the pot indexing function repeatedly to find that range. 
+//both return values will compute to the same pot index
+//used by the diagnostics window in PokerPlayer and printsceniinfo (below).
 void resolvepoti(int gr, int poti, int &lower, int &upper)
 {
-	//in case of error, we won't REPORT, but rather just return -1.
 	lower = upper = -1;
 
 	for (int pot=BB; pot<STACKSIZE; pot+=BB) //increment pot in multiples of the BB
@@ -171,8 +250,13 @@ void resolvepoti(int gr, int poti, int &lower, int &upper)
 		if (getpoti(gr, pot) == poti)
 			upper = pot;
 	}
+
+	if(lower==-1 || upper==-1 || lower > upper) 
+		REPORT("could not find pots to match pot index.")
 }
 
+//simple table of strings for bethistories.
+//used by diagnostics window (in PokerPlayer) and resolvebethist(below)
 string bethiststr(int bethist)
 {
 	switch(bethist)
@@ -188,101 +272,61 @@ string bethiststr(int bethist)
 	case GO5-GO_BASE:
 		return "check-bet-raise-call";
 	default:
-		return "[invalid bethist]";
+		REPORT("invalid betting history passed to bethiststr");
 	}
 }
 
-//in a convoluted way, produces "preflopbets : flopbets : turnbets"
-// or "preflopbets : flopbets"
-// or "preflopbets"
-string resolvebethist(int gr, int bethist)
+//this function calls the ones above to print all information
+//that the engine would know about a scenario index. to the 
+//given stream
+//used only by printfirstnodestrat in savestrategy.cpp (PokerNoLimit)
+void printsceniinfo(ostream &out, int sceni, int n_hands)
 {
-	string ret;
-	for(int i=gr; i>=TURN; i--)
+	int gr, poti, boardi, handi, bethist[3];
+	getindices(sceni, gr, poti, boardi, handi, bethist);
+	int potlower, potupper;
+	resolvepoti(gr, poti, potlower, potupper);
+
+	out << "Known pot range: " << potlower << " - " << potupper << endl;
+
+	if(gr==PREFLOP)
 	{
-		ret.insert(0, bethiststr(bethist%BETHIST_MAX));
-		ret.insert(0, " : ");
-		bethist /= BETHIST_MAX;
+		printpreflophand(out, handi);
 	}
-	if(gr!=PREFLOP)
-		ret.insert(0, bethiststr(bethist%BETHIST_MAX));
-	return ret;
-}
-
-//tells you about a sceni
-void printrepinfo(ostream &out, int sceni, int n_hands)
-{
-	if(sceni<SCENI_PREFLOP_MAX)
+	else if(gr==FLOP)
 	{
-		printpreflophands(out, sceni);
+		out << "Betting log: " << bethiststr(bethist[0]);
+		printflophands(out,handi,boardi,n_hands);
 	}
-	else if(0<=sceni && sceni<SCENI_FLOP_MAX)
+	else if(gr==TURN)
 	{
-		int potlower, potupper, handbin, boardscore;
-		sceni-=SCENI_PREFLOP_MAX;
-
-		//resolve the betting
-		out << "Betting log: " << resolvebethist(FLOP, sceni%BETHIST_MAX) << endl;
-		sceni/=BETHIST_MAX;
-
-		//resolve the pot
-		resolvepoti(FLOP, sceni%POTI_FLOP_MAX, potlower, potupper);
-		out << "Known pot range: " << potlower << " - " << potupper << endl;
-		sceni/=POTI_FLOP_MAX;
-
-		//resolve some example hands
-		boardscore = sceni%FLOPALYZER_MAX;
-		handbin = sceni/FLOPALYZER_MAX;
-		printflophands(out,handbin,boardscore,n_hands);
+		out << "Betting log: " << bethiststr(bethist[0]) 
+			<< " : " << bethiststr(bethist[1]) << endl;
+		printturnhands(out,handi,boardi,n_hands);
 	}
-	else if(sceni<SCENI_TURN_MAX)
+	else if(gr==RIVER)
 	{
-		int potlower, potupper, handbin, boardscore;
-		sceni-=SCENI_PREFLOP_MAX+SCENI_FLOP_MAX;
-
-		//resolve the betting
-		out << "Betting log: " << resolvebethist(TURN, sceni%(BETHIST_MAX*BETHIST_MAX)) << endl;
-		sceni/=BETHIST_MAX*BETHIST_MAX;
-
-		//resolve the pot
-		resolvepoti(TURN, sceni%POTI_TURN_MAX, potlower, potupper);
-		out << "Known pot range: " << potlower << " - " << potupper << endl;
-		sceni/=POTI_TURN_MAX;
-
-		//resolve some example hands
-		boardscore = sceni%TURNALYZER_MAX;
-		handbin = sceni/TURNALYZER_MAX;
-		printturnhands(out,handbin,boardscore,n_hands);
-	}
-	else if(sceni<SCENI_RIVER_MAX)
-	{
-		int potlower, potupper, handbin, boardscore;
-		sceni-=SCENI_PREFLOP_MAX+SCENI_FLOP_MAX+SCENI_TURN_MAX;
-
-		//resolve the betting
-		out << "Betting log: " << resolvebethist(RIVER, sceni%(BETHIST_MAX*BETHIST_MAX*BETHIST_MAX)) << endl;
-		sceni/=BETHIST_MAX*BETHIST_MAX*BETHIST_MAX;
-
-		//resolve the pot
-		resolvepoti(RIVER, sceni%POTI_RIVER_MAX, potlower, potupper);
-		out << "Known pot range: " << potlower << " - " << potupper << endl;
-		sceni/=POTI_RIVER_MAX;
-
-		//resolve some example hands
-		boardscore = sceni%RIVALYZER_MAX;
-		handbin = sceni/RIVALYZER_MAX;
-		printriverhands(out,handbin,boardscore,n_hands);
+		out << "Betting log: " << bethiststr(bethist[0]) 
+			<< " : " << bethiststr(bethist[1])
+			<< " : " << bethiststr(bethist[2]) << endl;
+		printriverhands(out,handi,boardi,n_hands);
 	}
 	else 
-		out << "INVALID SCENI: " << sceni << endl << endl;
+		REPORT("getindices returned an invalid gameround");
 }
 
 
-string actionstring(int action, int gr, int beti)
+//takes an action index, the gameround, a pointer to the relevant
+//betting tree node, and a multiplier.
+//returns a string that reports info on what that action represents.
+//it's units are the native ones for the poker engine (SB = 1) times
+//the multiplier.
+//used by diagnostics window (in PokerPlayer) 
+//and by printfirstnodestrat (savestrategy.cpp of PokerNoLimit)
+string actionstring(int action, int gr, betnode const * tree, double multiplier)
 {
-	const betnode * tree = (gr == PREFLOP) ? pfn+beti : n+beti;
 	stringstream str;
-	string ret;
+	str << fixed << setprecision(2);
 
 	switch(tree->result[action])
 	{
@@ -294,20 +338,95 @@ string actionstring(int action, int gr, int beti)
 	case GO3:
 	case GO4:
 	case GO5:
-		str << "Call " << (int)(tree->potcontrib[action]) << "sb:";
+		str << "Call $" << multiplier*(tree->potcontrib[action]);
 		break;
 	case AI:
-		str << "Call All-In:";
+		str << "Call All-In";
 		break;
 	default:
-		if(tree->potcontrib[action]==0)
-			str << "Bet All-In:";
+		if(isallin(tree,gr,action))
+			str << "All-In";
 		else
-			str << "Bet to " << (int)(tree->potcontrib[action]) << "sb:";
+			str << "Bet $" << multiplier*(tree->potcontrib[action]);
 		break;
 	}
 
-	ret = str.str();
-	ret.resize(13,' ');
-	return ret;
+	return str.str();
 }
+
+//since by betting tree can be ambiguous, more extensive tests
+//are needed to check if a node is a BET allin. this function takes
+//a pointer to a betting tree node, the gameround, and an action index
+//and tells you if it is a BET allin.
+//used by BotAPI (in PokerPlayer) and actionstring (this file)
+bool isallin(betnode const * mynode, int gr, int action)
+{
+	switch(mynode->result[action])
+	{
+	case FD:
+	case GO1: 
+	case GO2: 
+	case GO3: 
+	case GO4: 
+	case GO5: 
+	case AI: 
+	case NA:
+		return false;
+	}
+
+	if(mynode->potcontrib[action] != 0)
+		return false;
+
+	//must check to see if child node has 2 actions
+	betnode const * child;
+	child = (gr==PREFLOP) ? pfn : n;
+	if(child[mynode->result[action]].numacts == 2)
+		return true;
+	else
+		return false;
+}
+
+//takes a floating point pot value and returns the nearest integer
+//which is also a multiple of big blinds.
+//used by BotAPI and diagnostics window (both in PokerPlayer)
+int roundtobb(double pot)
+{
+	return (int)(pot/(double)(BB)+0.5) * BB;
+}
+
+//takes a cardmask with 2 or 3 cards in it, and returns
+//a randomly ordered array of 2 or 3 cardmasks with 1 card in each. 
+//used by diagnostics window only (in PokerPlayer)
+void decomposecm(CardMask in, CardMask out[])
+{
+	int j=0;
+	for(int i=0; i<52; i++)
+		if (StdDeck_CardMask_CARD_IS_SET(in, i))
+			out[j++]=StdDeck_MASK(i);
+
+	if(j!=2 && j!=3)
+		REPORT("not 2 or 3 cards in cm in decompose cm");
+
+	//this is so stupid
+	//choose one to be first
+	std::swap(out[0], out[mersenne.randInt(j-1)]);
+	//choose one to be second
+	std::swap(out[1], out[mersenne.randInt(j-2)+1]);
+}
+
+//takes a cardmask assumed to have 1 card in it and returns
+// a string that corresponds to the filename of the card image
+// for that card.
+//used by the GUI's: diagnostics window (in PokerPlayer) and by 
+//the game window (in SimpleGame).
+string cardfilename(CardMask m)
+{
+	int i;
+	ostringstream ret;
+	for(i=0; i<52; i++)
+		if (StdDeck_CardMask_CARD_IS_SET(m, i)) break;
+	i = 1 + (12-StdDeck_RANK(i))*4 + StdDeck_SUIT(i);
+	ret << "cards/" << i << ".png";
+	return ret.str();
+}
+	

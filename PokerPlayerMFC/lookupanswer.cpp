@@ -21,7 +21,7 @@ void readstrategy(int sceni, int beti, double * const probabilities, int n_acts)
 	//n_acts is the actual number of actions for this node from the betting
 	//tree itself. we have stored exactly that many - 1 actions here
 	//the last one is determined from those initial n - 1 actions.
-	f.open("strategy/2M8bin13ss.strat", std::ifstream::binary);
+	f.open("strategy/15M8bin13ss.strat", std::ifstream::binary);
 	f.seekg((std::streamoff)offset);
 	f.read((char*)floatprobs, (n_acts-1)*sizeof(float));
 	if(!f.good() || offset > 0x7fffffffUL)
@@ -37,6 +37,9 @@ void readstrategy(int sceni, int beti, double * const probabilities, int n_acts)
 
 	//finally, calculate the last element
 	probabilities[n_acts-1] = 1-std::accumulate(probabilities, probabilities + n_acts-1, 0.0);
+	//zero the rest
+	for(int a=n_acts; a<9; a++)
+		probabilities[a]=0;
 }
 	
 

@@ -19,6 +19,7 @@ enum Player
 
 //forward declaration
 struct betnode;
+class DiagnosticsPage;
 
 class BotAPI : private GameState
 {
@@ -58,11 +59,15 @@ public:
 
 private:
 
+	//diagnostics window
+	DiagnosticsPage * MyWindow;
+	void populatewindow();
+	void destroywindow();
+
 	//helperfunctions for advancetree
 	void docall(Player pl, double amount);
 	void dobet(Player pl, double amount);
 	void doallin(Player pl);
-	bool isallin(int a);
 	int getbestbetact(double betsize);
 	int getallinact();
 	int getbethist();

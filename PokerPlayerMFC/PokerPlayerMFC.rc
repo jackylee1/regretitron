@@ -52,48 +52,74 @@ END
 // Dialog
 //
 
-IDD_PROPPAGE_LARGE DIALOGEX 0, 0, 585, 431
-STYLE DS_SETFONT | DS_FIXEDSYS | WS_CAPTION
-CAPTION "Property Page"
-FONT 8, "MS Shell Dlg", 0, 0, 0x0
+IDD_PROPPAGE_LARGE DIALOGEX 0, 0, 414, 273
+STYLE DS_SETFONT | WS_CAPTION
+CAPTION "Under the hood."
+FONT 13, "Microsoft Sans Serif", 400, 0, 0x0
 BEGIN
-    PUSHBUTTON      "Refresh",IDC_REFRESH,479,42,64,25
-    LTEXT           "Static",IDC_CARD01,102,30,44,51
-    LTEXT           "Static",IDC_CARD00,49,30,44,51
-    LTEXT           "Static",IDC_CARD02,153,31,44,51
-    LTEXT           "Static",IDC_CARD04,260,30,44,51
-    LTEXT           "Static",IDC_CARD03,207,30,44,51
-    LTEXT           "Static",IDC_CARD05,314,30,44,51
-    LTEXT           "Static",IDC_CARD06,367,31,44,51
-    LTEXT           "Static",IDC_TEXT0,207,248,75,27
-    LTEXT           "Known pot sizes:",IDC_STATIC,97,245,92,19
-    LTEXT           "Known bet history:",IDC_STATIC,75,285,85,16
-    LTEXT           "preflop",IDC_STATIC,156,285,58,17
-    LTEXT           "flop",IDC_STATIC,277,280,61,16
-    LTEXT           "turn",IDC_STATIC,389,281,28,13
-    LTEXT           "Static",IDC_TEXT1,157,308,60,28
-    LTEXT           "Static",IDC_TEXT2,277,299,84,36
-    LTEXT           "Static",IDC_TEXT3,391,299,66,34
-    LTEXT           "Action Probabilities:",IDC_STATIC,38,362,96,12
-    LTEXT           "Static",IDC_ACT3,194,388,64,16
-    LTEXT           "Static",IDC_ACT0,7,387,64,16
-    LTEXT           "Static",IDC_ACT4,258,388,64,16
-    LTEXT           "Static",IDC_ACT5,324,388,64,16
-    LTEXT           "Static",IDC_ACT6,390,388,64,16
-    LTEXT           "Static",IDC_ACT7,457,388,64,16
-    LTEXT           "Static",IDC_ACT2,130,387,64,16
-    LTEXT           "Static",IDC_ACT1,68,388,64,16
-    LTEXT           "Static",IDC_ACT8,519,388,64,16
-    LTEXT           "Static",IDC_PROB3,193,408,64,16
-    LTEXT           "Static",IDC_PROB4,257,408,64,16
-    LTEXT           "Static",IDC_PROB5,323,408,64,16
-    LTEXT           "Static",IDC_PROB6,389,408,64,16
-    LTEXT           "Static",IDC_PROB7,457,408,64,16
-    LTEXT           "Static",IDC_PROB2,129,405,64,16
-    LTEXT           "Static",IDC_PROB1,67,408,64,16
-    LTEXT           "Static",IDC_PROB8,519,408,64,16
-    LTEXT           "Static",IDC_PROB0,7,407,50,17
-    LTEXT           "Example Representative Hands:",IDC_STATIC,17,11,178,17
+    LTEXT           "Static",IDC_CARD00,25,28,29,38
+    LTEXT           "Static",IDC_CARD01,57,28,29,38
+    LTEXT           "Static",IDC_CARD02,91,28,29,38
+    LTEXT           "Static",IDC_CARD03,123,28,29,38
+    LTEXT           "Static",IDC_CARD04,155,28,29,38
+    LTEXT           "Static",IDC_CARD05,189,28,29,38
+    LTEXT           "Static",IDC_CARD06,223,28,29,38
+    LTEXT           "Static",IDC_CARD1,25,68,29,38
+    LTEXT           "Static",IDC_CARD2,57,68,29,38
+    LTEXT           "Static",IDC_CARD3,91,68,29,38
+    LTEXT           "Static",IDC_CARD4,123,68,29,38
+    LTEXT           "Static",IDC_CARD5,155,68,29,38
+    LTEXT           "Static",IDC_CARD6,189,68,29,38
+    LTEXT           "Static",IDC_CARD7,223,68,29,38
+    LTEXT           "Static",IDC_CARD9,25,108,29,38
+    LTEXT           "Static",IDC_CARD8,57,108,29,38
+    LTEXT           "Static",IDC_CARD10,91,108,29,38
+    LTEXT           "Static",IDC_CARD12,123,108,29,38
+    LTEXT           "Static",IDC_CARD11,155,108,29,38
+    LTEXT           "Static",IDC_CARD13,189,108,29,38
+    LTEXT           "Static",IDC_CARD14,223,108,29,38
+    LTEXT           "Static",IDC_CARD16,25,148,29,38
+    LTEXT           "Static",IDC_CARD15,57,148,29,38
+    LTEXT           "Static",IDC_CARD17,91,148,29,38
+    LTEXT           "Static",IDC_CARD19,123,148,29,38
+    LTEXT           "Static",IDC_CARD18,155,148,29,38
+    LTEXT           "Static",IDC_CARD20,189,148,29,38
+    LTEXT           "Static",IDC_CARD21,223,148,29,38
+    LTEXT           "Static",IDC_CARD23,25,188,29,38
+    LTEXT           "Static",IDC_CARD22,57,188,29,38
+    LTEXT           "Static",IDC_CARD24,91,188,29,38
+    LTEXT           "Static",IDC_CARD26,123,188,29,38
+    LTEXT           "Static",IDC_CARD25,155,188,29,38
+    LTEXT           "Static",IDC_CARD27,189,188,29,38
+    LTEXT           "Static",IDC_CARD28,223,188,29,38
+    LTEXT           "Static",IDC_CARD30,25,228,29,38
+    LTEXT           "Static",IDC_CARD29,57,228,29,38
+    LTEXT           "Static",IDC_CARD31,91,228,29,38
+    LTEXT           "Static",IDC_CARD33,123,228,29,38
+    LTEXT           "Static",IDC_CARD32,155,228,29,38
+    LTEXT           "Static",IDC_CARD34,189,228,29,38
+    LTEXT           "Static",IDC_CARD35,223,228,29,38
+    CONTROL         "Radio1",IDC_RADIO1,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE | WS_GROUP,267,116,120,11
+    CONTROL         "Radio1",IDC_RADIO2,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,129,120,11
+    CONTROL         "Radio1",IDC_RADIO3,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,142,120,11
+    CONTROL         "Radio1",IDC_RADIO4,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,155,120,11
+    CONTROL         "Radio1",IDC_RADIO5,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,168,120,11
+    CONTROL         "Radio1",IDC_RADIO6,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,181,120,11
+    CONTROL         "Radio1",IDC_RADIO7,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,194,120,11
+    CONTROL         "Radio1",IDC_RADIO8,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,207,120,11
+    CONTROL         "Radio1",IDC_RADIO9,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,220,120,11
+    PUSHBUTTON      "Refresh Hands",IDC_REFRESH,180,7,59,17
+    LTEXT           "Static",IDC_TEXT0,307,59,81,8
+    LTEXT           "Known pot size:",IDC_STATIC,275,47,57,8
+    LTEXT           "Known bet history:",IDC_STATIC,273,71,62,8
+    LTEXT           "Static",IDC_TEXT1,268,87,56,17
+    LTEXT           "Static",IDC_TEXT2,307,86,52,14
+    LTEXT           "Static",IDC_TEXT3,354,86,53,20
+    LTEXT           "Example Representative Hands:",IDC_STATIC,17,11,99,8
+    LTEXT           "Perceived Invested:",IDC_STATIC,271,14,69,8
+    LTEXT           "Static",IDC_INVESTBOT,284,21,68,22
+    LTEXT           "Static",IDC_INVESTHUM,333,27,67,21
+    GROUPBOX        "Action Probabilities:",IDC_STATIC,261,105,133,131
 END
 
 
@@ -108,9 +134,9 @@ BEGIN
     IDD_PROPPAGE_LARGE, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 578
+        RIGHTMARGIN, 407
         TOPMARGIN, 7
-        BOTTOMMARGIN, 424
+        BOTTOMMARGIN, 266
     END
 END
 #endif    // APSTUDIO_INVOKED
