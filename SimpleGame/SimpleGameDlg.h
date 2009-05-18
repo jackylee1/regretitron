@@ -99,7 +99,6 @@ private:
 	CPictureCtrl bCard1;
 	CButton ShowBotCards;
 	CButton ShowDiagnostics;
-	CEdit PotTotal;
 	CEdit TotalWon;
 	CEdit InvestedHum;
 	CEdit InvestedBot;
@@ -112,4 +111,7 @@ private:
 	CStatic BotStack;
 	CStatic HumanStack;
 	CButton NewGameButton;
+	CButton AutoNewGame;
+	CButton AutoBotPlay;
+	CStatic PotValue;
 };

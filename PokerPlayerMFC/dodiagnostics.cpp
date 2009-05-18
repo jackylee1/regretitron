@@ -10,58 +10,94 @@
 //this function is a member of BotAPI so that it has access to all the
 //current state of the bot. MyWindow is also a member of BotAPI, and has public
 //controls and wrapper functions to allow me to update the page from outside of its class.
-void BotAPI::populatewindow()
+void BotAPI::populatewindow(CWnd* parentwin)
 {
+	CString text; //used throughout
+
 	//create window if needed
 
-	if(MyWindow == NULL)
-		MyWindow = new DiagnosticsPage;
+	if(MyWindow == NULL && parentwin != NULL)
+		MyWindow = new DiagnosticsPage(parentwin);
+
+	//check if game has started
+
+	if(mynode==NULL) return;
 
 	//set actions
 
-	bool isvalid[9]={false,false,false, false,false,false, false,false,false};
-	int temppot = roundtobb(currentpot);
-	double probabilities[9];
-	getvalidity(temppot,mynode,isvalid);
-	readstrategy(currentsceni, currentbetinode, probabilities, mynode->numacts);
-	for(int a=0; a<9; a++)
+	if(mynode->playertoact == myplayer)
 	{
-		if(!isvalid[a])
+		bool isvalid[9]={false,false,false, false,false,false, false,false,false};
+		int temppot = roundtobb(currentpot);
+		double probabilities[9];
+		getvalidity(temppot,mynode,isvalid);
+		readstrategy(currentsceni, currentbetinode, probabilities, mynode->numacts);
+		for(int a=0; a<9; a++)
+		{
+			if(!isvalid[a])
+			{
+				MyWindow->ActButton[a].SetWindowText(TEXT(""));
+				MyWindow->ActButton[a].EnableWindow(FALSE);
+				MyWindow->ActionBars[a].ShowWindow(SW_HIDE);
+			}
+			else
+			{
+				MyWindow->ActButton[a].SetWindowText(CSTR(actionstring(a,currentgr,mynode,multiplier)));
+				MyWindow->ActButton[a].EnableWindow(TRUE);
+				MyWindow->ActionBars[a].ShowWindow(SW_SHOW);
+				MyWindow->ActionBars[a].SetPos((int)(probabilities[a]*100.0));
+			}
+			if(answer==a) //non-EnabledWindow's can still be checked
+				MyWindow->ActButton[a].SetCheck(BST_CHECKED);
+			else
+				MyWindow->ActButton[a].SetCheck(BST_UNCHECKED);
+		}
+	}
+	else
+	{
+		for(int a=0; a<9; a++)
 		{
 			MyWindow->ActButton[a].SetWindowText(TEXT(""));
-			MyWindow->ActButton[a].EnableWindow(FALSE);
-			MyWindow->ActionBars[a].ShowWindow(SW_HIDE);
-		}
-		else
-		{
-			CString val;
-			val.Format(TEXT("%s"), 
-				CSTR(actionstring(a,currentgr,mynode,multiplier)));
-				//probabilities[a]*100);
-			MyWindow->ActButton[a].SetWindowText(val);
-			MyWindow->ActButton[a].EnableWindow(TRUE);
-			MyWindow->ActionBars[a].ShowWindow(SW_SHOW);
-			MyWindow->ActionBars[a].SetPos((int)(probabilities[a]*100.0));
-		}
-		if(answer==a) //non-EnabledWindow's can still be checked
-			MyWindow->ActButton[a].SetCheck(BST_CHECKED);
-		else
 			MyWindow->ActButton[a].SetCheck(BST_UNCHECKED);
+			MyWindow->ActButton[a].EnableWindow(FALSE);
+			MyWindow->ActionBars[a].SetPos(0);
+		}
 	}
 
 	//set sceni beti
 
-	CString val;
-	val.Format(TEXT("%d"),currentsceni);
-	MyWindow->SceniText.SetWindowText(val);
-	val.Format(TEXT("%d"),currentbetinode);
-	MyWindow->BetiText.SetWindowText(val);
+	text.Format(TEXT("%d"),currentsceni);
+	MyWindow->SceniText.SetWindowText(text);
+	text.Format(TEXT("%d"),currentbetinode);
+	MyWindow->BetiText.SetWindowText(text);
 
 	//get the indices used to label the known information
 
 	int gr, poti, boardi, handi, bethist[3];
 	getindices(currentsceni, gr, poti, boardi, handi, bethist);
 	if(gr != currentgr) REPORT("Invalid gr returned by getindices. sceni corrupted?");
+
+	//set bin number
+
+	if(currentgr==PREFLOP)
+	{
+		MyWindow->BinMax.SetWindowText(TEXT("Bin number:"));
+		MyWindow->BinNumber.SetWindowText(TEXT("-"));
+	}
+	else
+	{
+		text.Format(TEXT("%d"),handi+1);
+		MyWindow->BinNumber.SetWindowText(text);
+
+		if(currentgr==FLOP)
+			text.Format(TEXT("Bin number(1-%d):"),BIN_FLOP_MAX);
+		else if(currentgr==TURN)
+			text.Format(TEXT("Bin number(1-%d):"),BIN_TURN_MAX);
+		else if(currentgr==RIVER)
+			text.Format(TEXT("Bin number(1-%d):"),BIN_RIVER_MAX);
+
+		MyWindow->BinMax.SetWindowText(text);
+	}
 
 	//set bethist
 
@@ -70,7 +106,7 @@ void BotAPI::populatewindow()
 		if(g<currentgr)
 			MyWindow->Bethist[g].SetWindowText(CSTR(bethiststr(bethist[g])));
 		else
-			MyWindow->Bethist[g].SetWindowText(TEXT(""));
+			MyWindow->Bethist[g].SetWindowText(TEXT("-"));
 	}
 
 	//set pot amount
@@ -80,20 +116,19 @@ void BotAPI::populatewindow()
 	else
 	{
 		int lower, upper;
-		CString val;
 		resolvepoti(currentgr, poti, lower, upper);
 		lower = (int)((double)lower-(double)BB/2.0 + 0.5);
 		upper = (int)((double)upper+(double)BB/2.0 + 0.5);
-		val.Format(TEXT("$%0.2f - $%0.2f"), 2*multiplier*lower, 2*multiplier*upper);
-		MyWindow->PotSizes.SetWindowText(val);
+		text.Format(TEXT("$%0.2f - $%0.2f"), 2*multiplier*lower, 2*multiplier*upper);
+		MyWindow->PotSizes.SetWindowText(text);
 	}
 
 	//set perceived invested amounts
 
-	val.Format(TEXT("Human: $%0.2f"), multiplier*perceived[1-myplayer]);
-	MyWindow->PerceivedInvestHum.SetWindowText(val);
-	val.Format(TEXT("Bot: $%0.2f"), multiplier*perceived[myplayer]);
-	MyWindow->PerceivedInvestBot.SetWindowText(val);
+	text.Format(TEXT("Bot: $%0.2f\nHuman: $%0.2f"), 
+		multiplier*perceived[myplayer],
+		multiplier*perceived[1-myplayer]);
+	MyWindow->PerceivedInvestHum.SetWindowText(text);
 
 	//show representative hands
 

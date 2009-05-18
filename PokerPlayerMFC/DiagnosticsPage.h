@@ -30,10 +30,11 @@ public:
 	CStatic Bethist[3];
 	CButton ActButton[9];
 	CProgressCtrl ActionBars[9];
-	CStatic PerceivedInvestBot;
 	CStatic PerceivedInvestHum;
 	CStatic SceniText;
 	CStatic BetiText;
+	CStatic BinNumber;
+	CStatic BinMax;
 
 	//these are the interface for updating the example hands. i did these differently
 	//because i want the button on the page to refresh them. because of that, it makes

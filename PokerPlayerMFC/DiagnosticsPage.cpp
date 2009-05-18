@@ -22,7 +22,7 @@ DiagnosticsPage::DiagnosticsPage(CWnd* pParent /*=NULL*/)
 	//this is the code to actually make this page display when it is created via new.
 	//Boom: http://www.codeproject.com/KB/dialog/gettingmodeless.aspx
 	Create(DiagnosticsPage::IDD, GetDesktopWindow());
-	ShowWindow(SW_SHOW);
+	ShowWindow(SW_SHOWNORMAL);
 	//and see this thread on how to include a resource from
 	//a static library in order to have it be found in an
 	//application. See post 20 or last post.
@@ -90,7 +90,6 @@ void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RADIO7, ActButton[6]);
 	DDX_Control(pDX, IDC_RADIO8, ActButton[7]);
 	DDX_Control(pDX, IDC_RADIO9, ActButton[8]);
-	DDX_Control(pDX, IDC_INVESTBOT, PerceivedInvestBot);
 	DDX_Control(pDX, IDC_INVESTHUM, PerceivedInvestHum);
 	DDX_Control(pDX, IDC_SCENI, SceniText);
 	DDX_Control(pDX, IDC_BETI, BetiText);
@@ -103,6 +102,8 @@ void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_PROGRESS7, ActionBars[6]);
 	DDX_Control(pDX, IDC_PROGRESS8, ActionBars[7]);
 	DDX_Control(pDX, IDC_PROGRESS9, ActionBars[8]);
+	DDX_Control(pDX, IDC_BINNUM, BinNumber);
+	DDX_Control(pDX, IDC_MAXBIN, BinMax);
 }
 
 
@@ -168,6 +169,8 @@ void DiagnosticsPage::RefreshHands()
 			findflophand(myhandi, myboardi, hand, flop);
 			drawpreflop(n, hand);
 			drawflop(n, flop);
+			Card[n][5].FreeData();
+			Card[n][6].FreeData();
 		}
 		else if(mygr==TURN)
 		{
@@ -176,6 +179,7 @@ void DiagnosticsPage::RefreshHands()
 			drawpreflop(n, hand);
 			drawflop(n, flop);
 			Card[n][5].LoadFromFile(CSTR(cardfilename(turn)));
+			Card[n][6].FreeData();
 		}
 		else if(mygr==RIVER)
 		{
@@ -188,5 +192,7 @@ void DiagnosticsPage::RefreshHands()
 		}
 		else
 			REPORT("Invalid gameround in refresh hands");
+
+		//this->RedrawWindow(); //removes cards that have been Free'd
 	}
 }

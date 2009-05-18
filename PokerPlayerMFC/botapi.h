@@ -55,13 +55,13 @@ public:
 
 	//--------------------------------------------------------
 	//Diagnostics
-	void setdiagnostics(bool onoff);
+	void setdiagnostics(bool onoff, CWnd* parentwin = NULL);
 
 private:
 
 	//diagnostics window
 	DiagnosticsPage * MyWindow;
-	void populatewindow();
+	void populatewindow(CWnd * parentwin = NULL);
 	void destroywindow();
 
 	//helperfunctions for advancetree

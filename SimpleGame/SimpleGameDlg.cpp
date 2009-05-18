@@ -18,6 +18,8 @@ CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	  totalhumanwon(0), human(P0), bot(P1),
 	  MyBot(false) //turns off diagnostics (default state of checkbox)
 {
+	CardMask_RESET(botcm0); //ensures show bot cards produces jokers if done early
+	CardMask_RESET(botcm1);
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	Create(CSimpleGameDlg::IDD, NULL);
 	ShowWindow(SW_SHOW);
@@ -36,7 +38,6 @@ void CSimpleGameDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_BCARD0, bCard0);
 	DDX_Control(pDX, IDC_BCARD1, bCard1);
 	DDX_Control(pDX, IDC_CHECK1, ShowBotCards);
-	DDX_Control(pDX, IDC_EDIT4, PotTotal);
 	DDX_Control(pDX, IDC_EDIT5, TotalWon);
 	DDX_Control(pDX, IDC_EDIT2, InvestedHum);
 	DDX_Control(pDX, IDC_EDIT3, InvestedBot);
@@ -50,6 +51,9 @@ void CSimpleGameDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_BSTACK, BotStack);
 	DDX_Control(pDX, IDC_HSTACK, HumanStack);
 	DDX_Control(pDX, IDC_BUTTON5, NewGameButton);
+	DDX_Control(pDX, IDC_CHECK3, AutoNewGame);
+	DDX_Control(pDX, IDC_CHECK4, AutoBotPlay);
+	DDX_Control(pDX, IDC_POTVAL, PotValue);
 }
 
 BEGIN_MESSAGE_MAP(CSimpleGameDlg, CDialog)
@@ -99,7 +103,11 @@ void CSimpleGameDlg::OnCancel()
 //http://www.flounder.com/dialogapp.htm
 void CSimpleGameDlg::OnOK()
 {
-	if(BetRaiseButton.IsWindowEnabled())
+	if(MakeBotGoButton.IsWindowEnabled()) // bot's turn
+		OnBnClickedButton6();
+	else if(CallButton.IsWindowEnabled() && BetAmount.GetWindowTextLength()==0) //bet box empty
+		OnBnClickedButton2();
+	else if(BetRaiseButton.IsWindowEnabled())
 		OnBnClickedButton3();
 }
 
@@ -114,8 +122,6 @@ BOOL CSimpleGameDlg::OnInitDialog()
 
 	// TODO: Add extra initialization here
 	TotalWon.SetWindowText(TEXT("$0.00"));
-	ShowDiagnostics.SetCheck(BST_CHECKED);
-	MyBot.setdiagnostics(true);
 	graygameover();
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
@@ -209,8 +215,8 @@ void CSimpleGameDlg::updatepot()
 {
 	//reprint the pot to the screen
 	CString val;
-	val.Format(TEXT("$%.2f"), 2*pot);
-	PotTotal.SetWindowText(val);
+	val.Format(TEXT("Common Pot: $%.2f"), 2*pot);
+	PotValue.SetWindowText(val);
 }
 void CSimpleGameDlg::updateinvested()
 {
@@ -267,12 +273,18 @@ void CSimpleGameDlg::docall(Player pl)
 	if(isallin)
 	{
 		printbotcards();
-		Sleep(3000); //suspense needed.
-		printflop();
-		Sleep(1000);
-		printturn();
-		Sleep(1000);
-		printriver();
+		switch(gameround) //correct amount of suspense needed.
+		{
+		case PREFLOP:
+			Sleep(1000); 
+			printflop();
+		case FLOP:
+			Sleep(1000);
+			printturn();
+		case TURN:
+			Sleep(1000);
+			printriver();
+		}
 		gameround=RIVER;
 	}
 
@@ -282,25 +294,21 @@ void CSimpleGameDlg::docall(Player pl)
 	case PREFLOP: 
 		MyBot.setflop(flop, pot); 
 		printflop();
-		graypostact(P0); //P0 is first to act post flop
 		break;
 
 	case FLOP: 
 		MyBot.setturn(turn, pot); 
 		printturn();
-		graypostact(P0);
 		break;
 
 	case TURN: 
 		MyBot.setriver(river, pot); 
 		printriver();
-		graypostact(P0);
 		break;
 
 	case RIVER:
 		//game over
 		printbotcards();
-		dogameover(false);
 		break;
 
 	default:
@@ -309,6 +317,11 @@ void CSimpleGameDlg::docall(Player pl)
 
 	//finally, move on to the next gameround, rendering it invalid if this was river
 	gameround ++;
+
+	if(gameround>RIVER)
+		dogameover(false);
+	else
+		graypostact(P0); //P0 is first to act post flop
 }
 void CSimpleGameDlg::dobet(Player pl, double amount)
 {
@@ -350,10 +363,6 @@ void CSimpleGameDlg::dogameover(bool fold)
 	val.Format(TEXT("$%.2f"), totalhumanwon);
 	TotalWon.SetWindowText(val);
 
-	//Set grayness values
-
-	graygameover();
-
 	//print user friendly hints to invested amounts
 	if(fold)
 	{
@@ -377,6 +386,17 @@ void CSimpleGameDlg::dogameover(bool fold)
 		InvestedHum.SetWindowText(TEXT("TIE"));
 		InvestedBot.SetWindowText(TEXT("TIE"));
 	}
+
+	//Start new game or Set grayness values
+
+	if(AutoNewGame.GetCheck())
+	{
+		Sleep(3000);
+		OnBnClickedButton5();
+	}
+	else
+		graygameover();
+
 }
 
 // ---------------------------- Setting grayness -----------------------------
@@ -395,6 +415,12 @@ void CSimpleGameDlg::graygameover()
 
 void CSimpleGameDlg::graypostact(Player nexttoact)
 {
+	if(AutoBotPlay.GetCheck() && nexttoact == bot)
+	{
+		OnBnClickedButton6();
+		return;
+	}
+
 	NewGameButton.EnableWindow(FALSE);
 
 	if(nexttoact == bot)
@@ -463,7 +489,7 @@ void CSimpleGameDlg::OnBnClickedCheck2()
 	//This function is our only interaction
 	//(it decides when it's appropriate to pop up the window, and it closes it)
 	if(ShowDiagnostics.GetCheck())
-		MyBot.setdiagnostics(true);
+		MyBot.setdiagnostics(true, this);
 	else
 		MyBot.setdiagnostics(false);
 }

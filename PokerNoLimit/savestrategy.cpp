@@ -44,13 +44,14 @@ void printfirstnodestrat(char const * const filename)
 			if(isvalid[a])
 			{
 				strataccum+=stratn[a]/stratd[a];
-				log << "   " << actionstring(a,PREFLOP,pfn,1.0) << 100*safedivide(stratn[a],stratd[a]) << "%" << endl;
-				log << "   " << actionstring(a,PREFLOP,pfn,1.0) << 100*safedivide(stratn[a],stratd[a]) << "%" << endl;
+				log << setw(14) << actionstring(a,PREFLOP,pfn,1.0)+": " 
+					<< 100*safedivide(stratn[a],stratd[a]) << "%" << endl;
 			}
 		}
 		//finally, handle the last strat, if it is valid.
 		if(isvalid[maxa-1])
-			log << "   " << actionstring(maxa-1,PREFLOP,pfn,1.0) << 100*(1-strataccum) << "%" << endl;
+			log << setw(14) << actionstring(maxa-1,PREFLOP,pfn,1.0)+": " 
+				<< 100*(1-strataccum) << "%" << endl;
 	}
 	log.close();
 }

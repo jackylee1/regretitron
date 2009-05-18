@@ -236,6 +236,9 @@ void resolvepoti(int gr, int poti, int &lower, int &upper)
 {
 	lower = upper = -1;
 
+	if(gr==PREFLOP)
+		REPORT("there is no pot preflop.")
+
 	for (int pot=BB; pot<STACKSIZE; pot+=BB) //increment pot in multiples of the BB
 	{
 		if (getpoti(gr, pot) == poti)
@@ -244,6 +247,9 @@ void resolvepoti(int gr, int poti, int &lower, int &upper)
 			break;
 		}
 	}
+
+	if(lower==-1)
+		REPORT("could not find pots to match pot index.")
 
 	for (int pot=lower; pot<STACKSIZE; pot+=BB)
 	{
@@ -284,35 +290,38 @@ void printsceniinfo(ostream &out, int sceni, int n_hands)
 {
 	int gr, poti, boardi, handi, bethist[3];
 	getindices(sceni, gr, poti, boardi, handi, bethist);
-	int potlower, potupper;
-	resolvepoti(gr, poti, potlower, potupper);
-
-	out << "Known pot range: " << potlower << " - " << potupper << endl;
 
 	if(gr==PREFLOP)
 	{
 		printpreflophand(out, handi);
 	}
-	else if(gr==FLOP)
+	else
 	{
-		out << "Betting log: " << bethiststr(bethist[0]);
-		printflophands(out,handi,boardi,n_hands);
+		int potlower, potupper;
+		resolvepoti(gr, poti, potlower, potupper);
+		out << "Known pot range: " << potlower << " - " << potupper << endl;
+
+		if(gr==FLOP)
+		{
+			out << "Betting log: " << bethiststr(bethist[0]);
+			printflophands(out,handi,boardi,n_hands);
+		}
+		else if(gr==TURN)
+		{
+			out << "Betting log: " << bethiststr(bethist[0]) 
+				<< " : " << bethiststr(bethist[1]) << endl;
+			printturnhands(out,handi,boardi,n_hands);
+		}
+		else if(gr==RIVER)
+		{
+			out << "Betting log: " << bethiststr(bethist[0]) 
+				<< " : " << bethiststr(bethist[1])
+				<< " : " << bethiststr(bethist[2]) << endl;
+			printriverhands(out,handi,boardi,n_hands);
+		}
+		else 
+			REPORT("getindices returned an invalid gameround");
 	}
-	else if(gr==TURN)
-	{
-		out << "Betting log: " << bethiststr(bethist[0]) 
-			<< " : " << bethiststr(bethist[1]) << endl;
-		printturnhands(out,handi,boardi,n_hands);
-	}
-	else if(gr==RIVER)
-	{
-		out << "Betting log: " << bethiststr(bethist[0]) 
-			<< " : " << bethiststr(bethist[1])
-			<< " : " << bethiststr(bethist[2]) << endl;
-		printriverhands(out,handi,boardi,n_hands);
-	}
-	else 
-		REPORT("getindices returned an invalid gameround");
 }
 
 
@@ -351,6 +360,8 @@ string actionstring(int action, int gr, betnode const * tree, double multiplier)
 			str << "All-In";
 		else if(tree->potcontrib[action]==0)
 			str << "Check";
+		else if(gr==PREFLOP && tree->potcontrib[action]==BB)
+			str << "Call $" << multiplier*(tree->potcontrib[action]);
 		else
 			str << "Bet $" << multiplier*(tree->potcontrib[action]);
 		break;
@@ -422,6 +433,8 @@ void decomposecm(CardMask in, CardMask out[])
 //takes a cardmask assumed to have 1 card in it and returns
 // a string that corresponds to the filename of the card image
 // for that card.
+//Bonus! If the cardmask is empty, this returns 53.png, which 
+//is the joker!!!! (sweet)
 //used by the GUI's: diagnostics window (in PokerPlayer) and by 
 //the game window (in SimpleGame).
 string cardfilename(CardMask m)

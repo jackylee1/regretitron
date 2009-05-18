@@ -48,5 +48,4 @@
 #define REPORT(chars) { \
     AfxMessageBox(TEXT(chars));\
 	_asm {int 3}; \
-	exit(1); \
 }

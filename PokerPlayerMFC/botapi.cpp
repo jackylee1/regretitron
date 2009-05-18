@@ -36,16 +36,13 @@ BotAPI::~BotAPI()
 
 //turns diagnostics window on or off
 //this is the only interaction users of BotAPI have with this window.
-void BotAPI::setdiagnostics(bool onoff)
+void BotAPI::setdiagnostics(bool onoff, CWnd* parentwin)
 {
-	//if state hasn't changed, don't care
-	if(isdiagnosticson == onoff) return;
-	//update state
 	isdiagnosticson = onoff;
-	//handle new state
-	if(isdiagnosticson && mynode!=NULL && mynode->playertoact==myplayer)
-		populatewindow(); //will create window if not there
-	else if(!isdiagnosticson)
+
+	if(isdiagnosticson)
+		populatewindow(parentwin); //will create window if not there
+	else
 		destroywindow(); //will do nothing if window not there
 }
 
@@ -374,11 +371,27 @@ Action BotAPI::getanswer(double &amount)
 	if(myplayer != mynode->playertoact) REPORT("You asked for an answer when the bot thought action was on opp.");
 	if(answer<0 || answer>=9) REPORT("Inconsistant BotAPI state.");
 
+	//get answer from window if available
+
 	if(MyWindow!=NULL)
-		answer = MyWindow->GetCheckedRadioButton(IDC_RADIO1, IDC_RADIO9)-IDC_RADIO1;
-	if(answer<0 || answer>=9) REPORT("Failure of buttons.");
+	{
+		switch(MyWindow->GetCheckedRadioButton(IDC_RADIO1, IDC_RADIO9))
+		{
+		case IDC_RADIO1: answer=0; break;
+		case IDC_RADIO2: answer=1; break;
+		case IDC_RADIO3: answer=2; break;
+		case IDC_RADIO4: answer=3; break;
+		case IDC_RADIO5: answer=4; break;
+		case IDC_RADIO6: answer=5; break;
+		case IDC_RADIO7: answer=6; break;
+		case IDC_RADIO8: answer=7; break;
+		case IDC_RADIO9: answer=8; break;
+		default: REPORT("Failure of buttons.");
+		}
+	}
 
 	//pass back the correct numbers to communicate our answer
+
 	switch(mynode->result[answer])
 	{
 	case FD:
@@ -394,7 +407,9 @@ Action BotAPI::getanswer(double &amount)
 	case GO3:
 	case GO4:
 	case GO5:
-		amount = multiplier * (mynode->potcontrib[answer] + invested[myplayer]-perceived[myplayer]);
+		if(mynode->potcontrib[answer] != perceived[1-myplayer])
+			REPORT("tree value does not match reality");
+		amount = multiplier * invested[1-myplayer];
 		myact = CALL;
 		break;
 
@@ -421,8 +436,9 @@ Action BotAPI::getanswer(double &amount)
 		}
 		else
 		{
-			//so we actually bet or call the increment above what we really invested
-			amount = multiplier * (mynode->potcontrib[answer] + invested[myplayer]-perceived[myplayer]);
+			amount = multiplier * (mynode->potcontrib[answer] + invested[1-myplayer]-perceived[1-myplayer]);
+			if(amount < multiplier * mintotalwager())
+				amount = multiplier * mintotalwager();
 			myact = BET;
 		}
 	}
@@ -438,29 +454,36 @@ Action BotAPI::getanswer(double &amount)
 //diagnostics window
 void BotAPI::processmyturn()
 {
-	double cumulativeprob, randomprob, actionprobs[9];
 
-	if(mynode == NULL || mynode->playertoact != myplayer) return; //does not signify an error
+	if(mynode == NULL) return; //does not signify an error
 
-	readstrategy(currentsceni, currentbetinode, actionprobs, mynode->numacts);
+	//choose an action if we are next to act
 
-	//go through actions and choose one randomly with correct likelyhood.
-	do{
-		cumulativeprob = 0;
-		randomprob = mersenne.randExc(); //generates the answer!
-		answer = -1;
-		for(int a=0; a<mynode->numacts; a++)
-		{
-			cumulativeprob += actionprobs[a];
-			if (cumulativeprob > randomprob)
+	if(mynode->playertoact == myplayer)
+	{
+		double cumulativeprob, randomprob, actionprobs[9];
+
+		readstrategy(currentsceni, currentbetinode, actionprobs, mynode->numacts);
+
+		//go through actions and choose one randomly with correct likelyhood.
+		do{
+			cumulativeprob = 0;
+			randomprob = mersenne.randExc(); //generates the answer!
+			answer = -1;
+			for(int a=0; a<mynode->numacts; a++)
 			{
-				answer = a;
-				break;
+				cumulativeprob += actionprobs[a];
+				if (cumulativeprob > randomprob)
+				{
+					answer = a;
+					break;
+				}
 			}
-		}
-	}while(answer == -1);
+		}while(answer == -1);
+	}
 
 	//lastly, update diagnostics window
+
 	if(isdiagnosticson) populatewindow();
 }
 

@@ -46,7 +46,6 @@
 #define REPORT(chars) { \
     MessageBox(TEXT(chars), TEXT("failure"), MB_OK);\
 	_asm {int 3}; \
-	exit(1); \
 }
 
 
