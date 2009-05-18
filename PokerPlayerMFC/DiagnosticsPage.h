@@ -2,6 +2,7 @@
 #include "afxwin.h"
 #include "..\picturectrl.h"
 #include "resource.h"
+#include "afxcmn.h"
 
 
 // DiagnosticsPage dialog
@@ -28,8 +29,11 @@ public:
 	CStatic PotSizes;
 	CStatic Bethist[3];
 	CButton ActButton[9];
+	CProgressCtrl ActionBars[9];
 	CStatic PerceivedInvestBot;
 	CStatic PerceivedInvestHum;
+	CStatic SceniText;
+	CStatic BetiText;
 
 	//these are the interface for updating the example hands. i did these differently
 	//because i want the button on the page to refresh them. because of that, it makes
@@ -44,7 +48,7 @@ private:
 	int mygr, myhandi, myboardi;
 
 	//used by RefreshHands.
-	CPictureCtrl Card[6][7];
+	CPictureCtrl Card[5][7]; //5 rows of 7 cards
 	void drawpreflop(int whichset, CardMask hand);
 	void drawflop(int whichset, CardMask flop);
 };

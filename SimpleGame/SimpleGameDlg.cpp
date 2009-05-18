@@ -114,6 +114,8 @@ BOOL CSimpleGameDlg::OnInitDialog()
 
 	// TODO: Add extra initialization here
 	TotalWon.SetWindowText(TEXT("$0.00"));
+	ShowDiagnostics.SetCheck(BST_CHECKED);
+	MyBot.setdiagnostics(true);
 	graygameover();
 
 	return TRUE;  // return TRUE  unless you set the focus to a control

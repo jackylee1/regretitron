@@ -338,7 +338,10 @@ string actionstring(int action, int gr, betnode const * tree, double multiplier)
 	case GO3:
 	case GO4:
 	case GO5:
-		str << "Call $" << multiplier*(tree->potcontrib[action]);
+		if(tree->potcontrib[action]==0 || (gr==PREFLOP && tree->potcontrib[action]==BB))
+			str << "Check";
+		else
+			str << "Call $" << multiplier*(tree->potcontrib[action]);
 		break;
 	case AI:
 		str << "Call All-In";
@@ -346,6 +349,8 @@ string actionstring(int action, int gr, betnode const * tree, double multiplier)
 	default:
 		if(isallin(tree,gr,action))
 			str << "All-In";
+		else if(tree->potcontrib[action]==0)
+			str << "Check";
 		else
 			str << "Bet $" << multiplier*(tree->potcontrib[action]);
 		break;

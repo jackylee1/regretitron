@@ -52,74 +52,86 @@ END
 // Dialog
 //
 
-IDD_PROPPAGE_LARGE DIALOGEX 0, 0, 414, 273
+IDD_PROPPAGE_LARGE DIALOGEX 0, 0, 410, 255
 STYLE DS_SETFONT | WS_CAPTION
 CAPTION "Under the hood."
 FONT 13, "Microsoft Sans Serif", 400, 0, 0x0
 BEGIN
-    LTEXT           "Static",IDC_CARD00,25,28,29,38
-    LTEXT           "Static",IDC_CARD01,57,28,29,38
-    LTEXT           "Static",IDC_CARD02,91,28,29,38
-    LTEXT           "Static",IDC_CARD03,123,28,29,38
-    LTEXT           "Static",IDC_CARD04,155,28,29,38
-    LTEXT           "Static",IDC_CARD05,189,28,29,38
-    LTEXT           "Static",IDC_CARD06,223,28,29,38
-    LTEXT           "Static",IDC_CARD1,25,68,29,38
-    LTEXT           "Static",IDC_CARD2,57,68,29,38
-    LTEXT           "Static",IDC_CARD3,91,68,29,38
-    LTEXT           "Static",IDC_CARD4,123,68,29,38
-    LTEXT           "Static",IDC_CARD5,155,68,29,38
-    LTEXT           "Static",IDC_CARD6,189,68,29,38
-    LTEXT           "Static",IDC_CARD7,223,68,29,38
-    LTEXT           "Static",IDC_CARD9,25,108,29,38
-    LTEXT           "Static",IDC_CARD8,57,108,29,38
-    LTEXT           "Static",IDC_CARD10,91,108,29,38
-    LTEXT           "Static",IDC_CARD12,123,108,29,38
-    LTEXT           "Static",IDC_CARD11,155,108,29,38
-    LTEXT           "Static",IDC_CARD13,189,108,29,38
-    LTEXT           "Static",IDC_CARD14,223,108,29,38
-    LTEXT           "Static",IDC_CARD16,25,148,29,38
-    LTEXT           "Static",IDC_CARD15,57,148,29,38
-    LTEXT           "Static",IDC_CARD17,91,148,29,38
-    LTEXT           "Static",IDC_CARD19,123,148,29,38
-    LTEXT           "Static",IDC_CARD18,155,148,29,38
-    LTEXT           "Static",IDC_CARD20,189,148,29,38
-    LTEXT           "Static",IDC_CARD21,223,148,29,38
-    LTEXT           "Static",IDC_CARD23,25,188,29,38
-    LTEXT           "Static",IDC_CARD22,57,188,29,38
-    LTEXT           "Static",IDC_CARD24,91,188,29,38
-    LTEXT           "Static",IDC_CARD26,123,188,29,38
-    LTEXT           "Static",IDC_CARD25,155,188,29,38
-    LTEXT           "Static",IDC_CARD27,189,188,29,38
-    LTEXT           "Static",IDC_CARD28,223,188,29,38
-    LTEXT           "Static",IDC_CARD30,25,228,29,38
-    LTEXT           "Static",IDC_CARD29,57,228,29,38
-    LTEXT           "Static",IDC_CARD31,91,228,29,38
-    LTEXT           "Static",IDC_CARD33,123,228,29,38
-    LTEXT           "Static",IDC_CARD32,155,228,29,38
-    LTEXT           "Static",IDC_CARD34,189,228,29,38
-    LTEXT           "Static",IDC_CARD35,223,228,29,38
-    CONTROL         "Radio1",IDC_RADIO1,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE | WS_GROUP,267,116,120,11
-    CONTROL         "Radio1",IDC_RADIO2,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,129,120,11
-    CONTROL         "Radio1",IDC_RADIO3,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,142,120,11
-    CONTROL         "Radio1",IDC_RADIO4,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,155,120,11
-    CONTROL         "Radio1",IDC_RADIO5,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,168,120,11
-    CONTROL         "Radio1",IDC_RADIO6,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,181,120,11
-    CONTROL         "Radio1",IDC_RADIO7,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,194,120,11
-    CONTROL         "Radio1",IDC_RADIO8,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,207,120,11
-    CONTROL         "Radio1",IDC_RADIO9,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | BS_MULTILINE,267,220,120,11
-    PUSHBUTTON      "Refresh Hands",IDC_REFRESH,180,7,59,17
-    LTEXT           "Static",IDC_TEXT0,307,59,81,8
-    LTEXT           "Known pot size:",IDC_STATIC,275,47,57,8
-    LTEXT           "Known bet history:",IDC_STATIC,273,71,62,8
-    LTEXT           "Static",IDC_TEXT1,268,87,56,17
-    LTEXT           "Static",IDC_TEXT2,307,86,52,14
-    LTEXT           "Static",IDC_TEXT3,354,86,53,20
-    LTEXT           "Example Representative Hands:",IDC_STATIC,17,11,99,8
-    LTEXT           "Perceived Invested:",IDC_STATIC,271,14,69,8
-    LTEXT           "Static",IDC_INVESTBOT,284,21,68,22
-    LTEXT           "Static",IDC_INVESTHUM,333,27,67,21
-    GROUPBOX        "Action Probabilities:",IDC_STATIC,261,105,133,131
+    LTEXT           "Static",IDC_CARD00,12,31,29,38
+    LTEXT           "Static",IDC_CARD01,44,31,29,38
+    LTEXT           "Static",IDC_CARD02,83,31,29,38
+    LTEXT           "Static",IDC_CARD03,115,31,29,38
+    LTEXT           "Static",IDC_CARD04,147,31,29,38
+    LTEXT           "Static",IDC_CARD05,186,31,29,38
+    LTEXT           "Static",IDC_CARD06,226,31,29,38
+    LTEXT           "Static",IDC_CARD1,12,75,29,38
+    LTEXT           "Static",IDC_CARD2,44,75,29,38
+    LTEXT           "Static",IDC_CARD3,83,75,29,38
+    LTEXT           "Static",IDC_CARD4,115,75,29,38
+    LTEXT           "Static",IDC_CARD5,147,75,29,38
+    LTEXT           "Static",IDC_CARD6,186,75,29,38
+    LTEXT           "Static",IDC_CARD7,226,75,29,38
+    LTEXT           "Static",IDC_CARD9,12,119,29,38
+    LTEXT           "Static",IDC_CARD8,44,119,29,38
+    LTEXT           "Static",IDC_CARD10,83,119,29,38
+    LTEXT           "Static",IDC_CARD12,115,119,29,38
+    LTEXT           "Static",IDC_CARD11,147,119,29,38
+    LTEXT           "Static",IDC_CARD13,186,119,29,38
+    LTEXT           "Static",IDC_CARD14,226,119,29,38
+    LTEXT           "Static",IDC_CARD16,12,163,29,38
+    LTEXT           "Static",IDC_CARD15,44,163,29,38
+    LTEXT           "Static",IDC_CARD17,83,163,29,38
+    LTEXT           "Static",IDC_CARD19,115,163,29,38
+    LTEXT           "Static",IDC_CARD18,147,163,29,38
+    LTEXT           "Static",IDC_CARD20,186,163,29,38
+    LTEXT           "Static",IDC_CARD21,226,163,29,38
+    LTEXT           "Static",IDC_CARD23,12,207,29,38
+    LTEXT           "Static",IDC_CARD22,44,207,29,38
+    LTEXT           "Static",IDC_CARD24,83,207,29,38
+    LTEXT           "Static",IDC_CARD26,115,207,29,38
+    LTEXT           "Static",IDC_CARD25,147,207,29,38
+    LTEXT           "Static",IDC_CARD27,186,207,29,38
+    LTEXT           "Static",IDC_CARD28,226,207,29,38
+    CONTROL         "Radio1",IDC_RADIO1,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE | WS_GROUP,267,128,46,8,WS_EX_RIGHT
+    CONTROL         "Radio1",IDC_RADIO2,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,267,141,46,8,WS_EX_RIGHT
+    CONTROL         "Radio1",IDC_RADIO3,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,267,154,46,8,WS_EX_RIGHT
+    CONTROL         "Radio1",IDC_RADIO4,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,267,167,46,8,WS_EX_RIGHT
+    CONTROL         "Bet $100",IDC_RADIO5,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,267,180,46,8,WS_EX_RIGHT
+    CONTROL         "Radio1",IDC_RADIO6,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,267,193,46,8,WS_EX_RIGHT
+    CONTROL         "Radio1",IDC_RADIO7,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,267,206,46,8,WS_EX_RIGHT
+    CONTROL         "Radio1",IDC_RADIO8,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,267,219,46,8,WS_EX_RIGHT
+    CONTROL         "Radio1",IDC_RADIO9,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,267,232,46,8,WS_EX_RIGHT
+    PUSHBUTTON      "Refresh Hands",IDC_REFRESH,117,7,59,10
+    RTEXT           "$0.00 - $0.00",IDC_TEXT0,330,65,56,8
+    RTEXT           "Known pot size:",IDC_STATIC,262,65,66,8
+    RTEXT           "Preflop bet style:",IDC_STATIC,262,79,66,8
+    RTEXT           "preflop style",IDC_TEXT1,330,79,56,8
+    RTEXT           "flop style",IDC_TEXT2,330,88,56,8
+    RTEXT           "turn style",IDC_TEXT3,330,97,56,8
+    LTEXT           "Random cards with same index:",IDC_STATIC,7,8,99,8
+    RTEXT           "Perceived Invested:",IDC_STATIC,262,41,66,8
+    RTEXT           "Bot: $0.00",IDC_INVESTBOT,330,50,56,8
+    RTEXT           "Human: $0.00",IDC_INVESTHUM,330,41,56,8
+    GROUPBOX        "Hole cards",IDC_STATIC,7,21,70,227
+    GROUPBOX        "Flop",IDC_STATIC,79,21,100,227
+    GROUPBOX        "Turn",IDC_STATIC,181,21,38,227
+    GROUPBOX        "River",IDC_STATIC,221,21,39,227
+    RTEXT           "Flop bet style:",IDC_STATIC,262,88,66,8
+    RTEXT           "Turn bet style:",IDC_STATIC,262,97,66,8
+    RTEXT           "Scenario index:",IDC_STATIC,262,14,66,8
+    RTEXT           "Bet index:",IDC_STATIC,262,27,66,8
+    RTEXT           "beti",IDC_BETI,330,27,56,8
+    RTEXT           "sceni",IDC_SCENI,330,14,56,8
+    CONTROL         "",IDC_PROGRESS1,"msctls_progress32",0x1,318,128,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
+    CONTROL         "",IDC_PROGRESS2,"msctls_progress32",0x1,318,141,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
+    CONTROL         "",IDC_PROGRESS3,"msctls_progress32",0x1,318,154,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
+    CONTROL         "",IDC_PROGRESS4,"msctls_progress32",0x1,318,167,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
+    CONTROL         "",IDC_PROGRESS5,"msctls_progress32",0x1,318,180,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
+    CONTROL         "",IDC_PROGRESS6,"msctls_progress32",0x1,318,193,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
+    CONTROL         "",IDC_PROGRESS7,"msctls_progress32",0x1,318,206,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
+    CONTROL         "",IDC_PROGRESS8,"msctls_progress32",0x1,318,219,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
+    CONTROL         "",IDC_PROGRESS9,"msctls_progress32",0x1,318,232,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
+    GROUPBOX        "Actions, including randomly chosen one:",IDC_STATIC,267,117,136,129
 END
 
 
@@ -134,9 +146,9 @@ BEGIN
     IDD_PROPPAGE_LARGE, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 407
+        RIGHTMARGIN, 403
         TOPMARGIN, 7
-        BOTTOMMARGIN, 266
+        BOTTOMMARGIN, 248
     END
 END
 #endif    // APSTUDIO_INVOKED

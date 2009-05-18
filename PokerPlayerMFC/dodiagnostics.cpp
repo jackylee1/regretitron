@@ -30,21 +30,32 @@ void BotAPI::populatewindow()
 		{
 			MyWindow->ActButton[a].SetWindowText(TEXT(""));
 			MyWindow->ActButton[a].EnableWindow(FALSE);
+			MyWindow->ActionBars[a].ShowWindow(SW_HIDE);
 		}
 		else
 		{
 			CString val;
-			val.Format(TEXT("%s: %0.1f%%"), 
-				CSTR(actionstring(a,currentgr,mynode,multiplier)),
-				probabilities[a]*100);
+			val.Format(TEXT("%s"), 
+				CSTR(actionstring(a,currentgr,mynode,multiplier)));
+				//probabilities[a]*100);
 			MyWindow->ActButton[a].SetWindowText(val);
 			MyWindow->ActButton[a].EnableWindow(TRUE);
+			MyWindow->ActionBars[a].ShowWindow(SW_SHOW);
+			MyWindow->ActionBars[a].SetPos((int)(probabilities[a]*100.0));
 		}
 		if(answer==a) //non-EnabledWindow's can still be checked
 			MyWindow->ActButton[a].SetCheck(BST_CHECKED);
 		else
 			MyWindow->ActButton[a].SetCheck(BST_UNCHECKED);
 	}
+
+	//set sceni beti
+
+	CString val;
+	val.Format(TEXT("%d"),currentsceni);
+	MyWindow->SceniText.SetWindowText(val);
+	val.Format(TEXT("%d"),currentbetinode);
+	MyWindow->BetiText.SetWindowText(val);
 
 	//get the indices used to label the known information
 
@@ -56,14 +67,8 @@ void BotAPI::populatewindow()
 
 	for(int g=PREFLOP; g<RIVER; g++)
 	{
-		const wchar_t* roundnames[3] = {TEXT("Preflop"),TEXT("Flop"),TEXT("Turn")};
-
 		if(g<currentgr)
-		{
-			CString val;
-			val.Format(TEXT("%s\n%s"), roundnames[g], CSTR(bethiststr(bethist[g])));
-			MyWindow->Bethist[g].SetWindowText(val);
-		}
+			MyWindow->Bethist[g].SetWindowText(CSTR(bethiststr(bethist[g])));
 		else
 			MyWindow->Bethist[g].SetWindowText(TEXT(""));
 	}
@@ -85,10 +90,9 @@ void BotAPI::populatewindow()
 
 	//set perceived invested amounts
 
-	CString val;
-	val.Format(TEXT("Human invested:\n$%0.2f"), multiplier*perceived[1-myplayer]);
+	val.Format(TEXT("Human: $%0.2f"), multiplier*perceived[1-myplayer]);
 	MyWindow->PerceivedInvestHum.SetWindowText(val);
-	val.Format(TEXT("Bot invested:\n$%0.2f"), multiplier*perceived[myplayer]);
+	val.Format(TEXT("Bot: $%0.2f"), multiplier*perceived[myplayer]);
 	MyWindow->PerceivedInvestBot.SetWindowText(val);
 
 	//show representative hands

@@ -81,14 +81,6 @@ void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_CARD27, Card[4][5]);
 	DDX_Control(pDX, IDC_CARD28, Card[4][6]);
 
-	DDX_Control(pDX, IDC_CARD30, Card[5][0]);
-	DDX_Control(pDX, IDC_CARD29, Card[5][1]);
-	DDX_Control(pDX, IDC_CARD31, Card[5][2]);
-	DDX_Control(pDX, IDC_CARD33, Card[5][3]);
-	DDX_Control(pDX, IDC_CARD32, Card[5][4]);
-	DDX_Control(pDX, IDC_CARD34, Card[5][5]);
-	DDX_Control(pDX, IDC_CARD35, Card[5][6]);
-
 	DDX_Control(pDX, IDC_RADIO1, ActButton[0]);
 	DDX_Control(pDX, IDC_RADIO2, ActButton[1]);
 	DDX_Control(pDX, IDC_RADIO3, ActButton[2]);
@@ -100,6 +92,17 @@ void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RADIO9, ActButton[8]);
 	DDX_Control(pDX, IDC_INVESTBOT, PerceivedInvestBot);
 	DDX_Control(pDX, IDC_INVESTHUM, PerceivedInvestHum);
+	DDX_Control(pDX, IDC_SCENI, SceniText);
+	DDX_Control(pDX, IDC_BETI, BetiText);
+	DDX_Control(pDX, IDC_PROGRESS1, ActionBars[0]);
+	DDX_Control(pDX, IDC_PROGRESS2, ActionBars[1]);
+	DDX_Control(pDX, IDC_PROGRESS3, ActionBars[2]);
+	DDX_Control(pDX, IDC_PROGRESS4, ActionBars[3]);
+	DDX_Control(pDX, IDC_PROGRESS5, ActionBars[4]);
+	DDX_Control(pDX, IDC_PROGRESS6, ActionBars[5]);
+	DDX_Control(pDX, IDC_PROGRESS7, ActionBars[6]);
+	DDX_Control(pDX, IDC_PROGRESS8, ActionBars[7]);
+	DDX_Control(pDX, IDC_PROGRESS9, ActionBars[8]);
 }
 
 
@@ -151,7 +154,7 @@ void DiagnosticsPage::RefreshHands()
 	//we have had no info sent to us yet.
 	if(mygr == -1) return;
 
-	for(int n=0; n<6; n++) //6 sets of hands
+	for(int n=0; n<5; n++) //5 sets of hands
 	{
 		if(mygr==PREFLOP)
 		{
