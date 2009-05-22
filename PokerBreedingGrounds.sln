@@ -7,8 +7,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerNoLimit", "PokerNoLimi
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 	ProjectSection(ProjectDependencies) = postProject
-		{A4DEF05E-E072-493E-B282-84731D60BCF0} = {A4DEF05E-E072-493E-B282-84731D60BCF0}
 		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0} = {6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}
+		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD} = {FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}
+		{A4DEF05E-E072-493E-B282-84731D60BCF0} = {A4DEF05E-E072-493E-B282-84731D60BCF0}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerEval", "pokereval\poker-eval.vcproj", "{A4DEF05E-E072-493E-B282-84731D60BCF0}"
@@ -54,7 +55,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenHoldemDLL", "OpenHoldem
 		{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A} = {4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SimpleGameMFC", "SimpleGame\SimpleGame.vcproj", "{1C9B2E00-EBAE-4183-9C66-650A1EE6FB2A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SimpleGame", "SimpleGame\SimpleGame.vcproj", "{1C9B2E00-EBAE-4183-9C66-650A1EE6FB2A}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.Debug = "False"
@@ -63,13 +64,19 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SimpleGameMFC", "SimpleGame
 		{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A} = {4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerPlayerMFC", "PokerPlayerMFC\PokerPlayerMFC.vcproj", "{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerPlayer", "PokerPlayerMFC\PokerPlayerMFC.vcproj", "{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}"
 	ProjectSection(WebsiteProperties) = preProject
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 	ProjectSection(ProjectDependencies) = postProject
 		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0} = {6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TinyXML++", "TinyXML++\TiCPP.vcproj", "{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}"
+	ProjectSection(WebsiteProperties) = preProject
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 EndProject
 Global
@@ -127,6 +134,12 @@ Global
 		{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}.profile|Win32.Build.0 = Release|Win32
 		{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}.Release|Win32.ActiveCfg = Release|Win32
 		{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}.Release|Win32.Build.0 = Release|Win32
+		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}.Debug|Win32.Build.0 = Debug|Win32
+		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}.profile|Win32.ActiveCfg = Release|Win32
+		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}.profile|Win32.Build.0 = Release|Win32
+		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}.Release|Win32.ActiveCfg = Release|Win32
+		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

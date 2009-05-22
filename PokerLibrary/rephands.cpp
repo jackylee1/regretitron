@@ -109,21 +109,20 @@ void findriverhand(int bin, int riverscore, CardMask &priv, CardMask &flop, Card
 //and prints the hand in common 2 character plus 's' for suited
 //format, to the given stream
 //this and the next three are only used by printsceniinfo in this file.
-void printpreflophand(ostream &out, int index)
+string preflophandstring(int index)
 {
-	char ret[4];
+	string ret("");
 	char * mask;
 	CardMask hand = findpreflophand(index);
 
 	mask = GenericDeck_maskString(&StdDeck, &hand);
 
-	ret[0] = mask[0]; //first rank
-	ret[1] = mask[3]; //second rank
+	ret += mask[0]; //first rank
+	ret += mask[3]; //second rank
 	if(ret[0] < ret[1]) std::swap(ret[0], ret[1]);
-	ret[2] = (mask[1] == mask[4]) ? 's' : ' '; //suited or not.
-	ret[3] = '\0';
+	if(mask[1] == mask[4]) ret += 's'; //suited
 
-	out << "  " << ret << endl;
+	return ret;
 }
 
 //the following functions take a handi and boardi (bin number and 
@@ -268,15 +267,15 @@ string bethiststr(int bethist)
 	switch(bethist)
 	{
 	case GO1-GO_BASE:
-		return "check-check";
+		return "kk";
 	case GO2-GO_BASE:
-		return "bet-call";
+		return "bc";
 	case GO3-GO_BASE:
-		return "check-bet-call";
+		return "kbc";
 	case GO4-GO_BASE:
-		return "bet-raise-call";
+		return "brc";
 	case GO5-GO_BASE:
-		return "check-bet-raise-call";
+		return "kbrc";
 	default:
 		REPORT("invalid betting history passed to bethiststr");
 	}
@@ -293,7 +292,7 @@ void printsceniinfo(ostream &out, int sceni, int n_hands)
 
 	if(gr==PREFLOP)
 	{
-		printpreflophand(out, handi);
+		out << "  " << preflophandstring(handi) << endl;
 	}
 	else
 	{

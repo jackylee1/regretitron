@@ -240,7 +240,7 @@ void BotAPI::dobet(Player pl, double amount)
 	//these nodes do not have a betting action, so we use allin.
 	if (mynode->numacts == 3)
 	{
-		if(pl == myplayer) REPORT("bot should be unable to bet from a 3-membered node")
+		if(pl == myplayer) REPORT("bot should be unable to bet from a 3-membered node");
 
 		offtreebetallins = true;
 		doallin(pl);

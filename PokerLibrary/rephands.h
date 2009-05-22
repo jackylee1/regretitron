@@ -10,6 +10,8 @@ CardMask findpreflophand(int index);
 void findflophand(int bin, int flopscore, CardMask &priv, CardMask &flop);
 void findturnhand(int bin, int turnscore, CardMask &priv, CardMask &flop, CardMask &turn);
 void findriverhand(int bin, int riverscore, CardMask &priv, CardMask &flop, CardMask &turn, CardMask &river);
+//used by printsceniinfo and by savestrategy.cpp (in PokerNoLimit)
+std::string preflophandstring(int index);
 
 //used by diagnostics window (in PokerPlayer) and local functions (in this file)
 void getindices(int sceni, int &gr, int &poti, int &boardi, int &handi, int bethist[3]);

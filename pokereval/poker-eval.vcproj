@@ -23,7 +23,7 @@
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			UseOfATL="0"
 			ATLMinimizesCRunTimeLibraryUsage="false"
-			CharacterSet="1"
+			CharacterSet="2"
 			DeleteExtensionsOnClean="*.obj;*.ilk;*.pdb;*.tlb;*.tli;*.tlh;*.tmp;*.rsp;*.bat;*.lib;*.exp;$(TargetPath)"
 			>
 			<Tool
@@ -109,7 +109,7 @@
 			UseOfMFC="0"
 			UseOfATL="0"
 			ATLMinimizesCRunTimeLibraryUsage="false"
-			CharacterSet="1"
+			CharacterSet="2"
 			DeleteExtensionsOnClean="*.obj;*.ilk;*.pdb;*.tlb;*.tli;*.tlh;*.tmp;*.rsp;*.bat;*.lib;*.exp;$(TargetPath)"
 			WholeProgramOptimization="0"
 			>
@@ -198,7 +198,7 @@
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			UseOfATL="0"
 			ATLMinimizesCRunTimeLibraryUsage="false"
-			CharacterSet="1"
+			CharacterSet="2"
 			DeleteExtensionsOnClean="*.obj;*.ilk;*.pdb;*.tlb;*.tli;*.tlh;*.tmp;*.rsp;*.bat;*.lib;*.exp;$(TargetPath)"
 			>
 			<Tool

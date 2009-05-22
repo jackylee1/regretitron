@@ -15,18 +15,17 @@
 #include <iostream> //required for cout
 #include <fstream> //required for files
 #include <algorithm> //required for sort
-#include <assert.h>
-#include <windows.h> //needed for binstruct includes
+#include <sstream> //to convert numbers to strings
+#include <iomanip> //to pad things
 
-#include "poker_defs.h" // PokerEval
+//PokerEval
+#include "poker_defs.h"
 #include "inlines/eval.h"
 
-#include "../HandIndexingV1/getindex2N.h" //contains my fancy getindex2N function
-
-//needs to be simple cout as I concatenating strings with preprocessor values
-//and send them to REPORT. No need for messagebox
-#define REPORT(chars) { \
+#define REPORT(chars) do{ \
 	std::cout << chars << std::endl << std::flush; \
 	_asm {int 3}; \
 	exit(1); \
-}
+}while(0)
+
+#define PRINTMASK(c) GenericDeck_maskString(&StdDeck, &c)

@@ -57,10 +57,13 @@ void BotAPI::populatewindow(CWnd* parentwin)
 	{
 		for(int a=0; a<9; a++)
 		{
-			MyWindow->ActButton[a].SetWindowText(TEXT(""));
-			MyWindow->ActButton[a].SetCheck(BST_UNCHECKED);
+			if(mynode==pfn) //start of game, human is first
+			{
+				MyWindow->ActButton[a].SetWindowText(TEXT(""));
+				MyWindow->ActButton[a].SetCheck(BST_UNCHECKED);
+				MyWindow->ActionBars[a].SetPos(0);
+			}
 			MyWindow->ActButton[a].EnableWindow(FALSE);
-			MyWindow->ActionBars[a].SetPos(0);
 		}
 	}
 
@@ -101,12 +104,23 @@ void BotAPI::populatewindow(CWnd* parentwin)
 
 	//set bethist
 
-	for(int g=PREFLOP; g<RIVER; g++)
+	if(PREFLOP < currentgr && myplayer==P1)
+		text.Format(TEXT("bot first - %s"), CSTR(bethiststr(bethist[PREFLOP])));
+	else if(PREFLOP < currentgr && myplayer==P0)
+		text.Format(TEXT("human first - %s"), CSTR(bethiststr(bethist[PREFLOP])));
+	else
+		text = L"-";
+	MyWindow->Bethist[PREFLOP].SetWindowText(text);
+
+	for(int g=FLOP; g<RIVER; g++)
 	{
-		if(g<currentgr)
-			MyWindow->Bethist[g].SetWindowText(CSTR(bethiststr(bethist[g])));
+		if(g < currentgr && myplayer==P0)
+			text.Format(TEXT("bot first - %s"), CSTR(bethiststr(bethist[g])));
+		else if(g < currentgr && myplayer==P1)
+			text.Format(TEXT("human first - %s"), CSTR(bethiststr(bethist[g])));
 		else
-			MyWindow->Bethist[g].SetWindowText(TEXT("-"));
+			text = TEXT("-");
+		MyWindow->Bethist[g].SetWindowText(text);
 	}
 
 	//set pot amount

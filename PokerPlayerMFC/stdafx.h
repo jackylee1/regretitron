@@ -39,13 +39,18 @@
 #include <numeric> //has accumulate
 #include <limits> //has infinity
 
+// TinyXML
+#define TIXML_USE_TICPP
+#include "../TinyXML++/ticpp.h"
+
+//randomness
 #include "../mymersenne.h"
 
 //Pokereval
 #include "poker_defs.h"
 
 //pop up message box on error
-#define REPORT(chars) { \
+#define REPORT(chars) do{ \
     AfxMessageBox(TEXT(chars));\
 	_asm {int 3}; \
-}
+}while(0)

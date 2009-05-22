@@ -1,6 +1,7 @@
 #ifndef __constants_h__
 #define __constants_h__
 
+//below constants depend on these constants.
 #include "../HandIndexingV1/constants.h"
 
 const int PREFLOP = 0;
@@ -10,12 +11,14 @@ const int RIVER = 3;
 
 /***********************************************************************************/
 //constants for the binning of hands
-#include "binstruct8.h"
-const int BIN_PREFLOP_MAX = INDEX2_MAX; //should be 169
-const int BIN_FLOP_MAX = BIN_MAX; //comes from from binstructN.h
-const int BIN_TURN_MAX = BIN_MAX;
-const int BIN_RIVER_MAX = BIN_MAX;
+const int BIN_PREFLOP_MAX = INDEX2_MAX; //should be 169, not really bins.
 
+const int BIN_FLOP_MAX = 256;
+const int BIN_TURN_MAX = 64;
+const int BIN_RIVER_MAX = 12;
+const char * const FLOPFILENAME = "bins/flop256BINS.dat";
+const char * const TURNFILENAME = "bins/turn64BINS.dat";
+const char * const RIVERFILENAME = "bins/river12BINS.dat";
 
 /***********************************************************************************/
 //constants for the flopalyzer
@@ -30,14 +33,29 @@ const int POTI_FLOP_MAX = 6;
 const int POTI_TURN_MAX = 6;
 const int POTI_RIVER_MAX = 6;
 
-const unsigned char SB=1, BB=2;
 
 //stacksize of the smallest stack, in small blinds, 
 //as HU poker is only as good as its smaller stack.
 #define SS 13
-const int STACKSIZE = SS*BB; //26 should match that paper, with 13 big blinds each.
+#define PUSHFOLD 0
+const unsigned char SB=1, BB=2;
+const int STACKSIZE = SS*BB;
 
-#if SS==13
+#if PUSHFOLD
+const unsigned char B1=99, R11=99, R12=99, R13=99, R14=99, R15=99, R16=99;
+const unsigned char B2=99, R21=99, R22=99, R23=99, R24=99, R25=99, R26=99;
+const unsigned char B3=99, R31=99, R32=99, R33=99, R34=99, R35=99, R36=99;
+const unsigned char B4=99, R41=99, R42=99, R43=99, R44=99, R45=99, R46=99;
+const unsigned char B5=99, R51=99, R52=99, R53=99, R54=99, R55=99, R56=99;
+const unsigned char B6=99, R61=99, R62=99, R63=99, R64=99, R65=99, R66=99;
+#elif SS<=8 //all possible options are represented
+const unsigned char B1=2,  R11=4,  R12=6,  R13=8,  R14=10, R15=12, R16=99;
+const unsigned char B2=4,  R21=8,  R22=12, R23=99, R24=99, R25=99, R26=99;
+const unsigned char B3=6,  R31=12, R32=99, R33=99, R34=99, R35=99, R36=99;
+const unsigned char B4=8,  R41=99, R42=99, R43=99, R44=99, R45=99, R46=99;
+const unsigned char B5=10, R51=99, R52=99, R53=99, R54=99, R55=99, R56=99;
+const unsigned char B6=12, R61=99, R62=99, R63=99, R64=99, R65=99, R66=99;
+#elif SS==13
 const unsigned char B1=2,  R11=4,  R12=6,  R13=10, R14=14, R15=18, R16=22;
 const unsigned char B2=4,  R21=8,  R22=16, R23=20, R24=24, R25=99, R26=99;
 const unsigned char B3=8,  R31=16, R32=24, R33=99, R34=99, R35=99, R36=99;

@@ -16,6 +16,7 @@
 CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSimpleGameDlg::IDD, pParent),
 	  totalhumanwon(0), human(P0), bot(P1),
+	  handsplayed(0),
 	  MyBot(false) //turns off diagnostics (default state of checkbox)
 {
 	CardMask_RESET(botcm0); //ensures show bot cards produces jokers if done early
@@ -105,10 +106,12 @@ void CSimpleGameDlg::OnOK()
 {
 	if(MakeBotGoButton.IsWindowEnabled()) // bot's turn
 		OnBnClickedButton6();
-	else if(CallButton.IsWindowEnabled() && BetAmount.GetWindowTextLength()==0) //bet box empty
-		OnBnClickedButton2();
-	else if(BetRaiseButton.IsWindowEnabled())
+	else if(BetRaiseButton.IsWindowEnabled() && BetAmount.GetWindowTextLength()>0)
 		OnBnClickedButton3();
+	else if(CallButton.IsWindowEnabled())
+		OnBnClickedButton2();
+	else if(NewGameButton.IsWindowEnabled())
+		OnBnClickedButton5();
 }
 
 BOOL CSimpleGameDlg::OnInitDialog()
@@ -539,7 +542,7 @@ void CSimpleGameDlg::OnBnClickedButton3()
 	double val;
 	BetAmount.GetWindowText(valstr);
 	BetAmount.SetWindowText(TEXT(""));
-	val = wcstod(valstr, NULL); //converts string to double
+	val = strtod(valstr, NULL); //converts string to double
 
 	//input checking: make sure it's not too small or too big, then do it.
 	if(val >= mintotalwager(human) && val + pot < STACKSIZE)
@@ -559,6 +562,11 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	CardMask usedcards, fullhuman, fullbot;
 	HandVal r0, r1;
 
+	//increment games played
+	CString text;
+	text.Format("SimpleGame - %d hands played", handsplayed);
+	this->SetWindowText(text);
+	handsplayed++;
 	//change positions
 	std::swap(human,bot);
 	//set gameround

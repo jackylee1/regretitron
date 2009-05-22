@@ -17,6 +17,11 @@ inline float safedivide(float n, float d)
 		return n/d;
 }
 
+//this function takes a filename, and prints out a simple listing of the
+//results for betting node 0, sceni 0-168, which is the preflop. it attempts to
+//emulate the output of this website if PUSHFOLD is true:
+//http://www.daimi.au.dk/~bromille/pokerdata/SingleHandSmallBlind/SHSB.4000
+//used only by my main routines in PokerNoLimit.cpp
 void printfirstnodestrat(char const * const filename)
 {
 	ofstream log(filename);
@@ -28,30 +33,46 @@ void printfirstnodestrat(char const * const filename)
 
 	log << fixed << setprecision(5);
 
-	for(int sceni=0; sceni<SCENI_PREFLOP_MAX; sceni++)
+	for(int sceni=SCENI_PREFLOP_MAX-1; sceni>=0; sceni--)
 	{
 		getpointers(sceni, 0, maxa, 0, stratt, stratn, stratd, regret); //ignore walkeri
 		numa = getvalidity(0, &(pfn[0]), isvalid);
 
+#if PUSHFOLD
+		log << setw(5) << left << preflophandstring(sceni)+":";
+#else
 		//print the scenario index and an example hand
 		log << endl << "Scenario " << sceni << ":";
 		printsceniinfo(log, sceni, 5); //starts with spaces and ends with endl
+#endif
 		
 		//remember we only store max-1 strategies. the last must be found based on all adding to 1.
 		strataccum=0;
 		for (int a=0; a<maxa-1; a++)
 		{
+			float myprob = stratn[a]/stratd[a];
+
 			if(isvalid[a])
 			{
-				strataccum+=stratn[a]/stratd[a];
+				strataccum+=myprob;
+#if PUSHFOLD
+				if(myprob>0.98F) log << "fold" << endl;
+				else if (myprob>0.02F)
+#endif
 				log << setw(14) << actionstring(a,PREFLOP,pfn,1.0)+": " 
-					<< 100*safedivide(stratn[a],stratd[a]) << "%" << endl;
+					<< 100*stratn[a]/stratd[a] << "%" << endl;
 			}
 		}
 		//finally, handle the last strat, if it is valid.
 		if(isvalid[maxa-1])
+		{
+#if PUSHFOLD
+			if((1-strataccum)>0.98F) log << "jam" << endl;
+			else if ((1-strataccum)>0.02F)
+#endif
 			log << setw(14) << actionstring(maxa-1,PREFLOP,pfn,1.0)+": " 
 				<< 100*(1-strataccum) << "%" << endl;
+		}
 	}
 	log.close();
 }
@@ -107,3 +128,42 @@ void dumpstratresult(const char * const filename)
 }
 
 
+
+
+void savexml(const string filename)
+{
+	using namespace ticpp;
+
+	Document doc;  
+
+	Declaration* decl = new Declaration("1.0","","");  
+	doc.LinkEndChild(decl); 
+
+	Element* root = new Element("strategysettingsv1");  
+	doc.LinkEndChild(root);  
+
+	Element* bins = new Element("bins");
+	root->LinkEndChild(bins);
+
+	Element* board;
+
+	board = new Element("flop");
+	board->SetAttribute("nbins", BIN_FLOP_MAX);
+	//board->SetAttribute("filesize", FLOPFILESIZE);
+	board->SetText(FLOPFILENAME);
+	bins->LinkEndChild(board);
+
+	board = new Element("turn");
+	board->SetAttribute("nbins", BIN_TURN_MAX);
+	//board->SetAttribute("filesize", TURNFILESIZE);
+	board->SetText(TURNFILENAME);
+	bins->LinkEndChild(board);
+
+	board = new Element("river");
+	board->SetAttribute("nbins", BIN_FLOP_MAX);
+	//board->SetAttribute("filesize", RIVERFILESIZE);
+	board->SetText(RIVERFILENAME);
+	bins->LinkEndChild(board);
+
+	doc.SaveFile(filename.c_str());
+}

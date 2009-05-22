@@ -21,6 +21,10 @@
 #include <iomanip> //needed for formating the way floats are printed in cout's and the like
 #include <time.h> //needed benchmark timing
 
+// TinyXML
+#define TIXML_USE_TICPP
+#include "../TinyXML++/ticpp.h"
+
 // Needed for file mapping.
 #include <Windows.h>
 
@@ -36,10 +40,3 @@
 }
 
 #define PRINTMASK(c) GenericDeck_maskString(&StdDeck, &c)
-
-#define BENCH(c,n) do{ clock_t __clocker = clock()-c; \
-	std::cout << n << " iterations done in " \
-		<< float(__clocker)/CLOCKS_PER_SEC << " seconds. (" \
-		<< (float) n * CLOCKS_PER_SEC / (float) __clocker << " per second)" << endl; \
-	c = clock(); \
-}while(0);

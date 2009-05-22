@@ -12,6 +12,9 @@ int getpoti(int gr, int pot)
 {
 	//they can only ever bet in multiples of the big blind, so all the numbers i'll ever
 	//have should be even, because they can not agree upon a small blind bet.
+#if PUSHFOLD
+	REPORT("getpoti shouldn't happen in PUSHFOLD");
+#else
 	switch(pot)
 	{
 #if SS==50
@@ -89,14 +92,15 @@ int getpoti(int gr, int pot)
 	case 10*BB: return 4;
 	case 11*BB:
 	case 12*BB: return 5;
-#endif
+#endif /*SS*/
 
 	default:
 		REPORT("invalid pot size in poti for flop");
 	}
+#endif /*PUSHFOLD*/
 }
 
-#if !ONE_POT_PER_BIN
+#if !ONE_POT_PER_BIN && !PUSHFOLD
 inline int roundup(const int &pot)
 {
 	switch(pot)
@@ -188,7 +192,7 @@ inline int roundup(const int &pot)
 inline int getvalidity(const int &pot, betnode const * mynode, bool isvalid[9])
 {
 	int numa=0;
-#if ONE_POT_PER_BIN
+#if ONE_POT_PER_BIN || PUSHFOLD
 	int maxpot = pot;
 #else
 	//in this case do not allow to be invalid if maximum pot in this poti is invalid
@@ -499,8 +503,13 @@ void initpfn()
 	//change number of actions to 9.
 	pfn[0].numacts = 9;
 
-	//finally, change 'checking' value to 'calling' big blind amount
+#if PUSHFOLD
+	//if pushfold, we need to make "calling" big blind amount unavailable.
+	pfn[0].potcontrib[1] = 99;
+#else
+	//otherwise, change 'checking' value to 'calling' big blind amount BB
 	pfn[0].potcontrib[1] = BB;
+#endif
 
 	//FIX NODE ONE
 	//change 'checking' value to 'calling' big blind amount

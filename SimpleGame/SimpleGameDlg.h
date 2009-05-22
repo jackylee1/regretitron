@@ -67,6 +67,7 @@ private:
 	static const int SBLIND = 5;
 	static const int BBLIND = 10;
 	static const int STACKSIZE = 130;
+	int handsplayed;
 	BotAPI MyBot;
 	Player human, bot;
 	CardMask humancards, botcards, flop, turn, river;

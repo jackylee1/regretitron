@@ -21,7 +21,7 @@
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="4"
 			UseOfMFC="1"
-			CharacterSet="1"
+			CharacterSet="2"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -85,7 +85,7 @@
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="4"
 			UseOfMFC="1"
-			CharacterSet="1"
+			CharacterSet="2"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -171,6 +171,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\readstrategy.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\stdafx.cpp"
 				>
 				<FileConfiguration
@@ -210,6 +214,10 @@
 			</File>
 			<File
 				RelativePath="..\PictureCtrl.h"
+				>
+			</File>
+			<File
+				RelativePath=".\readstrategy.h"
 				>
 			</File>
 			<File

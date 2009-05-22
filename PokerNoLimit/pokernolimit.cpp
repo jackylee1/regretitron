@@ -326,64 +326,101 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 
 
 //------------------------ p l a y g a m e -------------------------//
-void simulate(unsigned int iter)
+const long long MILLION = 1000000;
+const long long THOUSAND = 1000;
+
+string iterstring(long long iter)
 {
-	clock_t c1;
-	c1 = clock();
-	for(unsigned int i=0; i<iter; i++)
+	ostringstream o;
+	if(iter%MILLION==0)
+		o << iter/MILLION << "million";
+	else if(iter>MILLION)
+		o << fixed << setprecision(1)<< double(iter)/MILLION << "million";
+	else if(iter>=10*THOUSAND)
+		o << iter/THOUSAND << "k";
+	else
+		o << iter;
+	return o.str();
+}
+
+string timestring(time_t mytime)
+{
+	char mytimestr[32];
+	tm mytm;
+	localtime_s(&mytm, &mytime);
+	strftime(mytimestr, 32, "%A, %I:%M %p", &mytm); //Thursday 5:54 PM
+	return string(mytimestr);
+}
+
+
+void simulate(long long iter)
+{
+	static float prevrate=-1;
+	cout << endl << "starting on " << timestring(time(NULL)) << ":" << endl;
+	cout << "doing " << iterstring(iter) << " iterations..." << endl;
+	if(prevrate > 0)
+		cout << "Expect to finish on " 
+			<< timestring(time(NULL)+iter/prevrate) << endl;
+
+	clock_t c = clock();
+	for(long long i=0; i<iter; i++)
 	{
 		gs.dealnewgame();
 		hasbeenvisited.reset(); //sets all to false
 		walker(0,0,0,1,1);
 	}
-	BENCH(c1,iter);
+	clock_t diff = clock()-c;
+	prevrate = (float) iter * CLOCKS_PER_SEC / (float) diff;
+
+	cout << "...took " << float(diff)/CLOCKS_PER_SEC << " seconds. ("
+		<< prevrate << " per second)." << endl;
 }
+
+#define SAVESTRATEGYFILE 1
+#define TESTING 0
 
 inline void playgame()
 {
-	clock_t c1;
-	c1 = clock();
-
 	cout << "starting work..." << endl;
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	cout << "dumping strat..." << endl;
-	printfirstnodestrat("output/1M8bin13ss.txt");
-	dumpstratresult("strategy/1M8bin13ss.strat");
-
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	simulate(100000);
-	cout << "dumping strat..." << endl;
-	printfirstnodestrat("output/2M8bin13ss.txt");
-	dumpstratresult("strategy/2M8bin13ss.strat");
-
-//	simulate(1000000);
-//	printfirstnodestrat("output/test 2Mi8bin4ss v2.txt");
-
-//	simulate(6000000);
-//	printfirstnodestrat("output/test 8Mi8bin4ss v2.txt");
+	long long i=25*THOUSAND;
+	long long total=0;
+	simulate(i);
+	total+=i;
+	while(1)
+	{
+		simulate(i);
+		total+=i;
+		cout << "saving log of first node strat." << endl;
+		ostringstream o;
+		o << "output/13ss - 256,64,12bins - " << iterstring(total) << ".txt";
+		printfirstnodestrat(o.str().c_str());
+#if SAVESTRATEGYFILE
+		if(total >= 500*THOUSAND)
+		{
+			ostringstream oo;
+			oo << "strategy/13ss - 256,64,12bins - " << iterstring(total) << ".strat";
+			cout << "saving strategy file." << endl;
+			dumpstratresult(oo.str().c_str());
+		}
+#endif
+		i*=2;
+	}
 }
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+	cout << "total memory requirement: " << ((long long)WALKERI_MAX*STRATT_WALKERI_BYTES + (long long)SCENI_MAX*SCENARIODATA_BYTES)/1048576 << "mb" << endl;
+#if TESTING
+	unsigned long long arr[56] = {0x9809812089147320ui64,0x9809812089147320ui64,0x9809812089147320ui64};
+
+	for(int i=0; i<190; i++)
+		store(arr, i, i%6, 5);
+	for(int i=0; i<190; i++)
+		cout << retrieve(arr, i, 5) << endl;
+	
+
+	savexml("textxml1.xml");
+#else
 	initpfn();
 	initbins();
 	initmem();
@@ -393,6 +430,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	closemem();
 	closebins();
 	system("PAUSE");
+#endif
 	return 0;
 }
 
