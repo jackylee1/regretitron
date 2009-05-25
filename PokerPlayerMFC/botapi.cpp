@@ -16,7 +16,7 @@ BotAPI::BotAPI(bool diagon)
    : isdiagnosticson(diagon), mynode(NULL), answer(-1), MyWindow(NULL)
 {
 	//init the preflop tree
-	initpfn();
+	initbettingtrees();
 	//init the bins for determinebins
 	initbins();
 }
@@ -80,7 +80,7 @@ void BotAPI::setnewgame(Player playernum, CardMask hand,
 	//multiplier already set above
 	currentsceni = getscenarioi(PREFLOP, myplayer, 0, NULL);
 	currentbetinode = 0;
-	mynode = pfn;
+	mynode = pfloptree;
 	bethist[0] = bethist[1] = bethist[2] = -1;
 
 	offtreebetallins = false;
@@ -120,7 +120,7 @@ void BotAPI::setflop(CardMask theflop, double newpot)
 	perceived[1] = 0;
 	currentsceni = getscenarioi(FLOP, myplayer, roundtobb(newpot/multiplier), bethist);
 	currentbetinode = 0; //ready for P0 to act
-	mynode = n;
+	mynode = floptree; //beti = 0
 	processmyturn();
 }
 
@@ -151,7 +151,7 @@ void BotAPI::setturn(CardMask theturn, double newpot)
 	perceived[1] = 0;
 	currentsceni = getscenarioi(TURN, myplayer, roundtobb(newpot/multiplier), bethist);
 	currentbetinode = 0; //ready for P0 to act
-	mynode = n;
+	mynode = turntree;
 	processmyturn();
 }
 
@@ -182,7 +182,7 @@ void BotAPI::setriver(CardMask theriver, double newpot)
 	perceived[1] = 0;
 	currentsceni = getscenarioi(RIVER, myplayer, roundtobb(newpot/multiplier), bethist);
 	currentbetinode = 0; //ready for P0 to act
-	mynode = n;
+	mynode = rivertree;
 	processmyturn();
 }
 
@@ -263,7 +263,7 @@ void BotAPI::dobet(Player pl, double amount)
 	invested[pl] = amount;
 	perceived[pl] = mynode->potcontrib[nextact];
 	currentbetinode = mynode->result[nextact];
-	mynode = (currentgr == PREFLOP ? pfn : n) + currentbetinode;
+	mynode = gettree(currentgr, currentbetinode);
 }
 
 //this is a "bet" of amount all-in
@@ -281,7 +281,7 @@ void BotAPI::doallin(Player pl)
 	invested[pl] = STACKSIZE-currentpot;
 	perceived[pl] = STACKSIZE-currentpot;
 	currentbetinode = mynode->result[nextact];
-	mynode = (currentgr == PREFLOP ? pfn : n) + currentbetinode;
+	mynode = gettree(currentgr, currentbetinode);
 }
 
 // ----------------------------------------------------------------------------

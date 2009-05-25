@@ -5,216 +5,28 @@
 // For extern vs static and const,
 // see: http://www.gamedev.net/community/forums/topic.asp?topic_id=318620
 
-//defines the granularity with which the engine sees the pot
-//only even values are possible since we assume bets are size of big blind
-
-int getpoti(int gr, int pot)
-{
-	//they can only ever bet in multiples of the big blind, so all the numbers i'll ever
-	//have should be even, because they can not agree upon a small blind bet.
-#if PUSHFOLD
-	REPORT("getpoti shouldn't happen in PUSHFOLD");
-#else
-	switch(pot)
-	{
-#if SS==50
-#define ONE_POT_PER_BIN 0 //if we don't combine pots, we can avoid rounding up.
-	case 1*BB:
-	case 2*BB:
-	case 3*BB:
-		return 0;
-	case 4*BB:
-	case 5*BB:
-	case 6*BB:
-		return 1;
-	case 7*BB:
-	case 8*BB:
-	case 9*BB:
-	case 10*BB:
-		return 2;
-	case 11*BB:
-	case 12*BB:
-	case 13*BB:
-	case 14*BB:
-		return 3;
-	case 15*BB:
-	case 16*BB:
-	case 17*BB:
-	case 18*BB:
-	case 19*BB:
-		return 4;
-	case 20*BB:
-	case 21*BB:
-	case 22*BB:
-	case 23*BB:
-	case 24*BB:
-		return 5;
-	case 25*BB:
-	case 26*BB:
-	case 27*BB:
-	case 28*BB:
-	case 29*BB:
-	case 30*BB:
-		return 6;
-	case 31*BB:
-	case 32*BB:
-	case 33*BB:
-	case 34*BB:
-	case 35*BB:
-	case 36*BB:
-		return 7;
-	case 37*BB:
-	case 38*BB:
-	case 39*BB:
-	case 40*BB:
-	case 41*BB:
-	case 42*BB:
-		return 8;
-	case 43*BB:
-	case 44*BB:
-	case 45*BB:
-	case 46*BB:
-	case 47*BB:
-	case 48*BB:
-	case 49*BB:
-		return 9;
-#elif SS==13
-#define ONE_POT_PER_BIN 0 //if we don't combine pots, we can avoid rounding up.
-	case 1*BB:
-	case 2*BB: return 0;
-	case 3*BB:
-	case 4*BB: return 1;
-	case 5*BB:
-	case 6*BB: return 2;
-	case 7*BB:
-	case 8*BB: return 3;
-	case 9*BB:
-	case 10*BB: return 4;
-	case 11*BB:
-	case 12*BB: return 5;
-#endif /*SS*/
-
-	default:
-		REPORT("invalid pot size in poti for flop");
-	}
-#endif /*PUSHFOLD*/
-}
-
-#if !ONE_POT_PER_BIN && !PUSHFOLD
-inline int roundup(const int &pot)
-{
-	switch(pot)
-	{
-#if SS==50
-	case 0: return 0; //needed for preflop
-	case 1*BB:
-	case 2*BB:
-	case 3*BB:
-		return 3*BB;
-	case 4*BB:
-	case 5*BB:
-	case 6*BB:
-		return 6*BB;
-	case 7*BB:
-	case 8*BB:
-	case 9*BB:
-	case 10*BB:
-		return 10*BB;
-	case 11*BB:
-	case 12*BB:
-	case 13*BB:
-	case 14*BB:
-		return 14*BB;
-	case 15*BB:
-	case 16*BB:
-	case 17*BB:
-	case 18*BB:
-	case 19*BB:
-		return 19*BB;
-	case 20*BB:
-	case 21*BB:
-	case 22*BB:
-	case 23*BB:
-	case 24*BB:
-		return 24*BB;
-	case 25*BB:
-	case 26*BB:
-	case 27*BB:
-	case 28*BB:
-	case 29*BB:
-	case 30*BB:
-		return 30*BB;
-	case 31*BB:
-	case 32*BB:
-	case 33*BB:
-	case 34*BB:
-	case 35*BB:
-	case 36*BB:
-		return 36*BB;
-	case 37*BB:
-	case 38*BB:
-	case 39*BB:
-	case 40*BB:
-	case 41*BB:
-	case 42*BB:
-		return 42*BB;
-	case 43*BB:
-	case 44*BB:
-	case 45*BB:
-	case 46*BB:
-	case 47*BB:
-	case 48*BB:
-	case 49*BB:
-		return 49*BB;
-#elif SS==13
-	case 0: return 0; //needed for preflop
-	case 1*BB:
-	case 2*BB: return 2*BB;
-	case 3*BB:
-	case 4*BB: return 4*BB;
-	case 5*BB:
-	case 6*BB: return 6*BB;
-	case 7*BB:
-	case 8*BB: return 8*BB;
-	case 9*BB:
-	case 10*BB: return 10*BB;
-	case 11*BB:
-	case 12*BB: return 12*BB;
-#endif
-
-	default:
-		REPORT("invalid pot size in roundup");
-	}
-}
-#endif
 
 //returns number valid actions
 inline int getvalidity(const int &pot, betnode const * mynode, bool isvalid[9])
 {
 	int numa=0;
-#if ONE_POT_PER_BIN || PUSHFOLD
-	int maxpot = pot;
-#else
-	//in this case do not allow to be invalid if maximum pot in this poti is invalid
-	int maxpot = roundup(pot);
-#endif
 
 	switch(mynode->numacts)
 	{
 	default: REPORT("invalid maxa");
 	case 9:
-		if(isvalid[8] = (maxpot + mynode->potcontrib[8] < STACKSIZE)) numa++;
+		if(isvalid[8] = (pot + mynode->potcontrib[8] < STACKSIZE)) numa++;
 	case 8:
-		if(isvalid[7] = (maxpot + mynode->potcontrib[7] < STACKSIZE)) numa++;
-		if(isvalid[6] = (maxpot + mynode->potcontrib[6] < STACKSIZE)) numa++;
-		if(isvalid[5] = (maxpot + mynode->potcontrib[5] < STACKSIZE)) numa++;
-		if(isvalid[4] = (maxpot + mynode->potcontrib[4] < STACKSIZE)) numa++;
-		if(isvalid[3] = (maxpot + mynode->potcontrib[3] < STACKSIZE)) numa++;
+		if(isvalid[7] = (pot + mynode->potcontrib[7] < STACKSIZE)) numa++;
+		if(isvalid[6] = (pot + mynode->potcontrib[6] < STACKSIZE)) numa++;
+		if(isvalid[5] = (pot + mynode->potcontrib[5] < STACKSIZE)) numa++;
+		if(isvalid[4] = (pot + mynode->potcontrib[4] < STACKSIZE)) numa++;
+		if(isvalid[3] = (pot + mynode->potcontrib[3] < STACKSIZE)) numa++;
 	case 3:
-		if(isvalid[2] = (maxpot + mynode->potcontrib[2] < STACKSIZE)) numa++;
+		if(isvalid[2] = (pot + mynode->potcontrib[2] < STACKSIZE)) numa++;
 	case 2:
-		if(isvalid[1] = (maxpot + mynode->potcontrib[1] < STACKSIZE)) numa++;
-		if(isvalid[0] = (maxpot + mynode->potcontrib[0] < STACKSIZE)) numa++;
+		if(isvalid[1] = (pot + mynode->potcontrib[1] < STACKSIZE)) numa++;
+		if(isvalid[0] = (pot + mynode->potcontrib[0] < STACKSIZE)) numa++;
 	}
 
 	return numa;
@@ -235,119 +47,119 @@ inline int getvalidity(const int &pot, betnode const * mynode, bool isvalid[9])
 // AI if an all-in bet is called
 // the number of a child node if the betting continues in the present round
 // or NA if this action is not used.
-extern const betnode n[N_NODES] =
+extern const betnode floptree[N_NODES] =
 {
 	// {P#, #A, {result}, {potcontrib}}
 	
 	//0-1, 8 available actions, these are intitial node, and response to check.
 	{P0,8, { 1, 2, 4, 6, 8, 10, 12, 98, NA}, {0, B1, B2, B3, B4, B5, B6, 0, NA}}, //0
-	{P1,8, {GO1, 3, 5, 7, 9, 11, 13, 99, NA}, {0, B1, B2, B3, B4, B5, B6, 0, NA}}, //1
+	{P1,8, {GO, 3, 5, 7, 9, 11, 13, 99, NA}, {0, B1, B2, B3, B4, B5, B6, 0, NA}}, //1
 
 	//2-13, 9 available actions, responding to a first bet
-	{P1,9, {FD, GO2, 14, 15, 16, 17, 18, 19, 86}, {0, B1, R11, R12, R13, R14, R15, R16, 0}}, //2
-	{P0,9, {FD, GO3, 20, 21, 22, 23, 24, 25, 92}, {0, B1, R11, R12, R13, R14, R15, R16, 0}}, //3
-	{P1,9, {FD, GO2, 26, 27, 28, 29, 30, 31, 87}, {0, B2, R21, R22, R23, R24, R25, R26, 0}}, //4
-	{P0,9, {FD, GO3, 32, 33, 34, 35, 36, 37, 93}, {0, B2, R21, R22, R23, R24, R25, R26, 0}}, //5
+	{P1,9, {FD, GO, 14, 15, 16, 17, 18, 19, 86}, {0, B1, R11, R12, R13, R14, R15, R16, 0}}, //2
+	{P0,9, {FD, GO, 20, 21, 22, 23, 24, 25, 92}, {0, B1, R11, R12, R13, R14, R15, R16, 0}}, //3
+	{P1,9, {FD, GO, 26, 27, 28, 29, 30, 31, 87}, {0, B2, R21, R22, R23, R24, R25, R26, 0}}, //4
+	{P0,9, {FD, GO, 32, 33, 34, 35, 36, 37, 93}, {0, B2, R21, R22, R23, R24, R25, R26, 0}}, //5
 
-	{P1,9, {FD, GO2, 38, 39, 40, 41, 42, 43, 88}, {0, B3, R31, R32, R33, R34, R35, R36, 0}}, //6
-	{P0,9, {FD, GO3, 44, 45, 46, 47, 48, 49, 94}, {0, B3, R31, R32, R33, R34, R35, R36, 0}}, //7
-	{P1,9, {FD, GO2, 50, 51, 52, 53, 54, 55, 89}, {0, B4, R41, R42, R43, R44, R45, R46, 0}}, //8
-	{P0,9, {FD, GO3, 56, 57, 58, 59, 60, 61, 95}, {0, B4, R41, R42, R43, R44, R45, R46, 0}}, //9
+	{P1,9, {FD, GO, 38, 39, 40, 41, 42, 43, 88}, {0, B3, R31, R32, R33, R34, R35, R36, 0}}, //6
+	{P0,9, {FD, GO, 44, 45, 46, 47, 48, 49, 94}, {0, B3, R31, R32, R33, R34, R35, R36, 0}}, //7
+	{P1,9, {FD, GO, 50, 51, 52, 53, 54, 55, 89}, {0, B4, R41, R42, R43, R44, R45, R46, 0}}, //8
+	{P0,9, {FD, GO, 56, 57, 58, 59, 60, 61, 95}, {0, B4, R41, R42, R43, R44, R45, R46, 0}}, //9
 
-	{P1,9, {FD, GO2, 62, 63, 64, 65, 66, 67, 90}, {0, B5, R51, R52, R53, R54, R55, R56, 0}}, //10
-	{P0,9, {FD, GO3, 68, 69, 70, 71, 72, 73, 96}, {0, B5, R51, R52, R53, R54, R55, R56, 0}}, //11
-	{P1,9, {FD, GO2, 74, 75, 76, 77, 78, 79, 91}, {0, B6, R61, R62, R63, R64, R65, R66, 0}}, //12
-	{P0,9, {FD, GO3, 80, 81, 82, 83, 84, 85, 97}, {0, B6, R61, R62, R63, R64, R65, R66, 0}}, //13
+	{P1,9, {FD, GO, 62, 63, 64, 65, 66, 67, 90}, {0, B5, R51, R52, R53, R54, R55, R56, 0}}, //10
+	{P0,9, {FD, GO, 68, 69, 70, 71, 72, 73, 96}, {0, B5, R51, R52, R53, R54, R55, R56, 0}}, //11
+	{P1,9, {FD, GO, 74, 75, 76, 77, 78, 79, 91}, {0, B6, R61, R62, R63, R64, R65, R66, 0}}, //12
+	{P0,9, {FD, GO, 80, 81, 82, 83, 84, 85, 97}, {0, B6, R61, R62, R63, R64, R65, R66, 0}}, //13
 
 	//14-19 & 20-25, 3 available actions, responding to raises to a bet B1
-	{P0,3, {FD, GO4, 100, NA6}, {B1, R11, 0, NA6}}, //14
-	{P0,3, {FD, GO4, 101, NA6}, {B1, R12, 0, NA6}}, //15
-	{P0,3, {FD, GO4, 102, NA6}, {B1, R13, 0, NA6}}, //16
-	{P0,3, {FD, GO4, 103, NA6}, {B1, R14, 0, NA6}}, //17
-	{P0,3, {FD, GO4, 104, NA6}, {B1, R15, 0, NA6}}, //18
-	{P0,3, {FD, GO4, 105, NA6}, {B1, R16, 0, NA6}}, //19
+	{P0,3, {FD, GO, 100, NA6}, {B1, R11, 0, NA6}}, //14
+	{P0,3, {FD, GO, 101, NA6}, {B1, R12, 0, NA6}}, //15
+	{P0,3, {FD, GO, 102, NA6}, {B1, R13, 0, NA6}}, //16
+	{P0,3, {FD, GO, 103, NA6}, {B1, R14, 0, NA6}}, //17
+	{P0,3, {FD, GO, 104, NA6}, {B1, R15, 0, NA6}}, //18
+	{P0,3, {FD, GO, 105, NA6}, {B1, R16, 0, NA6}}, //19
 
-	{P1,3, {FD, GO5, 106, NA6}, {B1, R11, 0, NA6}}, //20
-	{P1,3, {FD, GO5, 107, NA6}, {B1, R12, 0, NA6}}, //21
-	{P1,3, {FD, GO5, 108, NA6}, {B1, R13, 0, NA6}}, //22
-	{P1,3, {FD, GO5, 109, NA6}, {B1, R14, 0, NA6}}, //23
-	{P1,3, {FD, GO5, 110, NA6}, {B1, R15, 0, NA6}}, //24
-	{P1,3, {FD, GO5, 111, NA6}, {B1, R16, 0, NA6}}, //25
+	{P1,3, {FD, GO, 106, NA6}, {B1, R11, 0, NA6}}, //20
+	{P1,3, {FD, GO, 107, NA6}, {B1, R12, 0, NA6}}, //21
+	{P1,3, {FD, GO, 108, NA6}, {B1, R13, 0, NA6}}, //22
+	{P1,3, {FD, GO, 109, NA6}, {B1, R14, 0, NA6}}, //23
+	{P1,3, {FD, GO, 110, NA6}, {B1, R15, 0, NA6}}, //24
+	{P1,3, {FD, GO, 111, NA6}, {B1, R16, 0, NA6}}, //25
 
 	//26-31 & 32-37, 3 available actions, responding to raises to a bet B2
-	{P0,3, {FD, GO4, 112, NA6}, {B2, R21, 0, NA6}}, //26
-	{P0,3, {FD, GO4, 113, NA6}, {B2, R22, 0, NA6}}, //27
-	{P0,3, {FD, GO4, 114, NA6}, {B2, R23, 0, NA6}}, //28
-	{P0,3, {FD, GO4, 115, NA6}, {B2, R24, 0, NA6}}, //29
-	{P0,3, {FD, GO4, 116, NA6}, {B2, R25, 0, NA6}}, //30
-	{P0,3, {FD, GO4, 117, NA6}, {B2, R26, 0, NA6}}, //31
+	{P0,3, {FD, GO, 112, NA6}, {B2, R21, 0, NA6}}, //26
+	{P0,3, {FD, GO, 113, NA6}, {B2, R22, 0, NA6}}, //27
+	{P0,3, {FD, GO, 114, NA6}, {B2, R23, 0, NA6}}, //28
+	{P0,3, {FD, GO, 115, NA6}, {B2, R24, 0, NA6}}, //29
+	{P0,3, {FD, GO, 116, NA6}, {B2, R25, 0, NA6}}, //30
+	{P0,3, {FD, GO, 117, NA6}, {B2, R26, 0, NA6}}, //31
 
-	{P1,3, {FD, GO5, 118, NA6}, {B2, R21, 0, NA6}}, //32
-	{P1,3, {FD, GO5, 119, NA6}, {B2, R22, 0, NA6}}, //33
-	{P1,3, {FD, GO5, 120, NA6}, {B2, R23, 0, NA6}}, //34
-	{P1,3, {FD, GO5, 121, NA6}, {B2, R24, 0, NA6}}, //35
-	{P1,3, {FD, GO5, 122, NA6}, {B2, R25, 0, NA6}}, //36
-	{P1,3, {FD, GO5, 123, NA6}, {B2, R26, 0, NA6}}, //37
+	{P1,3, {FD, GO, 118, NA6}, {B2, R21, 0, NA6}}, //32
+	{P1,3, {FD, GO, 119, NA6}, {B2, R22, 0, NA6}}, //33
+	{P1,3, {FD, GO, 120, NA6}, {B2, R23, 0, NA6}}, //34
+	{P1,3, {FD, GO, 121, NA6}, {B2, R24, 0, NA6}}, //35
+	{P1,3, {FD, GO, 122, NA6}, {B2, R25, 0, NA6}}, //36
+	{P1,3, {FD, GO, 123, NA6}, {B2, R26, 0, NA6}}, //37
 
 	//38-43 & 44-49, 3 available actions, responding to raises to a bet B3
-	{P0,3, {FD, GO4, 124, NA6}, {B3, R31, 0, NA6}}, //38
-	{P0,3, {FD, GO4, 125, NA6}, {B3, R32, 0, NA6}}, //39
-	{P0,3, {FD, GO4, 126, NA6}, {B3, R33, 0, NA6}}, //40
-	{P0,3, {FD, GO4, 127, NA6}, {B3, R34, 0, NA6}}, //41
-	{P0,3, {FD, GO4, 128, NA6}, {B3, R35, 0, NA6}}, //42
-	{P0,3, {FD, GO4, 129, NA6}, {B3, R36, 0, NA6}}, //43
+	{P0,3, {FD, GO, 124, NA6}, {B3, R31, 0, NA6}}, //38
+	{P0,3, {FD, GO, 125, NA6}, {B3, R32, 0, NA6}}, //39
+	{P0,3, {FD, GO, 126, NA6}, {B3, R33, 0, NA6}}, //40
+	{P0,3, {FD, GO, 127, NA6}, {B3, R34, 0, NA6}}, //41
+	{P0,3, {FD, GO, 128, NA6}, {B3, R35, 0, NA6}}, //42
+	{P0,3, {FD, GO, 129, NA6}, {B3, R36, 0, NA6}}, //43
 
-	{P1,3, {FD, GO5, 130, NA6}, {B3, R31, 0, NA6}}, //44
-	{P1,3, {FD, GO5, 131, NA6}, {B3, R32, 0, NA6}}, //45
-	{P1,3, {FD, GO5, 132, NA6}, {B3, R33, 0, NA6}}, //46
-	{P1,3, {FD, GO5, 133, NA6}, {B3, R34, 0, NA6}}, //47
-	{P1,3, {FD, GO5, 134, NA6}, {B3, R35, 0, NA6}}, //48
-	{P1,3, {FD, GO5, 135, NA6}, {B3, R36, 0, NA6}}, //49
+	{P1,3, {FD, GO, 130, NA6}, {B3, R31, 0, NA6}}, //44
+	{P1,3, {FD, GO, 131, NA6}, {B3, R32, 0, NA6}}, //45
+	{P1,3, {FD, GO, 132, NA6}, {B3, R33, 0, NA6}}, //46
+	{P1,3, {FD, GO, 133, NA6}, {B3, R34, 0, NA6}}, //47
+	{P1,3, {FD, GO, 134, NA6}, {B3, R35, 0, NA6}}, //48
+	{P1,3, {FD, GO, 135, NA6}, {B3, R36, 0, NA6}}, //49
 
 	//50-55 & 56-61, 3 available actions, responding to raises to a bet B4
-	{P0,3, {FD, GO4, 136, NA6}, {B4, R41, 0, NA6}}, //50
-	{P0,3, {FD, GO4, 137, NA6}, {B4, R42, 0, NA6}}, //51
-	{P0,3, {FD, GO4, 138, NA6}, {B4, R43, 0, NA6}}, //52
-	{P0,3, {FD, GO4, 139, NA6}, {B4, R44, 0, NA6}}, //53
-	{P0,3, {FD, GO4, 140, NA6}, {B4, R45, 0, NA6}}, //54
-	{P0,3, {FD, GO4, 141, NA6}, {B4, R46, 0, NA6}}, //55
+	{P0,3, {FD, GO, 136, NA6}, {B4, R41, 0, NA6}}, //50
+	{P0,3, {FD, GO, 137, NA6}, {B4, R42, 0, NA6}}, //51
+	{P0,3, {FD, GO, 138, NA6}, {B4, R43, 0, NA6}}, //52
+	{P0,3, {FD, GO, 139, NA6}, {B4, R44, 0, NA6}}, //53
+	{P0,3, {FD, GO, 140, NA6}, {B4, R45, 0, NA6}}, //54
+	{P0,3, {FD, GO, 141, NA6}, {B4, R46, 0, NA6}}, //55
 
-	{P1,3, {FD, GO5, 142, NA6}, {B4, R41, 0, NA6}}, //56
-	{P1,3, {FD, GO5, 143, NA6}, {B4, R42, 0, NA6}}, //57
-	{P1,3, {FD, GO5, 144, NA6}, {B4, R43, 0, NA6}}, //58
-	{P1,3, {FD, GO5, 145, NA6}, {B4, R44, 0, NA6}}, //59
-	{P1,3, {FD, GO5, 146, NA6}, {B4, R45, 0, NA6}}, //60
-	{P1,3, {FD, GO5, 147, NA6}, {B4, R46, 0, NA6}}, //61
+	{P1,3, {FD, GO, 142, NA6}, {B4, R41, 0, NA6}}, //56
+	{P1,3, {FD, GO, 143, NA6}, {B4, R42, 0, NA6}}, //57
+	{P1,3, {FD, GO, 144, NA6}, {B4, R43, 0, NA6}}, //58
+	{P1,3, {FD, GO, 145, NA6}, {B4, R44, 0, NA6}}, //59
+	{P1,3, {FD, GO, 146, NA6}, {B4, R45, 0, NA6}}, //60
+	{P1,3, {FD, GO, 147, NA6}, {B4, R46, 0, NA6}}, //61
 
 	//62-67 & 68-73, 3 available actions, responding to raises to a bet B5
-	{P0,3, {FD, GO4, 148, NA6}, {B5, R51, 0, NA6}}, //62
-	{P0,3, {FD, GO4, 149, NA6}, {B5, R52, 0, NA6}}, //63
-	{P0,3, {FD, GO4, 150, NA6}, {B5, R53, 0, NA6}}, //64
-	{P0,3, {FD, GO4, 151, NA6}, {B5, R54, 0, NA6}}, //65
-	{P0,3, {FD, GO4, 152, NA6}, {B5, R55, 0, NA6}}, //66
-	{P0,3, {FD, GO4, 153, NA6}, {B5, R56, 0, NA6}}, //67
+	{P0,3, {FD, GO, 148, NA6}, {B5, R51, 0, NA6}}, //62
+	{P0,3, {FD, GO, 149, NA6}, {B5, R52, 0, NA6}}, //63
+	{P0,3, {FD, GO, 150, NA6}, {B5, R53, 0, NA6}}, //64
+	{P0,3, {FD, GO, 151, NA6}, {B5, R54, 0, NA6}}, //65
+	{P0,3, {FD, GO, 152, NA6}, {B5, R55, 0, NA6}}, //66
+	{P0,3, {FD, GO, 153, NA6}, {B5, R56, 0, NA6}}, //67
 
-	{P1,3, {FD, GO5, 154, NA6}, {B5, R51, 0, NA6}}, //68
-	{P1,3, {FD, GO5, 155, NA6}, {B5, R52, 0, NA6}}, //69
-	{P1,3, {FD, GO5, 156, NA6}, {B5, R53, 0, NA6}}, //70
-	{P1,3, {FD, GO5, 157, NA6}, {B5, R54, 0, NA6}}, //71
-	{P1,3, {FD, GO5, 158, NA6}, {B5, R55, 0, NA6}}, //72
-	{P1,3, {FD, GO5, 159, NA6}, {B5, R56, 0, NA6}}, //73
+	{P1,3, {FD, GO, 154, NA6}, {B5, R51, 0, NA6}}, //68
+	{P1,3, {FD, GO, 155, NA6}, {B5, R52, 0, NA6}}, //69
+	{P1,3, {FD, GO, 156, NA6}, {B5, R53, 0, NA6}}, //70
+	{P1,3, {FD, GO, 157, NA6}, {B5, R54, 0, NA6}}, //71
+	{P1,3, {FD, GO, 158, NA6}, {B5, R55, 0, NA6}}, //72
+	{P1,3, {FD, GO, 159, NA6}, {B5, R56, 0, NA6}}, //73
 
 	//74-79 & 80-85, 3 available actions, responding to raises to a bet B6
-	{P0,3, {FD, GO4, 160, NA6}, {B6, R61, 0, NA6}}, //74
-	{P0,3, {FD, GO4, 161, NA6}, {B6, R62, 0, NA6}}, //75
-	{P0,3, {FD, GO4, 162, NA6}, {B6, R63, 0, NA6}}, //76
-	{P0,3, {FD, GO4, 163, NA6}, {B6, R64, 0, NA6}}, //77
-	{P0,3, {FD, GO4, 164, NA6}, {B6, R65, 0, NA6}}, //78
-	{P0,3, {FD, GO4, 165, NA6}, {B6, R66, 0, NA6}}, //79
+	{P0,3, {FD, GO, 160, NA6}, {B6, R61, 0, NA6}}, //74
+	{P0,3, {FD, GO, 161, NA6}, {B6, R62, 0, NA6}}, //75
+	{P0,3, {FD, GO, 162, NA6}, {B6, R63, 0, NA6}}, //76
+	{P0,3, {FD, GO, 163, NA6}, {B6, R64, 0, NA6}}, //77
+	{P0,3, {FD, GO, 164, NA6}, {B6, R65, 0, NA6}}, //78
+	{P0,3, {FD, GO, 165, NA6}, {B6, R66, 0, NA6}}, //79
 
-	{P1,3, {FD, GO5, 166, NA6}, {B6, R61, 0, NA6}}, //80
-	{P1,3, {FD, GO5, 167, NA6}, {B6, R62, 0, NA6}}, //81
-	{P1,3, {FD, GO5, 168, NA6}, {B6, R63, 0, NA6}}, //82
-	{P1,3, {FD, GO5, 169, NA6}, {B6, R64, 0, NA6}}, //83
-	{P1,3, {FD, GO5, 170, NA6}, {B6, R65, 0, NA6}}, //84
-	{P1,3, {FD, GO5, 171, NA6}, {B6, R66, 0, NA6}}, //85
+	{P1,3, {FD, GO, 166, NA6}, {B6, R61, 0, NA6}}, //80
+	{P1,3, {FD, GO, 167, NA6}, {B6, R62, 0, NA6}}, //81
+	{P1,3, {FD, GO, 168, NA6}, {B6, R63, 0, NA6}}, //82
+	{P1,3, {FD, GO, 169, NA6}, {B6, R64, 0, NA6}}, //83
+	{P1,3, {FD, GO, 170, NA6}, {B6, R65, 0, NA6}}, //84
+	{P1,3, {FD, GO, 171, NA6}, {B6, R66, 0, NA6}}, //85
 
 	//86-91, 2 available actions, P0 responding to P1's all-in from P0's BN
 	{P0,2, {FD, AI, NA7}, {B1, 0, NA7}}, //86
@@ -462,18 +274,20 @@ extern const betnode n[N_NODES] =
 	
 
 //PREFLOP
-betnode pfn[N_NODES];
+betnode pfloptree[N_NODES];
+const betnode * const turntree = floptree;
+const betnode * const rivertree = floptree;
 
-//Alas, you will have to initialize!
-void initpfn()
+//Alas, you will have to initialize the preflop tree!
+void initbettingtrees()
 {
 	//Step 0, copy the tree. fix player to act.
 	for(int i=0; i<N_NODES; i++)
 	{
 		//copy post-flop tree
-		pfn[i] = n[i];
+		pfloptree[i] = floptree[i];
 		//change player to act to reflect reversed order preflop.
-		pfn[i].playertoact = 1-n[i].playertoact;
+		pfloptree[i].playertoact = 1-floptree[i].playertoact;
 	}
 
 	//Step 1, bump up all non-NA or 0 (All in, or check/fold nothing) valiues to +BB, 
@@ -482,8 +296,8 @@ void initpfn()
 	{
 		for(int j=0; j<9; j++)
 		{
-			if(pfn[i].potcontrib[j] != NA && pfn[i].potcontrib[j] != 0)
-				pfn[i].potcontrib[j] += BB;
+			if(pfloptree[i].potcontrib[j] != NA && pfloptree[i].potcontrib[j] != 0)
+				pfloptree[i].potcontrib[j] += BB;
 		}
 	}
 
@@ -492,37 +306,38 @@ void initpfn()
 	//shift the 8 actions of the first node from 0-7 to 1-8 ...
 	for(int i=8; i>0; i--)
 	{
-		pfn[0].potcontrib[i] = pfn[0].potcontrib[i-1];
-		pfn[0].result[i] = pfn[0].result[i-1];
+		pfloptree[0].potcontrib[i] = pfloptree[0].potcontrib[i-1];
+		pfloptree[0].result[i] = pfloptree[0].result[i-1];
 	}
 		
 	//... so that we can accomodate the new small blind folding action
-	pfn[0].result[0] = FD;
-	pfn[0].potcontrib[0] = SB;
+	pfloptree[0].result[0] = FD;
+	pfloptree[0].potcontrib[0] = SB;
 
 	//change number of actions to 9.
-	pfn[0].numacts = 9;
+	pfloptree[0].numacts = 9;
 
 #if PUSHFOLD
 	//if pushfold, we need to make "calling" big blind amount unavailable.
-	pfn[0].potcontrib[1] = 99;
+	pfloptree[0].potcontrib[1] = 99;
 #else
 	//otherwise, change 'checking' value to 'calling' big blind amount BB
-	pfn[0].potcontrib[1] = BB;
+	pfloptree[0].potcontrib[1] = BB;
 #endif
 
 	//FIX NODE ONE
 	//change 'checking' value to 'calling' big blind amount
-	pfn[1].potcontrib[0] = BB;
+	pfloptree[1].potcontrib[0] = BB;
 
 	//FIX NODES WITH FOLD ZERO (2-13, 98, 99)
 
 	//Now, must change the fold valuations from 0 to big blind.
 	//responses to the six initial bets over BB, for each player
 	for(int i=2; i<=13; i++)
-		pfn[i].potcontrib[0] = BB;
+		pfloptree[i].potcontrib[0] = BB;
 
 	//and response to all-in over BB, for each player.
-	pfn[98].potcontrib[0] = BB;
-	pfn[99].potcontrib[0] = BB;
+	pfloptree[98].potcontrib[0] = BB;
+	pfloptree[99].potcontrib[0] = BB;
 }
+

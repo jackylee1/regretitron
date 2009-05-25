@@ -57,7 +57,7 @@ void BotAPI::populatewindow(CWnd* parentwin)
 	{
 		for(int a=0; a<9; a++)
 		{
-			if(mynode==pfn) //start of game, human is first
+			if(mynode==pfloptree) //start of game, human is first
 			{
 				MyWindow->ActButton[a].SetWindowText(TEXT(""));
 				MyWindow->ActButton[a].SetCheck(BST_UNCHECKED);

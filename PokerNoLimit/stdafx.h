@@ -20,6 +20,8 @@
 #include <string> //needed for some of the rephands shenanigans
 #include <iomanip> //needed for formating the way floats are printed in cout's and the like
 #include <time.h> //needed benchmark timing
+#include <vector> //for recording exit node table needed for player
+#include <float.h> //for floating point epsilon
 
 // TinyXML
 #define TIXML_USE_TICPP
@@ -33,10 +35,10 @@
 #include "inlines/eval.h"
 
 // custom global macros
-#define REPORT(chars) { \
+#define REPORT(chars) do{ \
     MessageBox(NULL, TEXT(chars), TEXT("failure"), MB_OK);\
 	_asm {int 3}; \
 	exit(1); \
-}
+}while(0)
 
 #define PRINTMASK(c) GenericDeck_maskString(&StdDeck, &c)

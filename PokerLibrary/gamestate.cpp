@@ -5,61 +5,6 @@
 #include "treenolimit.h"
 #include "constants.h"
 
-#define COMBINE(i4, i3, i2, i1, n3, n2, n1) ((i4)*(n3)*(n2)*(n1) + (i3)*(n2)*(n1) + (i2)*(n1) + (i1))
-
-int GameState::getscenarioi(int gr, int ptoact, int pot, int bethist[3])
-{
-	//**************************
-	// sceni is created from;
-	// flop score (computed once per game, same for both players)
-	// hand score (computed once per game, depends on which player)
-	// pot size (depends on game state, same for both players)
-	// betting history (depends on game state, same for both players)
-
-	// flop score and hand score can be stored in the gamestate class
-	// and retrieved by passing in the specific gameround and playernumber
-
-	// pot size is calculated only in walker, and passed in as an argument
-
-	// betting history is determined by data in betting tree, and stored only in walker. 
-	// it is passed in as an argument
-	
-	//PLAN:
-	// - calculate a separate compact index based on gameround, and then add them all together
-
-	switch(gr)
-	{
-	case PREFLOP:
-		//flop score is non-existant
-		//we have handscore
-		//pot size is non-existant
-		//betting history is non-existant
-		// so, just handscore, and offset is zero
-		return binnumber[ptoact][PREFLOP];
-
-	case FLOP:
-		//flop score and handscore are stored here.
-		//pot size index is defined from tree file
-		//betting history we have
-		return COMBINE(binnumber[ptoact][FLOP], flopscore,      getpoti(gr,pot), bethist[0],
-			                                    FLOPALYZER_MAX, POTI_FLOP_MAX,   BETHIST_MAX)
-					+ SCENI_PREFLOP_MAX;
-
-	case TURN:
-		return COMBINE(binnumber[ptoact][TURN], turnscore,      getpoti(gr,pot), bethist[1]*BETHIST_MAX + bethist[0],
-			                                    TURNALYZER_MAX, POTI_TURN_MAX,   BETHIST_MAX*BETHIST_MAX)
-					+ SCENI_FLOP_MAX;
-
-	case RIVER:
-		return COMBINE(binnumber[ptoact][RIVER], riverscore,    getpoti(gr,pot), bethist[2]*BETHIST_MAX*BETHIST_MAX + bethist[1]*BETHIST_MAX + bethist[0],
-			                                     RIVALYZER_MAX, POTI_RIVER_MAX,  BETHIST_MAX*BETHIST_MAX*BETHIST_MAX)
-					+ SCENI_TURN_MAX;
-
-	default:
-		REPORT("ivalid gameround encountered in getscenarioi");
-	}
-}
-
 void GameState::dealnewgame()
 {
 	CardMask usedcards, full0, full1;
@@ -79,7 +24,7 @@ void GameState::dealnewgame()
 	CardMask_OR(usedcards, usedcards, turn);
 	MONTECARLO_N_CARDS_D(river, usedcards, 1, 1, );
 
-	//compute flopalyzer score
+	//compute flopalyzer scores
 	flopscore = flopalyzer(flop);
 	turnscore = turnalyzer(flop, turn);
 	riverscore = rivalyzer(flop, turn, river);

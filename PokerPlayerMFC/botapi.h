@@ -11,12 +11,6 @@ enum Action
 	ALLIN //a player has BET all-in. otherwise should use CALL
 };
 
-enum Player
-{
-	P0 = 0,//first to act post-flop
-	P1 = 1 //first to act pre-flop
-};
-
 //forward declaration
 struct betnode;
 class DiagnosticsPage;

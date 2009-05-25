@@ -28,17 +28,27 @@ struct betnode
 };
 
 //to initialize the below variables
-void initpfn();
+void initbettingtrees();
 
 //fills isvalid and returns num actions.
 extern inline int getvalidity(const int &pot, betnode const * mynode, bool isvalid[9]);
 
-//returns index of a certain pot value
-int getpoti(int gr, int pot);
+extern       betnode         pfloptree[N_NODES];
+extern const betnode         floptree[N_NODES];
+extern const betnode * const turntree;
+extern const betnode * const rivertree;
 
-//THESE ARE THE GLOBAL VARIABLES THAT MAKE UP THE BETTING TREE.
-//ONE IS FOR POST FLOP, THE OTHER IS FOR PREFLOP.
-extern const betnode n[N_NODES];
-extern       betnode pfn[N_NODES];
+//helper function to get the appropriate tree
+inline betnode const * gettree(int gr, int beti=0)
+{
+	switch(gr)
+	{
+	case PREFLOP: return pfloptree+beti;
+	case FLOP: return floptree+beti;
+	case TURN: return turntree+beti;
+	case RIVER: return rivertree+beti;
+	}
+	REPORT("invalid gameround");
+}
 
 #endif

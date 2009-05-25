@@ -9,16 +9,24 @@ const int FLOP = 1;
 const int TURN = 2;
 const int RIVER = 3;
 
+#define VECTORIZE 0
+
+#if VECTORIZE
+#define DEREF(basetree) (*basetree)
+#else
+#define DEREF(basetree) basetree
+#endif
+
 /***********************************************************************************/
 //constants for the binning of hands
 const int BIN_PREFLOP_MAX = INDEX2_MAX; //should be 169, not really bins.
 
 const int BIN_FLOP_MAX = 256;
-const int BIN_TURN_MAX = 64;
-const int BIN_RIVER_MAX = 12;
+const int BIN_TURN_MAX = 90;
+const int BIN_RIVER_MAX = 32;
 const char * const FLOPFILENAME = "bins/flop256BINS.dat";
-const char * const TURNFILENAME = "bins/turn64BINS.dat";
-const char * const RIVERFILENAME = "bins/river12BINS.dat";
+const char * const TURNFILENAME = "bins/turn90BINS.dat";
+const char * const RIVERFILENAME = "bins/river32BINS.dat";
 
 /***********************************************************************************/
 //constants for the flopalyzer
@@ -27,16 +35,16 @@ const int FLOPALYZER_MAX=6;
 const int TURNALYZER_MAX=17;
 const int RIVALYZER_MAX=37;
 
-/***********************************************************************************/
-//constants for the pot indexing, and those that define game parameters
-const int POTI_FLOP_MAX = 6;
-const int POTI_TURN_MAX = 6;
-const int POTI_RIVER_MAX = 6;
-
+/*****************************************************************************/
+//constants for cardsi returned by gamestate
+const int CARDSI_PFLOP_MAX = BIN_PREFLOP_MAX;
+const int CARDSI_FLOP_MAX = BIN_FLOP_MAX*FLOPALYZER_MAX;
+const int CARDSI_TURN_MAX = BIN_TURN_MAX*TURNALYZER_MAX;
+const int CARDSI_RIVER_MAX = BIN_RIVER_MAX*RIVALYZER_MAX;
 
 //stacksize of the smallest stack, in small blinds, 
 //as HU poker is only as good as its smaller stack.
-#define SS 13
+#define SS 6
 #define PUSHFOLD 0
 const unsigned char SB=1, BB=2;
 const int STACKSIZE = SS*BB;
@@ -56,19 +64,27 @@ const unsigned char B4=8,  R41=99, R42=99, R43=99, R44=99, R45=99, R46=99;
 const unsigned char B5=10, R51=99, R52=99, R53=99, R54=99, R55=99, R56=99;
 const unsigned char B6=12, R61=99, R62=99, R63=99, R64=99, R65=99, R66=99;
 #elif SS==13
+/*
 const unsigned char B1=2,  R11=4,  R12=6,  R13=10, R14=14, R15=18, R16=22;
-const unsigned char B2=4,  R21=8,  R22=16, R23=20, R24=24, R25=99, R26=99;
+const unsigned char B2=6,  R21=8,  R22=16, R23=20, R24=24, R25=99, R26=99;
 const unsigned char B3=8,  R31=16, R32=24, R33=99, R34=99, R35=99, R36=99;
 const unsigned char B4=12, R41=24, R42=99, R43=99, R44=99, R45=99, R46=99;
 const unsigned char B5=16, R51=99, R52=99, R53=99, R54=99, R55=99, R56=99;
 const unsigned char B6=20, R61=99, R62=99, R63=99, R64=99, R65=99, R66=99;
-#elif SS==50
-const unsigned char B1=2,  R11=4,  R12=6,  R13=8, R14=10, R15=12, R16=99;
-const unsigned char B2=4,  R21=8,  R22=12, R23=99, R24=99, R25=99, R26=99;
-const unsigned char B3=6,  R31=12, R32=99, R33=99, R34=44, R35=58, R36=74;
-const unsigned char B4=8, R41=16, R42=32, R43=44, R44=58, R45=74, R46=92;
-const unsigned char B5=10, R51=20, R52=44, R53=58, R54=74, R55=92,  R56=100;
-const unsigned char B6=12, R61=24, R62=58, R63=74, R64=92, R65=100, R66=100;
+*/
+const unsigned char B1=2,  R11=6,  R12=12, R13=20, R14=99, R15=99, R16=99;
+const unsigned char B2=6,  R21=12, R22=18, R23=99, R24=99, R25=99, R26=99;
+const unsigned char B3=12, R31=24, R32=99, R33=99, R34=99, R35=99, R36=99;
+const unsigned char B4=20, R41=99, R42=99, R43=99, R44=99, R45=99, R46=99;
+const unsigned char B5=99, R51=99, R52=99, R53=99, R54=99, R55=99, R56=99;
+const unsigned char B6=99, R61=99, R62=99, R63=99, R64=99, R65=99, R66=99;
+#elif SS>=35
+const unsigned char B1=4,  R11=12, R12=24, R13=48, R14=99, R15=99, R16=99;
+const unsigned char B2=12, R21=24, R22=48, R23=99, R24=99, R25=99, R26=99;
+const unsigned char B3=24, R31=48, R32=99, R33=99, R34=99, R35=99, R36=99;
+const unsigned char B4=48, R41=99, R42=99, R43=99, R44=99, R45=99, R46=99;
+const unsigned char B5=99, R51=99, R52=99, R53=99, R54=99, R55=99,  R56=100;
+const unsigned char B6=99, R61=99, R62=99, R63=99, R64=99, R65=100, R66=100;
 #endif
 
 /***********************************************************************************/
@@ -80,36 +96,11 @@ const int N_NODES = 172;
 const unsigned char NA=0xFF;
 const unsigned char AI=0xFE;
 const unsigned char FD=0xFD;
-const unsigned char GO5=0xFC; //check-bet-raise-call
-const unsigned char GO4=0xFB; //bet-raise-call
-const unsigned char GO3=0xFA; //check-bet-call
-const unsigned char GO2=0xF9; //bet-call
-const unsigned char GO1=0xF8; //check-check
-const unsigned char GO_BASE=GO1;
-const int BETHIST_MAX = 5; // number of GO's we have
-
-/***********************************************************************************/
-//constants that help keep track of the indexing of the game state.
-const int SCENI_PREFLOP_MAX = BIN_PREFLOP_MAX;
-const int SCENI_FLOP_MAX =  SCENI_PREFLOP_MAX + BIN_FLOP_MAX * FLOPALYZER_MAX * POTI_FLOP_MAX * BETHIST_MAX;
-const int SCENI_TURN_MAX =  SCENI_FLOP_MAX    + BIN_TURN_MAX * TURNALYZER_MAX * POTI_TURN_MAX * BETHIST_MAX*BETHIST_MAX;
-const int SCENI_RIVER_MAX = SCENI_TURN_MAX    + BIN_RIVER_MAX * RIVALYZER_MAX * POTI_RIVER_MAX * BETHIST_MAX*BETHIST_MAX*BETHIST_MAX;
-const int SCENI_MAX = SCENI_RIVER_MAX;
+const unsigned char GO=0xFC;
 
 
-/***********************************************************************************/
-//constants used for managing the memory, and the beti segmentation indexing
-//First, we segment the memory used into chunks, each covering an integral number of
-//scenario indices. Chunks overcome memory fragmentation I hope.
-#define N_CHUNKS 6
-
-#if N_CHUNKS > 1
-const int SCENIPERCHUNK = (SCENI_MAX / N_CHUNKS) + 1;
-#endif
-
-//Now, we can access a certain sceni number from above. The only thing missing is accessing
-//the particular parts that depend on beti. These numbers help allow that.
-//These allow determining the max actions we have stored for in memory from betting inde.
+//******************************
+//constants to help with efficient memory allocation of the betting tree.
 const int BETI_MAX = N_NODES;
 
 const int BETI9_CUTOFF = 14;
@@ -120,44 +111,4 @@ const int BETI9_MAX = BETI9_CUTOFF;
 const int BETI3_MAX = BETI3_CUTOFF-BETI9_CUTOFF;
 const int BETI2_MAX = BETI2_CUTOFF-BETI3_CUTOFF;
 
-//These are offsets in bytes. They may not always be word aligned.
-// a certain offset = the last offset  +  size of last offset
-const int STRATN9_OFFSET = 0;
-const int STRATD9_OFFSET = STRATN9_OFFSET + BETI9_MAX*8*sizeof(float);
-const int REGRET9_OFFSET = STRATD9_OFFSET + BETI9_MAX*8*sizeof(float);
-
-const int STRATN3_OFFSET = REGRET9_OFFSET + BETI9_MAX*9*sizeof(float);
-const int STRATD3_OFFSET = STRATN3_OFFSET + BETI3_MAX*2*sizeof(float);
-const int REGRET3_OFFSET = STRATD3_OFFSET + BETI3_MAX*2*sizeof(float);
-
-const int STRATN2_OFFSET = REGRET3_OFFSET + BETI3_MAX*3*sizeof(float);
-#if 0 //to match old results, set to 1 to put this back the way it was before i fixed the bug.
-const int STRATD2_OFFSET = STRATN2_OFFSET;
-const int REGRET2_OFFSET = STRATN2_OFFSET;
-#else
-const int STRATD2_OFFSET = STRATN2_OFFSET + BETI2_MAX*1*sizeof(float);
-const int REGRET2_OFFSET = STRATD2_OFFSET + BETI2_MAX*1*sizeof(float);
-#endif
-const int SCENARIODATA_BYTES = REGRET2_OFFSET + BETI2_MAX*2*sizeof(float);
-
-//separate indexing for stratt, as it's really a cache.
-const int STRATT9_OFFSET = 0;
-const int STRATT3_OFFSET = STRATT9_OFFSET + BETI9_MAX*8*sizeof(float);
-const int STRATT2_OFFSET = STRATT3_OFFSET + BETI3_MAX*2*sizeof(float);
-const int STRATT_WALKERI_BYTES = STRATT2_OFFSET + BETI2_MAX*1*sizeof(float);
-
-/******************/
-//constants for walker indexing in pokernolimit
-const int WALKERI_PREFLOP_MAX = 1;
-const int WALKERI_FLOP_MAX  = WALKERI_PREFLOP_MAX + BETHIST_MAX*POTI_FLOP_MAX;
-const int WALKERI_TURN_MAX  = WALKERI_FLOP_MAX    + BETHIST_MAX*BETHIST_MAX*POTI_TURN_MAX;
-const int WALKERI_RIVER_MAX = WALKERI_TURN_MAX    + BETHIST_MAX*BETHIST_MAX*BETHIST_MAX*POTI_RIVER_MAX;
-const int WALKERI_MAX = WALKERI_RIVER_MAX;
-
-/*****************/
-//constants for strategy dumps
-const int STRATDUMP9_OFFSET = 0;
-const int STRATDUMP3_OFFSET = STRATDUMP9_OFFSET + BETI9_MAX*8*sizeof(float);
-const int STRATDUMP2_OFFSET = STRATDUMP3_OFFSET + BETI3_MAX*2*sizeof(float);
-const int SCENI_STRATDUMP_BYTES = STRATDUMP2_OFFSET + BETI2_MAX*1*sizeof(float);
 #endif

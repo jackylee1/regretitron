@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "../PokerLibrary/treenolimit.h" //for the no-limit betting tree n[]
+#include "../PokerLibrary/treenolimit.h"
 #include "../PokerLibrary/determinebins.h"
 #include "../PokerLibrary/gamestate.h"
 #include "memorymgr.h"
@@ -9,172 +9,96 @@ using namespace std;
 
 //global gamestate class instance.
 GameState gs;
-//global bool array hasbeenvisited
-bitset<WALKERI_MAX*BETI_MAX> hasbeenvisited;
-//bethist array for the whoooole walker recursive call-tree
-int bethist[3]={-1,-1,-1};
+//counters to help index arrays by walker intances
+int pflopwalkeri, flopwalkeri, turnwalkeri;
 
-#define COMBINE(i2, i1, n1) ((i2)*(n1) + (i1))
-inline int getwalkeri(int gr, int pot)
-{
-	switch(gr)
-	{
-	case PREFLOP:
-		return 0;
-
-	case FLOP:
-		return COMBINE(getpoti(gr,pot), bethist[0],
-			                            BETHIST_MAX)
-					+ WALKERI_PREFLOP_MAX;
-
-	case TURN:
-		return COMBINE(getpoti(gr,pot), bethist[1]*BETHIST_MAX + bethist[0],
-			                            BETHIST_MAX*BETHIST_MAX)
-					+ WALKERI_FLOP_MAX;
-
-	case RIVER:
-		return COMBINE(getpoti(gr,pot), bethist[2]*BETHIST_MAX*BETHIST_MAX + bethist[1]*BETHIST_MAX + bethist[0],
-			                            BETHIST_MAX*BETHIST_MAX*BETHIST_MAX)
-					+ WALKERI_TURN_MAX;
-
-	default:
-		REPORT("invalid gameround encountered in walkeri");
-	}
-}
-
-
-//walker - Operates on a GIVEN game node, and then recursively walks the children nodes
-// Needs to know where the fuck it is.
-// beti[] contains the current betting node in beti[gr] and past ones in beti[x] for x < gr
-float walker(int gr, int pot, int beti, float prob0, float prob1)
+float walker(int gr, int pot, treedata_t * base0, treedata_t * base1,
+			 int beti, float prob0, float prob1)
 {
 	float totalregret=0;
 	float utility[9]; //where 9 is max actions for a node.
 	float avgutility=0;
-	betnode const * mynode;
-	float * stratt, * stratn, * stratd, * regret;
+	float stratt[9]; //allocated on the stack!
 	float stratmaxa=0; //this is the one that I do not store in the global data arrays.
-	int maxa; //just the size of the action arrays
-	int numa=0; //the number of actually possible actions
-	bool isvalid[9]; //if this action is possible (have enough money)
-	int walkeri;
 
-	//FIRST LETS FIND THE DATA WE NEED FOR THIS INSTANCE OF WALKER
-
-	//obtain pointer to correct betting node.
-	if (gr==PREFLOP) mynode = &(pfn[beti]);
-	else             mynode = &(n[beti]);
-
-	//obtain the correct maximum possible actions from this node.
-	maxa = mynode->numacts;
-
-
-	// DEPENDING ON STACKSIZE, AND GAME HISTORY, NOT ALL ACTIONS MAY BE POSSIBLE FROM
-	// THIS NODE! SINCE I AM NOT STORING THE ENTIRE GAME TREE, AND ONLY HAVE ONE INSTANCE
-	// OF THE BETTING TREE IN MEMORY FOR _ALL_ SITUATIONS, WE NEED TO DYNAMICALLY CHECK
-	// HERE TO SEE WHICH ACTIONS CAN BE AFFORDED.
-
-	numa=getvalidity(pot,mynode,isvalid);
+	betnode const * mynode = gettree(gr, beti);
+	int maxa = mynode->numacts;
+	bool isvalid[9];
+	int numa = getvalidity(pot,mynode,isvalid);
+#if VECTORIZE
+	vector<float>::iterator stratn, stratd, regret;
+#else
+	float * stratn, * stratd, * regret;
+#endif
+	if(mynode->playertoact==P0)
+		betindexing(beti, base0, stratn, stratd, regret);
+	else
+		betindexing(beti, base1, stratn, stratd, regret);
 
 
-	//**************************
-	// need to obtain pointers to the relevant data
-	// those pointers are indexed by:
-	// flop score (computed once per game, same for both players)
-	// hand score (computed once per game, depends on which player)
-	// pot size (depends on game state, same for both players)
-	// betting history (depends on game state, same for both players)
-	// current betting index (depends on game state, same for both players)
-
-	// flop score and hand score can be stored in a gamestate structure or class
-	// and retrieved by passing in the specific gameround and playertoact
-
-	// pot size is calculated only in walker, and we have it available all the time easily.
-
-	// betting history is determined by data in betting tree, and stored only in walker. 
-	// because of notes below, it is available by also including the specific gameround.
+	// OK, NOW WE WILL APPLY EQUATION (8) FROM TECH REPORT, COMPUTE STRATEGY T+1
 	
-	// we of course have the betting index.
-	
-	// because the data is stored differently for different beti depending on the number 
-	// of actions, it makes sense to combine everything together BUT beti into a single
-	// scenario index.
-	 
-	// I can coerce the GameState class to calculate this for me.
-
-	// THEN, i pass this scenario index in to the getpointers function, which handles memory
-	// and the special beti indexing.
-	walkeri = getwalkeri(gr, pot);
-	getpointers(gs.getscenarioi(gr, mynode->playertoact, pot, bethist), beti, maxa, walkeri,
-		stratt, stratn, stratd, regret);
-	//***************************
-
-
-	//HASBEENVISITED
-
-	if(!hasbeenvisited.test(COMBINE(walkeri, beti, BETI_MAX)))
+	//we trust that regret[a] is zero always for non-valid actions
+	switch(maxa) //this switch alone gives a savings of about 1.5% total execution time
 	{
-		hasbeenvisited.set(COMBINE(walkeri, beti, BETI_MAX));
-
-		// OK, NOW WE WILL APPLY EQUATION (8) FROM TECH REPORT, COMPUTE STRATEGY T+1
-		
-		//we trust that regret[a] is zero always for non-valid actions
-		switch(maxa) //this switch alone gives a savings of about 1.5% total execution time
-		{
-			//so this won't do anything for non-valid acitons
-			//non-valid a's will simply have regret still at 0.
-		case 9:
-			if (regret[8]>0) totalregret += regret[8];
-		case 8:
-			if (regret[7]>0) totalregret += regret[7];
-			if (regret[6]>0) totalregret += regret[6];
-			if (regret[5]>0) totalregret += regret[5];
-			if (regret[4]>0) totalregret += regret[4];
-			if (regret[3]>0) totalregret += regret[3];
-		case 3:
-			if (regret[2]>0) totalregret += regret[2];
-		case 2:
-			if (regret[1]>0) totalregret += regret[1];
-			if (regret[0]>0) totalregret += regret[0];
-		}
-
-		if (totalregret > 0)
-		{
-			//this won't do anything if regret[a] is zero
-			switch(maxa) //this switch gives 0.5% total savings
-			{
-			case 9:
-				(regret[7]>0) ? stratmaxa += stratt[7] = regret[7] / totalregret : stratt[7] = 0;
-			case 8:
-				(regret[6]>0) ? stratmaxa += stratt[6] = regret[6] / totalregret : stratt[6] = 0;
-				(regret[5]>0) ? stratmaxa += stratt[5] = regret[5] / totalregret : stratt[5] = 0;
-				(regret[4]>0) ? stratmaxa += stratt[4] = regret[4] / totalregret : stratt[4] = 0;
-				(regret[3]>0) ? stratmaxa += stratt[3] = regret[3] / totalregret : stratt[3] = 0;
-				(regret[2]>0) ? stratmaxa += stratt[2] = regret[2] / totalregret : stratt[2] = 0;
-			case 3:
-				(regret[1]>0) ? stratmaxa += stratt[1] = regret[1] / totalregret : stratt[1] = 0;
-			case 2:
-				(regret[0]>0) ? stratmaxa += stratt[0] = regret[0] / totalregret : stratt[0] = 0;
-			}
-
-			//this will naturally be zero if non-valid
-			stratmaxa = 1-stratmaxa;
-		}
-		else
-		{
-			int a;
-			for(a=0; a<maxa-1; a++) 
-			{
-				//but here we must check to make sure it's valid
-				if(isvalid[a])
-					stratt[a] = (float)1/numa;
-			}
-			//and here too
-			if(isvalid[a])
-				stratmaxa = (float)1/numa;
-		}
-
+		//so this won't do anything for non-valid acitons
+		//non-valid a's will simply have regret still at 0.
+	case 9:
+		if (regret[8]>0) totalregret += regret[8];
+	case 8:
+		if (regret[7]>0) totalregret += regret[7];
+		if (regret[6]>0) totalregret += regret[6];
+		if (regret[5]>0) totalregret += regret[5];
+		if (regret[4]>0) totalregret += regret[4];
+		if (regret[3]>0) totalregret += regret[3];
+	case 3:
+		if (regret[2]>0) totalregret += regret[2];
+	case 2:
+		if (regret[1]>0) totalregret += regret[1];
+		if (regret[0]>0) totalregret += regret[0];
 	}
+
+	if (totalregret > 0)
+	{
+		//this won't do anything if regret[a] is zero
+		switch(maxa) //this switch gives 0.5% total savings
+		{
+		case 9:
+			(regret[7]>0) ? stratmaxa += stratt[7] = regret[7] / totalregret : stratt[7] = 0;
+		case 8:
+			(regret[6]>0) ? stratmaxa += stratt[6] = regret[6] / totalregret : stratt[6] = 0;
+			(regret[5]>0) ? stratmaxa += stratt[5] = regret[5] / totalregret : stratt[5] = 0;
+			(regret[4]>0) ? stratmaxa += stratt[4] = regret[4] / totalregret : stratt[4] = 0;
+			(regret[3]>0) ? stratmaxa += stratt[3] = regret[3] / totalregret : stratt[3] = 0;
+			(regret[2]>0) ? stratmaxa += stratt[2] = regret[2] / totalregret : stratt[2] = 0;
+		case 3:
+			(regret[1]>0) ? stratmaxa += stratt[1] = regret[1] / totalregret : stratt[1] = 0;
+		case 2:
+			(regret[0]>0) ? stratmaxa += stratt[0] = regret[0] / totalregret : stratt[0] = 0;
+		}
+
+		//this will naturally be zero if non-valid
+		stratmaxa = 1-stratmaxa;
+
+		if(stratmaxa < -FLT_EPSILON*3)
+			REPORT("fatal error in walker: stratmaxa negative");
+		else if(stratmaxa <= FLT_EPSILON) //rounding errors occur
+			stratmaxa=0;
+	}
+	else
+	{
+		int a;
+		for(a=0; a<maxa-1; a++) 
+		{
+			//but here we must check to make sure it's valid
+			if(isvalid[a])
+				stratt[a] = (float)1/numa;
+		}
+		//and here too
+		if(isvalid[a])
+			stratmaxa = (float)1/numa;
+	}
+
 
 
 	//NOW, WE WANT TO FIND THE UTILITY OF EACH ACTION. 
@@ -182,84 +106,77 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 
 	for(int a=0; a<maxa; a++)
 	{
-		// because I only store the first N-1 in memory:
+		if(!isvalid[a])
+			continue;
+
 		float st = (a==maxa-1) ? stratmaxa : stratt[a]; 
 
-
-		//if we do not have enough money, we do not touch this action. It does not exist.
-		if (!isvalid[a])
+		if(st==0 && ((mynode->playertoact==0 && prob1==0) || (mynode->playertoact==1 && prob0==0)) )
 			continue;
-
-		//sometimes you feel like a nut! (cuts execution time many fold)
-		//both options work, though i don't understand why the second one does. They each produce the
-		//same exact correct numbers, to 5 decimal places after 1, 2, and 8 million iterations at 4ss.
-		// and they yeild the same execution time, to within a tenth of a second.
-		// the second one may be *slightly* slower. it confounds me!
-		if( st==0 && ((mynode->playertoact==0 && prob1==0) || (mynode->playertoact==1 && prob0==0)) )
-		//if((mynode->playertoact==0 && prob1==0 && (st==0 || prob0==0)) || 
-	    //   (mynode->playertoact==1 && prob0==0 && (st==0 || prob1==0)))
-		{
-			utility[a] = 10000000000000000.0F; //that oughta do it.
-			continue;
-		}
 
 		switch(mynode->result[a])
 		{
-		case NA:
+		case NA: //error
 			REPORT("Invalid betting tree node action reached."); //will exit
 
-		case AI: // SHOWDOWN - from all-in call!
+		case AI: //called allin
 			utility[a] = STACKSIZE * (gs.gettwoprob0wins()-1);
 			break;
 
-		// CONTINUE AT NEXT GAME ROUND
-		case GO1: 
-		case GO2: 
-		case GO3: 
-		case GO4: 
-		case GO5: 
-
-			//...which is an actual game round...
-			if(gr!=RIVER)
+		case GO: //next game round
+			if(gr==RIVER)// showdown
+				utility[a] = (pot+mynode->potcontrib[a]) * (gs.gettwoprob0wins()-1);
+			else 
 			{
-				//this is the only time we set bethist. array access okay as gr!=RIVER
-				//this should create an integer between 0 and 4
-				bethist[gr]=(mynode->result[a]-GO_BASE); 
-				if(bethist[gr] <0 || bethist[gr] >= BETHIST_MAX)
-					REPORT("invalid betting history encountered in walker");
-
-				//NOTE that bethist, being an array, is passed by reference. this is bad becasue
-				// walker is recursive, and only ONE copy of the array will be used for an ENTIRE
-				// game including all instances of walker. BUT, because all child instances of walker
-				// will return before we go onto another betting history option, and because bethist's
-				// are recalled (i.e. don't change in the future), i think it should work perfectly.
+				treedata_t * newbase0, * newbase1;
+				if(gr==PREFLOP)
+				{
+					while(pfexitnodes[pflopwalkeri] != beti)
+						pflopwalkeri++;
+					newbase0 = ftreebase[pflopwalkeri].treedata + gs.getflopcardsi(P0);
+					newbase1 = ftreebase[pflopwalkeri].treedata + gs.getflopcardsi(P1);
+				}
+				else if(gr==FLOP)
+				{
+					while(fexitnodes[flopwalkeri].x != pfexitnodes[pflopwalkeri]) //pflopwalkeri was brought up to speed when we exited the preflop
+						flopwalkeri++;
+					while(fexitnodes[flopwalkeri].y != beti)
+						flopwalkeri++;
+					newbase0 = ttreebase[flopwalkeri].treedata + gs.getturncardsi(P0);
+					newbase1 = ttreebase[flopwalkeri].treedata + gs.getturncardsi(P1);
+				}
+				else //(gr==TURN)
+				{
+					if(pfexitnodes[pflopwalkeri] != fexitnodes[flopwalkeri].x)
+						REPORT("failure of fucked up indexing");
+					while(texitnodes[turnwalkeri].x != pfexitnodes[pflopwalkeri])
+						turnwalkeri++;
+					while(texitnodes[turnwalkeri].y != fexitnodes[flopwalkeri].y)
+						turnwalkeri++;
+					while(texitnodes[turnwalkeri].z != beti)
+						turnwalkeri++;
+					newbase0 = rtreebase[turnwalkeri].treedata + gs.getrivercardsi(P0);
+					newbase1 = rtreebase[turnwalkeri].treedata + gs.getrivercardsi(P1);
+				}
 
 				if(mynode->playertoact==0)
-					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], 0, prob0*st, prob1);
+					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], newbase0, newbase1, 0, prob0*st, prob1);
 				else
-					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], 0, prob0, prob1*st);
+					utility[a] = walker(gr+1, pot+mynode->potcontrib[a], newbase0, newbase1, 0, prob0, prob1*st);
 			}
-			// ...or a SHOWDOWN - from the river!
-			else
-				utility[a] = (pot+mynode->potcontrib[a]) * (gs.gettwoprob0wins()-1);
-
 			break;
-		
-		case FD: // FOLD
 
+		case FD: //fold
 			utility[a] = (pot+mynode->potcontrib[a]) * (2*mynode->playertoact - 1); //acting player is loser
 			break;
 
-		default: // CONTINUE WITHIN THIS GAME ROUND
-
-			//result is a child node!
+		default: //child node within this game round
 			if(mynode->playertoact==0)
-				utility[a] = walker(gr, pot, mynode->result[a], prob0*st, prob1);
+				utility[a] = walker(gr, pot, base0, base1, mynode->result[a], prob0*st, prob1);
 			else
-				utility[a] = walker(gr, pot, mynode->result[a], prob0, prob1*st);
+				utility[a] = walker(gr, pot, base0, base1, mynode->result[a], prob0, prob1*st);
 		}
 
-		//keep a running total of the EV of utility under current strat.
 		avgutility += st*utility[a];
 	}
 
@@ -333,11 +250,11 @@ string iterstring(long long iter)
 {
 	ostringstream o;
 	if(iter%MILLION==0)
-		o << iter/MILLION << "million";
+		o << iter/MILLION << 'M';
 	else if(iter>MILLION)
-		o << fixed << setprecision(1)<< double(iter)/MILLION << "million";
+		o << fixed << setprecision(1)<< double(iter)/MILLION << 'M';
 	else if(iter>=10*THOUSAND)
-		o << iter/THOUSAND << "k";
+		o << iter/THOUSAND << 'k';
 	else
 		o << iter;
 	return o.str();
@@ -365,9 +282,14 @@ void simulate(long long iter)
 	clock_t c = clock();
 	for(long long i=0; i<iter; i++)
 	{
+		treedata_t * newbase0, * newbase1;
 		gs.dealnewgame();
-		hasbeenvisited.reset(); //sets all to false
-		walker(0,0,0,1,1);
+		newbase0 = pftreebase->treedata + gs.getpreflopcardsi(P0);
+		newbase1 = pftreebase->treedata + gs.getpreflopcardsi(P1);
+		pflopwalkeri = 0;
+		flopwalkeri = 0;
+		turnwalkeri = 0;
+		walker(PREFLOP,0,newbase0,newbase1,0,1,1);
 	}
 	clock_t diff = clock()-c;
 	prevrate = (float) iter * CLOCKS_PER_SEC / (float) diff;
@@ -376,7 +298,7 @@ void simulate(long long iter)
 		<< prevrate << " per second)." << endl;
 }
 
-#define SAVESTRATEGYFILE 1
+#define SAVESTRATEGYFILE 0
 #define TESTING 0
 
 inline void playgame()
@@ -392,15 +314,15 @@ inline void playgame()
 		total+=i;
 		cout << "saving log of first node strat." << endl;
 		ostringstream o;
-		o << "output/13ss - 256,64,12bins - " << iterstring(total) << ".txt";
+		o << "output/6ss-256,90,32bins-" << iterstring(total) << "-1.txt";
 		printfirstnodestrat(o.str().c_str());
 #if SAVESTRATEGYFILE
 		if(total >= 500*THOUSAND)
 		{
 			ostringstream oo;
-			oo << "strategy/13ss - 256,64,12bins - " << iterstring(total) << ".strat";
+			oo << "strategy/6ss-256,90,32bins-" << iterstring(total) << ".strat";
 			cout << "saving strategy file." << endl;
-			dumpstratresult(oo.str().c_str());
+			savestratresult(oo.str().c_str());
 		}
 #endif
 		i*=2;
@@ -409,21 +331,11 @@ inline void playgame()
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	cout << "total memory requirement: " << ((long long)WALKERI_MAX*STRATT_WALKERI_BYTES + (long long)SCENI_MAX*SCENARIODATA_BYTES)/1048576 << "mb" << endl;
 #if TESTING
-	unsigned long long arr[56] = {0x9809812089147320ui64,0x9809812089147320ui64,0x9809812089147320ui64};
-
-	for(int i=0; i<190; i++)
-		store(arr, i, i%6, 5);
-	for(int i=0; i<190; i++)
-		cout << retrieve(arr, i, 5) << endl;
-	
-
-	savexml("textxml1.xml");
 #else
-	initpfn();
-	initbins();
+	initbettingtrees();
 	initmem();
+	initbins();
 
 	playgame();
 

@@ -7,43 +7,38 @@
 
 using namespace std;
 
-inline float safedivide(float n, float d)
-{
-	if (d==0 && n!=0) //if we just didn't get there, then the numerator would also be zero
-		REPORT("zero denominator!")
-	else if(d==0 && n==0) //could have just never gotten there, or could be invalid action
-		return 0; //zero probability either way.
-	else //d!=0
-		return n/d;
-}
 
 //this function takes a filename, and prints out a simple listing of the
-//results for betting node 0, sceni 0-168, which is the preflop. it attempts to
+//results for betting node 0, at the preflop. it attempts to
 //emulate the output of this website if PUSHFOLD is true:
 //http://www.daimi.au.dk/~bromille/pokerdata/SingleHandSmallBlind/SHSB.4000
 //used only by my main routines in PokerNoLimit.cpp
 void printfirstnodestrat(char const * const filename)
 {
 	ofstream log(filename);
-	float *stratt, *stratn, *stratd, *regret;
-	int maxa = pfn[0].numacts;
+	int maxa = pfloptree[0].numacts;
 	int numa;
 	float strataccum;
 	bool isvalid[9];
 
 	log << fixed << setprecision(5);
 
-	for(int sceni=SCENI_PREFLOP_MAX-1; sceni>=0; sceni--)
+	for(int cardsi=CARDSI_PFLOP_MAX-1; cardsi>=0; cardsi--)
 	{
-		getpointers(sceni, 0, maxa, 0, stratt, stratn, stratd, regret); //ignore walkeri
-		numa = getvalidity(0, &(pfn[0]), isvalid);
+		numa = getvalidity(0, &(pfloptree[0]), isvalid);
+#if VECTORIZE
+		vector<float>::iterator stratn, stratd, regret;
+#else
+		float * stratn, * stratd, * regret;
+#endif
+		betindexing(0,&(pftreebase->treedata[cardsi]),stratn,stratd,regret);
 
 #if PUSHFOLD
-		log << setw(5) << left << preflophandstring(sceni)+":";
+		log << setw(5) << left << preflophandstring(cardsi)+":";
 #else
 		//print the scenario index and an example hand
-		log << endl << "Scenario " << sceni << ":";
-		printsceniinfo(log, sceni, 5); //starts with spaces and ends with endl
+		log << endl << "cardsi: " << cardsi << ":" << endl;
+		log << preflophandstring(cardsi)+":" << endl;
 #endif
 		
 		//remember we only store max-1 strategies. the last must be found based on all adding to 1.
@@ -59,7 +54,7 @@ void printfirstnodestrat(char const * const filename)
 				if(myprob>0.98F) log << "fold" << endl;
 				else if (myprob>0.02F)
 #endif
-				log << setw(14) << actionstring(a,PREFLOP,pfn,1.0)+": " 
+				log << setw(14) << actionstring(a,PREFLOP,pfloptree,1.0)+": " 
 					<< 100*stratn[a]/stratd[a] << "%" << endl;
 			}
 		}
@@ -70,64 +65,12 @@ void printfirstnodestrat(char const * const filename)
 			if((1-strataccum)>0.98F) log << "jam" << endl;
 			else if ((1-strataccum)>0.02F)
 #endif
-			log << setw(14) << actionstring(maxa-1,PREFLOP,pfn,1.0)+": " 
+			log << setw(14) << actionstring(maxa-1,PREFLOP,pfloptree,1.0)+": " 
 				<< 100*(1-strataccum) << "%" << endl;
 		}
 	}
 	log.close();
 }
-
-void dumpstratresult(const char * const filename)
-{
-	ofstream f(filename, ofstream::binary);
-	float *stratt, *stratn, *stratd, *regret;
-	float result[8];
-
-	//dumps out the strategy result in it's own format.
-	for(int s=0; s<SCENI_MAX; s++)
-	{
-		int b=0;
-
-		for(; b<BETI9_CUTOFF; b++)
-		{
-			int maxa = (s<SCENI_PREFLOP_MAX) ? pfn[b].numacts : n[b].numacts;
-			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
-
-			//we print all values, valid or not. 
-			memset(result, 0, 8*sizeof(float));
-			for(int a=0; a<maxa-1; a++) result[a] = safedivide(stratn[a],stratd[a]);
-
-			f.write((char*)result, 8*sizeof(float));
-		}
-		
-		for(; b<BETI3_CUTOFF; b++)
-		{
-			int maxa = (s<SCENI_PREFLOP_MAX) ? pfn[b].numacts : n[b].numacts;
-			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
-
-			//we print all values, valid or not. 
-			memset(result, 0, 8*sizeof(float));
-			for(int a=0; a<maxa-1; a++) result[a] = safedivide(stratn[a],stratd[a]);
-
-			f.write((char*)result, 2*sizeof(float));
-		}
-		
-		for(; b<BETI2_CUTOFF; b++)
-		{
-			int maxa = (s<SCENI_PREFLOP_MAX) ? pfn[b].numacts : n[b].numacts;
-			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
-
-			//we print all values, valid or not. 
-			memset(result, 0, 8*sizeof(float));
-			for(int a=0; a<maxa-1; a++) result[a] = safedivide(stratn[a],stratd[a]);
-
-			f.write((char*)result, 1*sizeof(float));
-		}
-	}
-	f.close();
-}
-
-
 
 
 void savexml(const string filename)
