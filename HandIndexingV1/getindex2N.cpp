@@ -230,7 +230,7 @@ inline int getindex2(const suitrep n[])
 		return n[3].ranki + M21;
 
 	default:
-		REPORT("You called getindex2 with wrong amount of cards")
+		REPORT("You called getindex2 with wrong amount of cards");
 	}
 }
 

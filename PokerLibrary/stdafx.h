@@ -17,8 +17,6 @@
 #include <sstream> //for formatting strings more easily
 #include <iomanip> //needed for formating the way floats are printed in cout's and the like
 
-// Needed for file mapping.
-#include <Windows.h>
 
 // PokerEval
 #include "poker_defs.h"
@@ -28,10 +26,10 @@
 #include "../mymersenne.h"
 
 // custom global macros
-#define REPORT(chars) { \
-    MessageBox(NULL, TEXT(chars), TEXT("failure"), MB_OK);\
+#define REPORT(chars) do{ \
+	std::cout << chars << std::endl; \
 	_asm {int 3}; \
 	exit(1); \
-}
+}while(0)
 
 #define PRINTMASK(c) GenericDeck_maskString(&StdDeck, &c)

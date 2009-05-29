@@ -27,16 +27,13 @@
 #define TIXML_USE_TICPP
 #include "../TinyXML++/ticpp.h"
 
-// Needed for file mapping.
-#include <Windows.h>
-
 // PokerEval
 #include "poker_defs.h"
 #include "inlines/eval.h"
 
 // custom global macros
 #define REPORT(chars) do{ \
-    MessageBox(NULL, TEXT(chars), TEXT("failure"), MB_OK);\
+	std::cout << chars << std::endl; \
 	_asm {int 3}; \
 	exit(1); \
 }while(0)

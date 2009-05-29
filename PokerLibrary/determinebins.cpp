@@ -5,49 +5,43 @@
 #include "binstorage.h"
 
 //some global pointer to data
-HANDLE flopfile, turnfile, riverfile, flopfilemap, turnfilemap, riverfilemap;
+
 unsigned long long * flopbins;
 unsigned long long * turnbins;
 unsigned long long * riverbins;
 
 //I open the files here.
+//helper function for the below.
+void loadbinfile(char const * const filename, const int bytes, unsigned long long* &buf)
+{
+	if(sizeof(unsigned long long) != 8) REPORT("well bloody hell...");
+	if(bytes%8 != 0) REPORT("Your file is ragged.");
+
+	//allocate memory
+
+	buf = new unsigned long long[bytes/8];
+
+	//open the file, read it in, and close it
+
+	std::ifstream f(filename, std::ifstream::binary);
+	f.read((char*)buf, bytes);
+	if(f.gcount()!=bytes || f.eof() || EOF!=f.peek())
+		REPORT("a bin file could not be found, or is corrupted.");
+	f.close();
+}
+
 void initbins()
 {
-	//open the files
-	flopfile = CreateFile(FLOPFILENAME, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	turnfile = CreateFile(TURNFILENAME, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	riverfile = CreateFile(RIVERFILENAME, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-	//memory map the files
-	flopfilemap = CreateFileMapping(flopfile, NULL, PAGE_READONLY, 0, 0, TEXT("flopbins"));
-	turnfilemap = CreateFileMapping(turnfile, NULL, PAGE_READONLY, 0, 0, TEXT("turnbins"));
-	riverfilemap = CreateFileMapping(riverfile, NULL, PAGE_READONLY, 0, 0, TEXT("riverbins"));
-
-	//set global pointers to the files
-	flopbins = (unsigned long long*) MapViewOfFile(flopfilemap, FILE_MAP_READ, 0, 0, 0); //size 0 maps entire file.
-	turnbins = (unsigned long long*) MapViewOfFile(turnfilemap, FILE_MAP_READ, 0, 0, 0); //size 0 maps entire file.
-	riverbins = (unsigned long long*) MapViewOfFile(riverfilemap, FILE_MAP_READ, 0, 0, 0); //size 0 maps entire file.
-
-	//make sure it worked.
-	if(flopfile == INVALID_HANDLE_VALUE || GetFileSize(flopfile, NULL) != binfilesize(BIN_FLOP_MAX,INDEX23_MAX) || flopfilemap == NULL || flopbins == NULL)
-		REPORT("could not open file with flop bins and memory map it.");
-	if(turnfile == INVALID_HANDLE_VALUE || GetFileSize(turnfile, NULL) != binfilesize(BIN_TURN_MAX,INDEX24_MAX) || turnfilemap == NULL || turnbins == NULL)
-		REPORT("could not open file with turn bins and memory map it.");
-	if(riverfile == INVALID_HANDLE_VALUE || GetFileSize(riverfile, NULL) != binfilesize(BIN_RIVER_MAX,INDEX25_MAX) || riverfilemap == NULL || riverbins == NULL)
-		REPORT("could not open file with river bins and memory map it.");
+	loadbinfile(RIVERFILENAME, binfilesize(BIN_RIVER_MAX, INDEX25_MAX), riverbins);
+	loadbinfile(TURNFILENAME, binfilesize(BIN_TURN_MAX, INDEX24_MAX), turnbins);
+	loadbinfile(FLOPFILENAME, binfilesize(BIN_FLOP_MAX, INDEX23_MAX), flopbins);
 }
 
 void closebins()
 {
-	UnmapViewOfFile(flopbins);
-	UnmapViewOfFile(turnbins);
-	UnmapViewOfFile(riverbins);
-	CloseHandle(flopfilemap);
-	CloseHandle(turnfilemap);
-	CloseHandle(riverfilemap);
-	CloseHandle(flopfile);
-	CloseHandle(turnfile);
-	CloseHandle(riverfile);
+	delete[] flopbins;
+	delete[] turnbins;
+	delete[] riverbins;
 }
 
 //read the data in those files

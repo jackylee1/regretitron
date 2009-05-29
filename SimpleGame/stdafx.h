@@ -44,7 +44,7 @@
 
 //pop up message box on error
 #define REPORT(chars) do{ \
-    MessageBox(TEXT(chars), TEXT("failure"), MB_OK);\
+    AfxMessageBox(TEXT(chars));\
 	_asm {int 3}; \
 }while(0)
 
