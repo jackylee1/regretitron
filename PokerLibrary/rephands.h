@@ -17,10 +17,9 @@ std::string preflophandstring(int index);
 void getindices(int sceni, int &gr, int &poti, int &boardi, int &handi, int bethist[3]);
 void resolvepoti(int gr, int poti, int &lower, int &upper);
 std::string bethiststr(int bethist);
-bool isallin(betnode const * mynode, int gr, int action);
 
 //used by diagnostics window (in PokerPlayer) and savestrategy.cpp (in PokerNoLimit)
-std::string actionstring(int action, int gr, betnode const * tree, double multiplier);
+std::string actionstring(int gr, int action, const betnode &bn, double multiplier);
 
 //used only by printfirstnodestrat in savestrategy.cpp (in PokerNoLimit)
 void printsceniinfo(std::ostream &out, int sceni, int n_hands);

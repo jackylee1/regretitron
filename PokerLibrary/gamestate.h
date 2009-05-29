@@ -14,6 +14,7 @@ class GameState
 {
 public:
 	void dealnewgame();
+	int getcardsi(Player pl, int gr);
 	int getpreflopcardsi(Player pl);
 	int getflopcardsi(Player pl);
 	int getturncardsi(Player pl);
@@ -31,6 +32,17 @@ private: //but, for clarity, BotAPI does not use these.
 };
 
 #define COMBINE(i2, i1, n1) ((i2)*(n1) + (i1))
+inline int GameState::getcardsi(Player pl, int gr)
+{
+	switch (gr)
+	{
+	case PREFLOP: return getpreflopcardsi(pl);
+	case FLOP: return getflopcardsi(pl);
+	case TURN: return getturncardsi(pl);
+	case RIVER: return getrivercardsi(pl);
+	default: REPORT("massive failure...");
+	}
+}
 inline int GameState::getpreflopcardsi(Player pl)
 {
 	return binnumber[pl][PREFLOP];

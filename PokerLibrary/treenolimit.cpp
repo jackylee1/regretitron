@@ -2,35 +2,82 @@
 #include "treenolimit.h"
 #include "constants.h"
 
-// For extern vs static and const,
-// see: http://www.gamedev.net/community/forums/topic.asp?topic_id=318620
 
-
-//returns number valid actions
-inline int getvalidity(const int &pot, betnode const * mynode, bool isvalid[9])
+//this used to be the body of getnode, could be the future body of getnode,
+//in a post-tree world
+#if 0
+inline void getnode(int gameround, Action prevact, int betturn, int invprev, 
+					int invacting, int moneyleft, int prevbeti, actiondef &ad)
 {
-	int numa=0;
-
-	switch(mynode->numacts)
+	//currently reproduces standard betting trees
+	switch(prevact)
 	{
-	default: REPORT("invalid maxa");
-	case 9:
-		if(isvalid[8] = (pot + mynode->potcontrib[8] < STACKSIZE)) numa++;
-	case 8:
-		if(isvalid[7] = (pot + mynode->potcontrib[7] < STACKSIZE)) numa++;
-		if(isvalid[6] = (pot + mynode->potcontrib[6] < STACKSIZE)) numa++;
-		if(isvalid[5] = (pot + mynode->potcontrib[5] < STACKSIZE)) numa++;
-		if(isvalid[4] = (pot + mynode->potcontrib[4] < STACKSIZE)) numa++;
-		if(isvalid[3] = (pot + mynode->potcontrib[3] < STACKSIZE)) numa++;
-	case 3:
-		if(isvalid[2] = (pot + mynode->potcontrib[2] < STACKSIZE)) numa++;
-	case 2:
-		if(isvalid[1] = (pot + mynode->potcontrib[1] < STACKSIZE)) numa++;
-		if(isvalid[0] = (pot + mynode->potcontrib[0] < STACKSIZE)) numa++;
-	}
+	case NONE:
+		if(gameround == PREFLOP) //first to act pre-flop
+		{
+			ad.numactions = 9;
+			ad.action[0] = FOLD; //fold the small blind
+			ad.value[0]  = SB;
+			ad.action[1] = BET; //really check
+			ad.value[1]  = BB;
+			ad.action[2] = BET; //the six betting amounts
+			ad.action[3] = BET;
+			ad.action[4] = BET;
+			ad.action[5] = BET;
+			ad.action[6] = BET;
+			ad.action[7] = BET;
+			ad.value[2]  = B1+BB;
+			ad.value[3]  = B2+BB;
+			ad.value[4]  = B3+BB;
+			ad.value[5]  = B4+BB;
+			ad.value[6]  = B5+BB;
+			ad.value[7]  = B6+BB;
+			ad.action[8] = BETALL; //bet all n
+			ad.value[8]  = -1;
+			return;
+		}
+		else //first to act post-flop
+		{
+			ad.numactions = 8;
+			ad.action[0] = BET; //really, it's check
+			ad.value[0]  = 0;
+			ad.action[1] = BET; //the six betting amounts
+			ad.action[2] = BET;
+			ad.action[3] = BET;
+			ad.action[4] = BET;
+			ad.action[5] = BET;
+			ad.action[6] = BET;
+			ad.value[1]  = B1;
+			ad.value[2]  = B2;
+			ad.value[3]  = B3;
+			ad.value[4]  = B4;
+			ad.value[5]  = B5;
+			ad.value[6]  = B6;
+			ad.action[7] = BETALL;
+			ad.value[7]  = -1;
+			return;
+		}
+	case BET:
 
-	return numa;
+		return;
+	case BETALL:
+		ad.numactions = 2;
+		ad.action[0] = FOLD;
+		ad.value[0]  = invacting;
+		ad.action[1] = CALLALL;
+		ad.value[1]  = -1;
+		return;
+	case CALLALL:
+	case CALL:
+	case FOLD:
+		REPORT("no actions available once folded/called in gameround");
+	default:
+		REPORT("wtf?");
+	}
 }
+#endif
+
+
 
 
 //THESE ARE THE GLOBAL VARIABLES THAT MAKE UP THE BETTING TREE.
@@ -273,12 +320,104 @@ extern const betnode floptree[N_NODES] =
 }; 
 	
 
-//PREFLOP
+//preflop, turn, and river
 betnode pfloptree[N_NODES];
 const betnode * const turntree = floptree;
 const betnode * const rivertree = floptree;
 
+//helper function to get the appropriate tree
+//used only by below functions
+inline betnode const * gettree(int gr, int beti)
+{
+	switch(gr)
+	{
+	case PREFLOP: return pfloptree+beti;
+	case FLOP: return floptree+beti;
+	case TURN: return turntree+beti;
+	case RIVER: return rivertree+beti;
+	}
+	REPORT("invalid gameround");
+}
+
+//fills isvalid and returns num actions.
+//used only by getnode function
+inline int getvalidity(const int &pot, betnode const * mynode, bool isvalid[9])
+{
+	int numa=0;
+
+	switch(mynode->numacts)
+	{
+	default: REPORT("invalid maxa");
+	case 9:
+		if(isvalid[8] = (pot + mynode->potcontrib[8] < STACKSIZE)) numa++;
+	case 8:
+		if(isvalid[7] = (pot + mynode->potcontrib[7] < STACKSIZE)) numa++;
+		if(isvalid[6] = (pot + mynode->potcontrib[6] < STACKSIZE)) numa++;
+		if(isvalid[5] = (pot + mynode->potcontrib[5] < STACKSIZE)) numa++;
+		if(isvalid[4] = (pot + mynode->potcontrib[4] < STACKSIZE)) numa++;
+		if(isvalid[3] = (pot + mynode->potcontrib[3] < STACKSIZE)) numa++;
+	case 3:
+		if(isvalid[2] = (pot + mynode->potcontrib[2] < STACKSIZE)) numa++;
+	case 2:
+		if(isvalid[1] = (pot + mynode->potcontrib[1] < STACKSIZE)) numa++;
+		if(isvalid[0] = (pot + mynode->potcontrib[0] < STACKSIZE)) numa++;
+	}
+
+	return numa;
+}
+
+//grabs a betnode from the trees, and condenses it down to one that does
+//not waste actions, filling in the betnode parameter &bn.
+//used by all the code in the whole solution.
+inline void getnode(int gr, int pot, int beti, betnode &bn)
+{
+	//fill in compressed node fromr actual tree node
+	const betnode * treenode = gettree(gr, beti); //the actual tree node
+	bool isvalid[MAX_ACTIONS];
+	bn.numacts = getvalidity(pot,treenode,isvalid); //works on regular tree nodes
+	bn.playertoact = treenode->playertoact;
+	int j=0;
+	for(int i=0; i<treenode->numacts; i++)
+	{
+		if(isvalid[i])
+		{
+			bn.potcontrib[j] = treenode->potcontrib[i];
+			bn.result[j] = treenode->result[i];
+			j++;
+		}
+	}
+	if(j!=bn.numacts) REPORT("failure of counting");
+}
+
+//since my betting tree can be ambiguous, more extensive tests
+//are needed to check if a node is a BET allin. this function takes
+//the result and potcontrib of a betnode, and the gameround,
+//and tells you if that action is a BET allin. It assumes the 
+//betnode came from these trees.
+//used by BotAPI (in PokerPlayer) and actionstring in rephands.cpp (of PokerLibrary)
+bool isallin(int result, int potcontrib, int gr)
+{
+	switch(result)
+	{
+	case FD:
+	case GO: 
+	case AI: 
+	case NA:
+		return false;
+	}
+
+	if(potcontrib != 0)
+		return false;
+
+	//must check to see if child node has 2 actions
+	if(gettree(gr, result)->numacts == 2)
+		return true;
+	else
+		return false;
+}
+
 //Alas, you will have to initialize the preflop tree!
+//used by any code that hopes the betting trees will work before it uses them
 void initbettingtrees()
 {
 	//Step 0, copy the tree. fix player to act.
@@ -340,4 +479,3 @@ void initbettingtrees()
 	pfloptree[98].potcontrib[0] = BB;
 	pfloptree[99].potcontrib[0] = BB;
 }
-

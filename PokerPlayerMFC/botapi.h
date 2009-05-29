@@ -3,14 +3,6 @@
 
 #include "../PokerLibrary/gamestate.h"
 
-enum Action
-{
-	FOLD, //a player has folded
-	CALL, //ends the betting, continuing at next round
-	BET,  //keeps the betting going. could be check i spose
-	ALLIN //a player has BET all-in. otherwise should use CALL
-};
-
 //forward declaration
 struct betnode;
 class DiagnosticsPage;

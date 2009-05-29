@@ -3,146 +3,121 @@
 
 #include "../PokerLibrary/constants.h"
 
-inline float safedivide(float n, float d)
+//algorithm strategy data for N-membered nodes
+//used once per cardsi per N-membered node.
+template <int N> struct dataN_t
 {
-	if (d==0 && n!=0) //if we just didn't get there, then the numerator would also be zero
-		REPORT("zero denominator!");
-	else if(d==0 && n==0) //could have just never gotten there, or could be invalid action
-		return 0; //zero probability either way.
-	else //d!=0
-		return n/d;
-}
-
-//algorithm strategy data for 9-membered nodes
-//used once per cardsi per gameround-betting-tree-9-membered node.
-template <int N> struct treedataN_t
-{
-#if VECTORIZE
-	treedataN_t() : stratn(N-1,0), stratd(N-1,0), regret(N,0) {}
-	std::vector<float> stratn;
-	std::vector<float> stratd;
-	std::vector<float> regret;
-#else
+	dataN_t() //initialize all to zero
+	{
+		for(int a=0; a<N-1; a++)
+			stratn[a] = stratd[a] = regret[a] = 0;
+		regret[N-1] = 0;
+	}
 	float stratn[N-1];
 	float stratd[N-1];
 	float regret[N];
-#endif
-};
-template <int N> struct treestratN_t
-{
-	treestratN_t() : strat(N-1,0) {}
-	std::vector<float> strat;
 };
 
-
-//entire algorithm data for a single cardsi for a single gr-betting-tree.
-//used once per cardsi per gameround-betting-tree
-struct treedata_t
+//resulting strategy data for N-membered nodes
+//used once per cardsi per N-membered node.
+//probability 0 is mapped to 0
+//probability 1 is mapped to 256
+//then is rounded down, to yeild number 0-255, with all number used equally.
+template <int N> struct stratN_t
 {
-	treedataN_t<9> data9[BETI9_MAX];
-	treedataN_t<3> data3[BETI3_MAX];
-	treedataN_t<2> data2[BETI2_MAX];
-};
 
-struct treestrat_t
-{
-	treestrat_t(const treedata_t &d) 
+	//this constructor is used to convert from algorithm data types (above) to strategy 
+	//probabilities, packed as 8-bit chars. we perform the safe division here.
+
+	stratN_t(const dataN_t<N> &data)
 	{
-		for(int b=0; b<BETI9_MAX; b++)
-			for(int a=0; a<8; a++)
-				strat9[b].strat[a] = safedivide(d.data9[b].stratn[a], d.data9[b].stratd[a]);
-		for(int b=0; b<BETI3_MAX; b++)
-			for(int a=0; a<2; a++)
-				strat3[b].strat[a] = safedivide(d.data3[b].stratn[a], d.data3[b].stratd[a]);
-		for(int b=0; b<BETI2_MAX; b++)
-			for(int a=0; a<1; a++)
-				strat2[b].strat[a] = safedivide(d.data2[b].stratn[a], d.data2[b].stratd[a]);
+		for(int a=0; a<N-1; a++)
+		{
+			//if we just didn't get there, then the numerator would also be zero
+			if (data.stratd[a]==0 && data.stratn[a]!=0) 
+				REPORT("zero denominator!");
+			//could have just never gotten there, will happen for short iteration runs
+			else if(data.stratd[a]==0 && data.stratn[a]==0) 
+				strat[a] = 0; //would evaluate to infinity otherwise
+			else
+			{
+				int temp = int(256.0 * data.stratn[a] / data.stratd[a]);
+				if(temp == 256) temp = 255; //will happen if ratio is exactly one
+				if(temp < 0 || temp > 255)
+					REPORT("failure to divide");
+				strat[a] = unsigned char(temp);
+			}
+		}
 	}
 
-	treestratN_t<9> strat9[BETI9_MAX];
-	treestratN_t<3> strat3[BETI3_MAX];
-	treestratN_t<2> strat2[BETI2_MAX];
+	//the actual data.
+
+	unsigned char strat[N-1];
 };
 
-//a single gameround-betting-tree. contains algorithm data for each
-//possible cardsi and a single gameround-betting-tree
-//used once per gameround-betting-tree.
-struct pftree_t
-{
-	treedata_t treedata[CARDSI_PFLOP_MAX];
-};
-struct ftree_t
-{
-	treedata_t treedata[CARDSI_FLOP_MAX];
-};
-struct ttree_t
-{
-	treedata_t treedata[CARDSI_TURN_MAX];
-};
-struct rtree_t
-{
-	treedata_t treedata[CARDSI_RIVER_MAX];
-};
+//each is a pointer to a large array allocated on the heap
+//one such array per gameround per type of node.
+//used as 2-dimensional arrays below.
+//alocated individually in initmem(). 
+//i supposed it is a ragged array
+extern dataN_t<9> * data9[4];
+extern dataN_t<8> * data8[4];
+extern dataN_t<7> * data7[4];
+extern dataN_t<6> * data6[4];
+extern dataN_t<5> * data5[4];
+extern dataN_t<4> * data4[4];
+extern dataN_t<3> * data3[4];
+extern dataN_t<2> * data2[4];
 
-
-extern pftree_t * pftreebase;
-extern ftree_t * ftreebase;
-extern ttree_t * ttreebase;
-extern rtree_t * rtreebase;
-struct twople
+//used to obtain the correct pointers to the data from the above arrays, 
+//so that other code doesn't need to worry about it.
+inline void dataindexing(int gr, int nacts, int actioni, int cardsi, 
+						 float* &stratn, float* &stratd, float* &regret)
 {
-	twople(int _x, int _y) : x(_x), y(_y) {}
-	unsigned char x;
-	unsigned char y;
-};
-struct threeple
-{
-	threeple(twople a, int _z) : x(a.x), y(a.y), z(_z) {}
-	unsigned char x;
-	unsigned char y;
-	unsigned char z;
-};
-extern std::vector<unsigned char> pfexitnodes;
-extern std::vector<twople> fexitnodes;
-extern std::vector<threeple> texitnodes;
-
-
-
-#if VECTORIZE
-#define GET(exp) exp.begin()
-#else
-#define GET(exp) exp
-#endif
-//returns the needed data and beti-offset for a single treedata_t
-inline void betindexing(int beti, treedata_t * baseptr,
-#if VECTORIZE
-			std::vector<float>::iterator &stratn, 
-			std::vector<float>::iterator &stratd, 
-			std::vector<float>::iterator &regret)
-#else
-			float * &stratn, float * &stratd, float * &regret)
-#endif
-{
-	if (beti<BETI9_CUTOFF)
+	switch(nacts)
 	{
-		int betioffset = beti;
-		stratn = GET(baseptr->data9[betioffset].stratn);
-		stratd = GET(baseptr->data9[betioffset].stratd);
-		regret = GET(baseptr->data9[betioffset].regret);
-	}
-	else if (beti<BETI3_CUTOFF)
-	{
-		int betioffset = beti-BETI9_CUTOFF;
-		stratn = GET(baseptr->data3[betioffset].stratn);
-		stratd = GET(baseptr->data3[betioffset].stratd);
-		regret = GET(baseptr->data3[betioffset].regret);
-	}
-	else if (beti<BETI2_CUTOFF)
-	{
-		int betioffset = beti-BETI3_CUTOFF;
-		stratn = GET(baseptr->data2[betioffset].stratn);
-		stratd = GET(baseptr->data2[betioffset].stratd);
-		regret = GET(baseptr->data2[betioffset].regret);
+	case 9:
+		stratn = data9[gr][cardsi*actionmax[gr][7] + actioni].stratn;
+		stratd = data9[gr][cardsi*actionmax[gr][7] + actioni].stratd;
+		regret = data9[gr][cardsi*actionmax[gr][7] + actioni].regret;
+		return;
+	case 8:
+		stratn = data8[gr][cardsi*actionmax[gr][6] + actioni].stratn;
+		stratd = data8[gr][cardsi*actionmax[gr][6] + actioni].stratd;
+		regret = data8[gr][cardsi*actionmax[gr][6] + actioni].regret;
+		return;
+	case 7:
+		stratn = data7[gr][cardsi*actionmax[gr][5] + actioni].stratn;
+		stratd = data7[gr][cardsi*actionmax[gr][5] + actioni].stratd;
+		regret = data7[gr][cardsi*actionmax[gr][5] + actioni].regret;
+		return;
+	case 6:
+		stratn = data6[gr][cardsi*actionmax[gr][4] + actioni].stratn;
+		stratd = data6[gr][cardsi*actionmax[gr][4] + actioni].stratd;
+		regret = data6[gr][cardsi*actionmax[gr][4] + actioni].regret;
+		return;
+	case 5:
+		stratn = data5[gr][cardsi*actionmax[gr][3] + actioni].stratn;
+		stratd = data5[gr][cardsi*actionmax[gr][3] + actioni].stratd;
+		regret = data5[gr][cardsi*actionmax[gr][3] + actioni].regret;
+		return;
+	case 4:
+		stratn = data4[gr][cardsi*actionmax[gr][2] + actioni].stratn;
+		stratd = data4[gr][cardsi*actionmax[gr][2] + actioni].stratd;
+		regret = data4[gr][cardsi*actionmax[gr][2] + actioni].regret;
+		return;
+	case 3:
+		stratn = data3[gr][cardsi*actionmax[gr][1] + actioni].stratn;
+		stratd = data3[gr][cardsi*actionmax[gr][1] + actioni].stratd;
+		regret = data3[gr][cardsi*actionmax[gr][1] + actioni].regret;
+		return;
+	case 2:
+		stratn = data2[gr][cardsi*actionmax[gr][0] + actioni].stratn;
+		stratd = data2[gr][cardsi*actionmax[gr][0] + actioni].stratd;
+		regret = data2[gr][cardsi*actionmax[gr][0] + actioni].regret;
+		return;
+	default:
+		REPORT("invalid number of actions");
 	}
 }
 

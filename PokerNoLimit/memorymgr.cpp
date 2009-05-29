@@ -6,29 +6,30 @@
 using namespace std;
 
 //global data handles
-pftree_t * pftreebase;
-ftree_t * ftreebase;
-ttree_t * ttreebase;
-rtree_t * rtreebase;
+dataN_t<9> * data9[4];
+dataN_t<8> * data8[4];
+dataN_t<7> * data7[4];
+dataN_t<6> * data6[4];
+dataN_t<5> * data5[4];
+dataN_t<4> * data4[4];
+dataN_t<3> * data3[4];
+dataN_t<2> * data2[4];
 
 //needed to be saved later for lookup table to traverse tree during real game
-vector<unsigned char> pfexitnodes;
-vector<twople> fexitnodes;
-vector<threeple> texitnodes;
+int actionmax[4][MAX_ACTIONS-1]; //minus one because single-action nodes don't exist
 
 //helper recursive function for initmem
 void walkercount(int gr, int pot, int beti)
 {
-	bool isvalid[9];
-	betnode const * mynode = gettree(gr, beti);
-	getvalidity(pot,mynode,isvalid);
+	betnode mynode;
+	getnode(gr, pot, beti, mynode);
+	int numa = mynode.numacts; //for ease of typing
 
-	for(int a=0; a<mynode->numacts; a++)
+	actionmax[gr][numa-2]++;
+
+	for(int a=0; a<numa; a++)
 	{
-		if(!isvalid[a])
-			continue;
-
-		switch(mynode->result[a])
+		switch(mynode.result[a])
 		{
 		case NA:
 			REPORT("invalid tree");
@@ -36,29 +37,17 @@ void walkercount(int gr, int pot, int beti)
 		case AI:
 			continue;
 		case GO:
-			if(gr==PREFLOP)
-			{
-				pfexitnodes.push_back(beti);
-				walkercount(gr+1, pot+mynode->potcontrib[a], 0);
-			}
-			else if(gr==FLOP)
-			{
-				fexitnodes.push_back(twople(pfexitnodes.back(), beti));
-				walkercount(gr+1, pot+mynode->potcontrib[a], 0);
-			}
-			else if(gr==TURN)
-				texitnodes.push_back(threeple(fexitnodes.back(), beti));
-			else
-				REPORT("error in walkercount");
-
+			if(gr!=RIVER)
+				walkercount(gr+1, pot+mynode.potcontrib[a], 0);
 			continue;
 
 		default://child node
-			walkercount(gr, pot, mynode->result[a]);
+			walkercount(gr, pot, mynode.result[a]);
 		}
 	}
 }
 
+//pretty formatted bytes printing
 string space(long long bytes)
 {
 	ostringstream o;
@@ -75,51 +64,90 @@ string space(long long bytes)
 	return o.str();
 }
 	
-
+//cout how much memory will use, then allocate it
 void initmem()
 {
+	clock_t c = clock();
 	walkercount(0,0,0);
-	int preflopwalkercount = pfexitnodes.size();
-	int flopwalkercount = fexitnodes.size();
-	int turnwalkercount = texitnodes.size();
+	clock_t diff = clock()-c;
+	cout << "...took " << float(diff)/CLOCKS_PER_SEC << " seconds." << endl;
+
+	long long actionbytes = 0;
+	long long size[MAX_ACTIONS-1];
+	size[7] = sizeof(dataN_t<9>);
+	size[6] = sizeof(dataN_t<8>);
+	size[5] = sizeof(dataN_t<7>);
+	size[4] = sizeof(dataN_t<6>);
+	size[3] = sizeof(dataN_t<5>);
+	size[2] = sizeof(dataN_t<4>);
+	size[1] = sizeof(dataN_t<3>);
+	size[0] = sizeof(dataN_t<2>);
+	long long cards[4];
+	cards[0] = CARDSI_PFLOP_MAX;
+	cards[1] = CARDSI_FLOP_MAX;
+	cards[2] = CARDSI_TURN_MAX;
+	cards[3] = CARDSI_RIVER_MAX;
+
+	for(int gr=PREFLOP; gr<=RIVER; gr++)
+	{
+		cout << "round " << gr << " uses " << cards[gr] << " card indexings..." << endl;
+
+		for(int a=0; a<MAX_ACTIONS-1; a++)
+		{
+			long long mybytes = actionmax[gr][a]*size[a]*cards[gr];
+			actionbytes += mybytes;
+			cout << "round " << gr << " uses " << actionmax[gr][a] << " nodes with " << a+2 
+				<< " members for a total of " << space(mybytes) << endl;
+		}
+	}
+
 	long long fbinbytes = binfilesize(BIN_FLOP_MAX, INDEX23_MAX);
 	long long tbinbytes = binfilesize(BIN_TURN_MAX, INDEX24_MAX);
 	long long rbinbytes = binfilesize(BIN_RIVER_MAX, INDEX25_MAX);
 	cout << BIN_FLOP_MAX << " flop bins use: " << space(fbinbytes) << endl;
 	cout << BIN_TURN_MAX << " turn bins use: " << space(tbinbytes) << endl;
 	cout << BIN_RIVER_MAX << " river bins use: " << space(rbinbytes) << endl;
-	long long pftreebytes = sizeof(pftree_t);
-	long long ftreebytes = (long long)preflopwalkercount*sizeof(ftree_t);
-	long long ttreebytes = (long long)flopwalkercount*sizeof(ttree_t);
-	long long rtreebytes = (long long)turnwalkercount*sizeof(rtree_t);
-	cout << "1 preflop tree with " << CARDSI_PFLOP_MAX << " cardsi uses: " << space(pftreebytes) << endl;
-	cout << preflopwalkercount << " flop trees with " << CARDSI_FLOP_MAX << " cardsi (" 
-		<< space(sizeof(ftree_t)) << ") for " 
-		<< space(ftreebytes) << endl;
-	cout << flopwalkercount << " turn trees with " << CARDSI_TURN_MAX << " cardsi ("
-		<< space(sizeof(ttree_t)) << ") for " 
-		<< space(ttreebytes) << endl;
-	cout << turnwalkercount << " river trees with " << CARDSI_RIVER_MAX << " cardsi ("
-		<< space(sizeof(rtree_t)) << ") for " 
-		<< space(rtreebytes) << endl;
-	cout << "total: " << space(fbinbytes+tbinbytes+rbinbytes+pftreebytes+ftreebytes+ttreebytes+rtreebytes) << endl;
+
+	cout << "total: " << space(fbinbytes+tbinbytes+rbinbytes+actionbytes) << endl;
 	system("pause");
-	rtreebase = new rtree_t [turnwalkercount];
-	ttreebase = new ttree_t [flopwalkercount];
-	ftreebase = new ftree_t [preflopwalkercount];
-	pftreebase = new pftree_t;
+
+	for(int gr=PREFLOP; gr<=RIVER; gr++)
+	{
+#define ALLOC(i) data##i[gr] = (actionmax[gr][i-2]>0) ? \
+	new dataN_t<i>[actionmax[gr][i-2]*cards[gr]] : \
+	NULL
+		ALLOC(9);
+		ALLOC(8);
+		ALLOC(7);
+		ALLOC(6);
+		ALLOC(5);
+		ALLOC(4);
+		ALLOC(3);
+		ALLOC(2);
+#undef ALLOC
+	}
 }
 
 void closemem()
 {
-	delete pftreebase;
-	delete[] ftreebase;
-	delete[] ttreebase;
-	delete[] rtreebase;
+	for(int gr=PREFLOP; gr<=RIVER; gr++)
+	{
+#define DEALLOC(i) if(data##i[gr] != NULL) delete[] data##i[gr]
+		DEALLOC(9);
+		DEALLOC(8);
+		DEALLOC(7);
+		DEALLOC(6);
+		DEALLOC(5);
+		DEALLOC(4);
+		DEALLOC(3);
+		DEALLOC(2);
+#undef DEALLOC
+	}
 }
 
 
 
+/*
 void savestratresult(const char * const filename)
 {
 	ofstream f(filename, ofstream::binary);
@@ -190,57 +218,4 @@ void savestratresult(const char * const filename)
 		}
 	}
 }
-
-
-/*
-void dumpstratresult(const char * const filename)
-{
-	ofstream f(filename, ofstream::binary);
-	float *stratt, *stratn, *stratd, *regret;
-	float result[8];
-
-	//dumps out the strategy result in it's own format.
-	for(int s=0; s<SCENI_MAX; s++)
-	{
-		int b=0;
-
-		for(; b<BETI9_CUTOFF; b++)
-		{
-			int maxa = (s<SCENI_PREFLOP_MAX) ? pfloptree[b].numacts : n[b].numacts;
-			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
-
-			//we print all values, valid or not. 
-			memset(result, 0, 8*sizeof(float));
-			for(int a=0; a<maxa-1; a++) result[a] = safedivide(stratn[a],stratd[a]);
-
-			f.write((char*)result, 8*sizeof(float));
-		}
-		
-		for(; b<BETI3_CUTOFF; b++)
-		{
-			int maxa = (s<SCENI_PREFLOP_MAX) ? pfloptree[b].numacts : n[b].numacts;
-			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
-
-			//we print all values, valid or not. 
-			memset(result, 0, 8*sizeof(float));
-			for(int a=0; a<maxa-1; a++) result[a] = safedivide(stratn[a],stratd[a]);
-
-			f.write((char*)result, 2*sizeof(float));
-		}
-		
-		for(; b<BETI2_CUTOFF; b++)
-		{
-			int maxa = (s<SCENI_PREFLOP_MAX) ? pfloptree[b].numacts : n[b].numacts;
-			getpointers(s,b,maxa,0,stratt,stratn,stratd,regret);
-
-			//we print all values, valid or not. 
-			memset(result, 0, 8*sizeof(float));
-			for(int a=0; a<maxa-1; a++) result[a] = safedivide(stratn[a],stratd[a]);
-
-			f.write((char*)result, 1*sizeof(float));
-		}
-	}
-	f.close();
-}
 */
-

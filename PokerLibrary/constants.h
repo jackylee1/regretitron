@@ -9,14 +9,6 @@ const int FLOP = 1;
 const int TURN = 2;
 const int RIVER = 3;
 
-#define VECTORIZE 0
-
-#if VECTORIZE
-#define DEREF(basetree) (*basetree)
-#else
-#define DEREF(basetree) basetree
-#endif
-
 /***********************************************************************************/
 //constants for the binning of hands
 const int BIN_PREFLOP_MAX = INDEX2_MAX; //should be 169, not really bins.
@@ -42,9 +34,12 @@ const int CARDSI_FLOP_MAX = BIN_FLOP_MAX*FLOPALYZER_MAX;
 const int CARDSI_TURN_MAX = BIN_TURN_MAX*TURNALYZER_MAX;
 const int CARDSI_RIVER_MAX = BIN_RIVER_MAX*RIVALYZER_MAX;
 
+//constants for the actiondefs
+const int MAX_ACTIONS = 9;
+
 //stacksize of the smallest stack, in small blinds, 
 //as HU poker is only as good as its smaller stack.
-#define SS 6
+#define SS 13
 #define PUSHFOLD 0
 const unsigned char SB=1, BB=2;
 const int STACKSIZE = SS*BB;
@@ -79,12 +74,12 @@ const unsigned char B4=20, R41=99, R42=99, R43=99, R44=99, R45=99, R46=99;
 const unsigned char B5=99, R51=99, R52=99, R53=99, R54=99, R55=99, R56=99;
 const unsigned char B6=99, R61=99, R62=99, R63=99, R64=99, R65=99, R66=99;
 #elif SS>=35
-const unsigned char B1=4,  R11=12, R12=24, R13=48, R14=99, R15=99, R16=99;
-const unsigned char B2=12, R21=24, R22=48, R23=99, R24=99, R25=99, R26=99;
-const unsigned char B3=24, R31=48, R32=99, R33=99, R34=99, R35=99, R36=99;
-const unsigned char B4=48, R41=99, R42=99, R43=99, R44=99, R45=99, R46=99;
-const unsigned char B5=99, R51=99, R52=99, R53=99, R54=99, R55=99,  R56=100;
-const unsigned char B6=99, R61=99, R62=99, R63=99, R64=99, R65=100, R66=100;
+const unsigned char B1=4,  R11=12, R12=24, R13=36, R14=50, R15=66, R16=99;
+const unsigned char B2=12, R21=24, R22=36, R23=50, R24=66, R25=99, R26=99;
+const unsigned char B3=24, R31=36, R32=50, R33=66, R34=99, R35=99, R36=99;
+const unsigned char B4=36, R41=50, R42=66, R43=99, R44=99, R45=99, R46=99;
+const unsigned char B5=50, R51=66, R52=99, R53=99, R54=99, R55=99,  R56=100;
+const unsigned char B6=66, R61=99, R62=99, R63=99, R64=99, R65=100, R66=100;
 #endif
 
 /***********************************************************************************/
@@ -97,18 +92,5 @@ const unsigned char NA=0xFF;
 const unsigned char AI=0xFE;
 const unsigned char FD=0xFD;
 const unsigned char GO=0xFC;
-
-
-//******************************
-//constants to help with efficient memory allocation of the betting tree.
-const int BETI_MAX = N_NODES;
-
-const int BETI9_CUTOFF = 14;
-const int BETI3_CUTOFF = 86;
-const int BETI2_CUTOFF = BETI_MAX;
-
-const int BETI9_MAX = BETI9_CUTOFF;
-const int BETI3_MAX = BETI3_CUTOFF-BETI9_CUTOFF;
-const int BETI2_MAX = BETI2_CUTOFF-BETI3_CUTOFF;
 
 #endif

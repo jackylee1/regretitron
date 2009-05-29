@@ -173,64 +173,38 @@ void printriverhands(ostream &out, int bin, int riverscore, int n)
 //the multiplier.
 //used by diagnostics window (in PokerPlayer) 
 //and by printfirstnodestrat (savestrategy.cpp of PokerNoLimit)
-string actionstring(int action, int gr, betnode const * tree, double multiplier)
+string actionstring(int gr, int action, const betnode &bn, double multiplier)
 {
 	stringstream str;
 	str << fixed << setprecision(2);
 
-	switch(tree->result[action])
+	switch(bn.result[action])
 	{
 	case FD:
 		str << "Fold";
 		break;
 	case GO:
-		if(tree->potcontrib[action]==0 || (gr==PREFLOP && tree->potcontrib[action]==BB))
+		if(bn.potcontrib[action]==0 || (gr==PREFLOP && bn.potcontrib[action]==BB))
 			str << "Check";
 		else
-			str << "Call $" << multiplier*(tree->potcontrib[action]);
+			str << "Call $" << multiplier*(bn.potcontrib[action]);
 		break;
 	case AI:
 		str << "Call All-In";
 		break;
 	default:
-		if(isallin(tree,gr,action))
+		if(isallin(bn.result[action], bn.potcontrib[action], gr))
 			str << "All-In";
-		else if(tree->potcontrib[action]==0)
+		else if(bn.potcontrib[action]==0)
 			str << "Check";
-		else if(gr==PREFLOP && tree->potcontrib[action]==BB)
-			str << "Call $" << multiplier*(tree->potcontrib[action]);
+		else if(gr==PREFLOP && bn.potcontrib[action]==BB)
+			str << "Call $" << multiplier*(bn.potcontrib[action]);
 		else
-			str << "Bet $" << multiplier*(tree->potcontrib[action]);
+			str << "Bet $" << multiplier*(bn.potcontrib[action]);
 		break;
 	}
 
 	return str.str();
-}
-
-//since by betting tree can be ambiguous, more extensive tests
-//are needed to check if a node is a BET allin. this function takes
-//a pointer to a betting tree node, the gameround, and an action index
-//and tells you if it is a BET allin.
-//used by BotAPI (in PokerPlayer) and actionstring (this file)
-bool isallin(betnode const * mynode, int gr, int action)
-{
-	switch(mynode->result[action])
-	{
-	case FD:
-	case GO: 
-	case AI: 
-	case NA:
-		return false;
-	}
-
-	if(mynode->potcontrib[action] != 0)
-		return false;
-
-	//must check to see if child node has 2 actions
-	if(gettree(gr, mynode->result[action])->numacts == 2)
-		return true;
-	else
-		return false;
 }
 
 //takes a floating point pot value and returns the nearest integer

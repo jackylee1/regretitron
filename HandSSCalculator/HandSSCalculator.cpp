@@ -735,11 +735,15 @@ int _tmain(int argc, _TCHAR* argv[])
 	saveturnHSS(); //Depends on "bins/riverEV.dat". Generates "bins/turnHSS.dat".
 	saveflopHSS(); //Depends on "bins/turnHSS.dat". Generates "bins/flopHSS.dat".
 	savepreflopHSS(); //Deps on "bins/flopHSS.dat". Generates "bins/preflopHSS.dat".
-	saveflopBINS(256); //Deps on "bins/flopHSS.dat". Generates "bins/flopNBINS.dat".
-	saveflopBINS(128); //Deps on "bins/flopHSS.dat". Generates "bins/flopNBINS.dat".
-	saveturnBINS(64);  //Deps on "bins/turnHSS.dat". Generates "bins/turnNBINS.dat".
+	saveflopBINS(N_BINS); //Deps on "bins/flopHSS.dat". Generates "bins/flopNBINS.dat".
+	saveflopBINS(N_BINS); //Deps on "bins/flopHSS.dat". Generates "bins/flopNBINS.dat".
+	saveturnBINS(N_BINS);  //Deps on "bins/turnHSS.dat". Generates "bins/turnNBINS.dat".
+	saveriverBINS(N_BINS); //Deps on "bins/riverEV.dat". Generates "bins/riverNBINS.dat".
 	*/
-	saveriverBINS(12); //Deps on "bins/riverEV.dat". Generates "bins/riverNBINS.dat".
+
+	//USAGE: any of the above functions can be called from main and will work as expected,
+	//given the dependencies. be sure to replace N_BINS above with the number of bins;
+	//N_BINS is just a placeholder.
 
 	system("PAUSE");
 	return 0;

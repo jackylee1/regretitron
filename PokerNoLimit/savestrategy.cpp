@@ -15,23 +15,21 @@ using namespace std;
 //used only by my main routines in PokerNoLimit.cpp
 void printfirstnodestrat(char const * const filename)
 {
-	ofstream log(filename);
-	int maxa = pfloptree[0].numacts;
-	int numa;
-	float strataccum;
-	bool isvalid[9];
+	//tree stuff
+	betnode mynode; // will hold compressed node
+	getnode(PREFLOP, 0, 0, mynode);
+	int numa = mynode.numacts;
 
+	//log stuff
+	ofstream log(filename);
 	log << fixed << setprecision(5);
 
+	float strataccum;
 	for(int cardsi=CARDSI_PFLOP_MAX-1; cardsi>=0; cardsi--)
 	{
-		numa = getvalidity(0, &(pfloptree[0]), isvalid);
-#if VECTORIZE
-		vector<float>::iterator stratn, stratd, regret;
-#else
+		//data stuff
 		float * stratn, * stratd, * regret;
-#endif
-		betindexing(0,&(pftreebase->treedata[cardsi]),stratn,stratd,regret);
+		dataindexing(PREFLOP, numa, 0, cardsi, stratn, stratd, regret);
 
 #if PUSHFOLD
 		log << setw(5) << left << preflophandstring(cardsi)+":";
@@ -43,31 +41,25 @@ void printfirstnodestrat(char const * const filename)
 		
 		//remember we only store max-1 strategies. the last must be found based on all adding to 1.
 		strataccum=0;
-		for (int a=0; a<maxa-1; a++)
+		for (int a=0; a<numa-1; a++)
 		{
 			float myprob = stratn[a]/stratd[a];
 
-			if(isvalid[a])
-			{
-				strataccum+=myprob;
+			strataccum+=myprob;
 #if PUSHFOLD
-				if(myprob>0.98F) log << "fold" << endl;
-				else if (myprob>0.02F)
+			if(myprob>0.98F) log << "fold" << endl;
+			else if (myprob>0.02F)
 #endif
-				log << setw(14) << actionstring(a,PREFLOP,pfloptree,1.0)+": " 
-					<< 100*stratn[a]/stratd[a] << "%" << endl;
-			}
+			log << setw(14) << actionstring(PREFLOP,a,mynode,1.0)+": "
+				<< 100*stratn[a]/stratd[a] << "%" << endl;
 		}
-		//finally, handle the last strat, if it is valid.
-		if(isvalid[maxa-1])
-		{
+		//finally, handle the last strat
 #if PUSHFOLD
-			if((1-strataccum)>0.98F) log << "jam" << endl;
-			else if ((1-strataccum)>0.02F)
+		if((1-strataccum)>0.98F) log << "jam" << endl;
+		else if ((1-strataccum)>0.02F)
 #endif
-			log << setw(14) << actionstring(maxa-1,PREFLOP,pfloptree,1.0)+": " 
-				<< 100*(1-strataccum) << "%" << endl;
-		}
+		log << setw(14) << actionstring(PREFLOP,numa,mynode,1.0)+": " 
+			<< 100*(1-strataccum) << "%" << endl;
 	}
 	log.close();
 }
