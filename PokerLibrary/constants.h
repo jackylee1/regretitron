@@ -39,7 +39,7 @@ const int MAX_ACTIONS = 9;
 
 //stacksize of the smallest stack, in small blinds, 
 //as HU poker is only as good as its smaller stack.
-#define SS 13
+#define SS 6
 #define PUSHFOLD 0
 const unsigned char SB=1, BB=2;
 const int STACKSIZE = SS*BB;

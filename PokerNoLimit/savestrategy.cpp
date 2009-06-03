@@ -58,7 +58,7 @@ void printfirstnodestrat(char const * const filename)
 		if((1-strataccum)>0.98F) log << "jam" << endl;
 		else if ((1-strataccum)>0.02F)
 #endif
-		log << setw(14) << actionstring(PREFLOP,numa,mynode,1.0)+": " 
+		log << setw(14) << actionstring(PREFLOP,numa-1,mynode,1.0)+": " 
 			<< 100*(1-strataccum) << "%" << endl;
 	}
 	log.close();

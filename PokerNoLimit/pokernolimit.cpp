@@ -5,6 +5,7 @@
 #include "memorymgr.h"
 #include "savestrategy.h"
 #include "../PokerLibrary/constants.h"
+#include "../mymersenne.h"
 using namespace std;
 
 //global gamestate class instance.
@@ -218,7 +219,7 @@ inline void playgame()
 		total+=i;
 		cout << "saving log of first node strat." << endl;
 		ostringstream o;
-		o << "output/13ss-256,90,32bins-" << iterstring(total) << "-1.txt";
+		o << "output/6ss-256,90,32bins-" << iterstring(total) << "-seed42-testwindivnodes.txt";
 		printfirstnodestrat(o.str().c_str());
 #if SAVESTRATEGYFILE
 		if(total >= 500*THOUSAND)
@@ -240,6 +241,8 @@ int main(int argc, char* argv[])
 	initbettingtrees();
 	initmem();
 	initbins();
+
+	mersenne.seed(42);
 
 	playgame();
 
