@@ -62,7 +62,7 @@ inline int retrieve(unsigned long long * dataarr, int i, int bin_max)
 	int binsperword = 64/nbits;
 	unsigned long long word = dataarr[i/binsperword];
 	word>>=nbits*(i%binsperword);
-	word&=~(UINT64(0xffffffffffffffff)<<nbits);
+	word&=~(0xffffffffffffffffULL<<nbits);
 	return (int)word;
 }
 
@@ -84,8 +84,8 @@ inline void store(unsigned long long * dataarr, int i, int bin, int bin_max)
 	int binsperword = 64/nbits;
 	int position = i%binsperword;
 	
-	unsigned long long zeromask = UINT64(0xffffffffffffffff)<<(nbits*(position+1));
-	zeromask |= ~(UINT64(0xffffffffffffffff)<<(nbits*position));
+	unsigned long long zeromask = 0xffffffffffffffffULL<<(nbits*(position+1));
+	zeromask |= ~(0xffffffffffffffffULL<<(nbits*position));
 	dataarr[i/binsperword] &= zeromask; //zeroes out the old value
 	
 	unsigned long long bin_bits = bin;

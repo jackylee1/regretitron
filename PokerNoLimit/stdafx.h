@@ -21,6 +21,7 @@
 #include <time.h> //needed benchmark timing
 #include <vector> //for recording exit node table needed for player
 #include <float.h> //for floating point epsilon
+#include <numeric> //for accumulate
 #ifndef _WIN32
 #include <stdlib.h> //for LINUX exit function exit(int)
 #endif

@@ -240,6 +240,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\portability.h"
+				>
+			</File>
+			<File
 				RelativePath="..\SharedCode\report.h"
 				>
 			</File>

@@ -21,7 +21,7 @@ int actionmax[4][MAX_ACTIONS-1]; //minus one because single-action nodes don't e
 
 //used to obtain the correct pointers to the data from the above arrays, 
 //so that other code doesn't need to worry about it.
-void dataindexing(int gr, int nacts, int actioni, int cardsi, fp_type* &stratn, fp_type* &stratd, fp_type* &regret)
+void dataindexing(int gr, int nacts, int actioni, int cardsi, fpstore_type* &stratn, fpstore_type* &stratd, fpstore_type* &regret)
 {
 	switch(nacts)
 	{
@@ -105,12 +105,12 @@ string space(long long bytes)
 	ostringstream o;
 	if(bytes < 1024)
 		o << bytes << " bytes.";
-	else if(bytes < INT64(1024)*1024)
+	else if(bytes < 1024LL*1024)
 		o << fixed << setprecision(1) << (double)bytes / 1024 << "KB";
-	else if(bytes < INT64(1024)*1024*1024)
-		o << fixed << setprecision(1) << (double)bytes / (INT64(1024)*1024) << "MB";
-	else if(bytes < INT64(1024)*1024*1024*1024)
-		o << fixed << setprecision(1) << (double)bytes / (INT64(1024)*1024*1024) << "GB";
+	else if(bytes < 1024LL*1024*1024)
+		o << fixed << setprecision(1) << (double)bytes / (1024LL*1024) << "MB";
+	else if(bytes < 1024LL*1024*1024*1024)
+		o << fixed << setprecision(1) << (double)bytes / (1024LL*1024*1024) << "GB";
 	else
 		o << "DAYM that's a lotta memory!";
 	return o.str();
@@ -122,7 +122,9 @@ void initmem()
 	clock_t c = clock();
 	walkercount(0,0,0);
 	clock_t diff = clock()-c;
-	cout << "...took " << float(diff)/CLOCKS_PER_SEC << " seconds." << endl;
+	cout << "...took " << (float)diff/CLOCKS_PER_SEC << " seconds." << endl;
+
+	cout << "floating point type fpstore_type uses " << sizeof(fpstore_type) << " bytes." << endl;
 
 	long long actionbytes = 0;
 	long long size[MAX_ACTIONS-1];
@@ -162,7 +164,7 @@ void initmem()
 
 	cout << "total: " << space(fbinbytes+tbinbytes+rbinbytes+actionbytes) << endl;
 
-        PAUSE();
+	PAUSE();
 
 	for(int gr=PREFLOP; gr<=RIVER; gr++)
 	{

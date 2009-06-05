@@ -44,7 +44,7 @@ void dummywalker(int gr, int pot, int beti)
 }
 
 
-double walker(int gr, int pot, int beti, double prob0, double prob1)
+fpworking_type walker(int gr, int pot, int beti, fpworking_type prob0, fpworking_type prob1)
 {
 
 	//obtain definition of possible bets for this turn
@@ -55,7 +55,7 @@ double walker(int gr, int pot, int beti, double prob0, double prob1)
 
 	//obtain pointers to data for this turn
 
-	fp_type * stratn, * stratd, * regret;
+	fpstore_type * stratn, * stratd, * regret;
 	dataindexing(gr, numa, actioncounters[gr][numa-2]++, gs.getcardsi((Player)mynode.playertoact, gr), 
 		stratn, stratd, regret);
 
@@ -64,28 +64,28 @@ double walker(int gr, int pot, int beti, double prob0, double prob1)
 
 	//find total regret
 
-	double totalregret=0;
+	fpworking_type totalregret=0;
 
 	for(int i=0; i<numa; i++)
 		if (regret[i]>0) totalregret += regret[i];
 
 	//set strategy proportional to positive regret, or 1/numa if no positive regret
 
-	double stratt[MAX_ACTIONS];
+	fpworking_type stratt[MAX_ACTIONS];
 
 	if (totalregret > 0)
 		for(int i=0; i<numa; i++)
 			(regret[i]>0) ? stratt[i] = regret[i] / totalregret : stratt[i] = 0;
 	else
 		for(int i=0; i<numa; i++)
-			stratt[i] = (double)1/numa;
+			stratt[i] = (fpworking_type)1/numa;
 
 
 	//NOW, WE WANT TO FIND THE UTILITY OF EACH ACTION. 
 	//WE OFTEN DO THIS BY CALLING WALKER RECURSIVELY.
 
-	double utility[MAX_ACTIONS];
-	double avgutility=0;
+	fpworking_type utility[MAX_ACTIONS];
+	fpworking_type avgutility=0;
 
 	for(int i=0; i<numa; i++)
 	{
@@ -160,6 +160,9 @@ double walker(int gr, int pot, int beti, double prob0, double prob1)
 			for(int a=0; a<numa-1; a++)
 				stratn[a] += prob0 * stratt[a];
 			*stratd += prob0;
+#if STORENTHSTRAT
+			stratn[numa-1] += prob0 * stratt[numa-1];
+#endif
 		}
 
 		//shortcut
@@ -176,6 +179,9 @@ double walker(int gr, int pot, int beti, double prob0, double prob1)
 			for(int a=0; a<numa-1; a++)
 				stratn[a] += prob1 * stratt[a];
 			*stratd += prob1;
+#if STORENTHSTRAT
+			stratn[numa-1] += prob1 * stratt[numa-1];
+#endif
 		}
 
 		//shortcut
@@ -201,11 +207,11 @@ string iterstring(long long iter)
 {
 	ostringstream o;
 	if(iter%MILLION==0)
-		o << iter/MILLION << 'M';
+		o << 'M' << iter/MILLION;
 	else if(iter>MILLION)
-		o << fixed << setprecision(1)<< double(iter)/MILLION << 'M';
+		o << 'M' << fixed << setprecision(1)<< (double)iter/MILLION;
 	else if(iter>=10*THOUSAND)
-		o << iter/THOUSAND << 'k';
+		o << 'k' << iter/THOUSAND;
 	else
 		o << iter;
 	return o.str();
@@ -258,7 +264,8 @@ inline void playgame()
 	cout << "starting work..." << endl;
 	long long i=25*THOUSAND;
 	long long total=0;
-	simulate(i);
+	simulate(100);
+	simulate(i-100);
 	total+=i;
 	while(1)
 	{
@@ -266,7 +273,7 @@ inline void playgame()
 		total+=i;
 		cout << "saving log of first node strat." << endl;
 		ostringstream o;
-		o << "output/test-doublefloat-dummywalker-" << iterstring(total) 
+		o << "output/" << SAVENAME << "-" << iterstring(total) 
 #ifdef _WIN32
 			<< "-win.txt";
 #else
@@ -277,7 +284,7 @@ inline void playgame()
 		if(total >= 500*THOUSAND)
 		{
 			ostringstream oo;
-			oo << "strategy/6ss-256,90,32bins-" << iterstring(total) << ".strat";
+			oo << "strategy/" << SAVENAME << "-" << iterstring(total) << ".strat";
 			cout << "saving strategy file." << endl;
 			savestratresult(oo.str().c_str());
 		}

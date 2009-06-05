@@ -1,5 +1,5 @@
-CPP := g++ # for C++ code
-CC := gcc # for C code
+CPP := g++# for C++ code
+CC := gcc# for C code
 CFLAGS := -Wall
 
 ifeq ($(DEBUG),y)

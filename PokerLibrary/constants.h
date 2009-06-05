@@ -5,7 +5,12 @@
 #include "../HandIndexingV1/constants.h"
 
 //the datatype used for all calculation data. precision vs memory usage
-typedef float fp_type;
+typedef long double fpworking_type; //for intermediate types used by walker (affects performance)
+typedef double fpstore_type; //for storage in data arrays managed by memorymgr (affects memory usage)
+const char SAVENAME[] = "test-w80,s64";
+
+#define STORENTHSTRAT 1 //whether we store the Nth strategy value, or calculate it assuming all add to one.
+#define PRINTSUM 1 //only affects printfirstnodestrat and only if STORENTHSTRAT is on
 
 const int PREFLOP = 0;
 const int FLOP = 1;
@@ -76,6 +81,13 @@ const unsigned char B3=12, R31=24, R32=99, R33=99, R34=99, R35=99, R36=99;
 const unsigned char B4=20, R41=99, R42=99, R43=99, R44=99, R45=99, R46=99;
 const unsigned char B5=99, R51=99, R52=99, R53=99, R54=99, R55=99, R56=99;
 const unsigned char B6=99, R61=99, R62=99, R63=99, R64=99, R65=99, R66=99;
+#elif SS>=25 && SS<35
+const unsigned char B1=2,  R11=6,  R12=12, R13=20, R14=30, R15=42, R16=56;
+const unsigned char B2=6,  R21=12, R22=20, R23=32, R24=44, R25=58, R26=99;
+const unsigned char B3=12, R31=20, R32=34, R33=46, R34=60, R35=99, R36=99;
+const unsigned char B4=20, R41=34, R42=48, R43=60, R44=99, R45=99, R46=99;
+const unsigned char B5=34, R51=48, R52=60, R53=99, R54=99, R55=99, R56=99;
+const unsigned char B6=48, R61=60, R62=99, R63=99, R64=99, R65=99, R66=99;
 #elif SS>=35
 const unsigned char B1=4,  R11=12, R12=24, R13=36, R14=50, R15=66, R16=99;
 const unsigned char B2=12, R21=24, R22=36, R23=50, R24=66, R25=99, R26=99;

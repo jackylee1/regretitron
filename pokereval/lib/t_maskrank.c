@@ -13,17 +13,17 @@ a specific rank.
  */
 
 StdDeck_CardMask StdDeck_maskRankTable[13] = { 
-      { INT64(0xfffefffefffefffe) }  ,
-      { INT64(0xfffdfffdfffdfffd) }  ,
-      { INT64(0xfffbfffbfffbfffb) }  ,
-      { INT64(0xfff7fff7fff7fff7) }  ,
-      { INT64(0xffefffefffefffef) }  ,
-      { INT64(0xffdfffdfffdfffdf) }  ,
-      { INT64(0xffbfffbfffbfffbf) }  ,
-      { INT64(0xff7fff7fff7fff7f) }  ,
-      { INT64(0xfefffefffefffeff) }  ,
-      { INT64(0xfdfffdfffdfffdff) }  ,
-      { INT64(0xfbfffbfffbfffbff) }  ,
-      { INT64(0xf7fff7fff7fff7ff) }  ,
-      { INT64(0xefffefffefffefff) }  
+      { 0xfffefffefffefffeLL }  ,
+      { 0xfffdfffdfffdfffdLL }  ,
+      { 0xfffbfffbfffbfffbLL }  ,
+      { 0xfff7fff7fff7fff7LL }  ,
+      { 0xffefffefffefffefLL }  ,
+      { 0xffdfffdfffdfffdfLL }  ,
+      { 0xffbfffbfffbfffbfLL }  ,
+      { 0xff7fff7fff7fff7fLL }  ,
+      { 0xfefffefffefffeffLL }  ,
+      { 0xfdfffdfffdfffdffLL }  ,
+      { 0xfbfffbfffbfffbffLL }  ,
+      { 0xf7fff7fff7fff7ffLL }  ,
+      { 0xefffefffefffefffLL }  
 };
