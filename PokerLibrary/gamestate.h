@@ -1,7 +1,7 @@
 #ifndef _gamestate_h_
 #define _gamestate_h_
 
-#include "poker_defs.h"
+#include <poker_defs.h>
 #include "constants.h"
 
 enum Player

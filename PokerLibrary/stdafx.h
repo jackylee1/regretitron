@@ -19,16 +19,17 @@
 
 
 // PokerEval
-#include "poker_defs.h"
-#include "inlines/eval.h"
+#include <poker_defs.h>
+#include <inlines/eval.h>
 
 // So all files get nice random numbers
 #include "../mymersenne.h"
 
 // custom global macros
+#include "../portability.h"
 #define REPORT(chars) do{ \
 	std::cout << chars << std::endl; \
-	_asm {int 3}; \
+	ASMBRK; \
 	exit(1); \
 }while(0)
 

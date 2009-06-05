@@ -20,7 +20,7 @@ struct betnode
 };
 
 //used to get a condensed betnode type structure.
-extern inline void getnode(int gr, int pot, int beti, betnode &bn);
+void getnode(int gr, int pot, int beti, betnode &bn);
 
 //must be called before anything else
 void initbettingtrees();

@@ -349,18 +349,18 @@ inline int getvalidity(const int &pot, betnode const * mynode, bool isvalid[9])
 	{
 	default: REPORT("invalid maxa");
 	case 9:
-		if(isvalid[8] = (pot + mynode->potcontrib[8] < STACKSIZE)) numa++;
+		if((isvalid[8] = (pot + mynode->potcontrib[8] < STACKSIZE))) numa++;
 	case 8:
-		if(isvalid[7] = (pot + mynode->potcontrib[7] < STACKSIZE)) numa++;
-		if(isvalid[6] = (pot + mynode->potcontrib[6] < STACKSIZE)) numa++;
-		if(isvalid[5] = (pot + mynode->potcontrib[5] < STACKSIZE)) numa++;
-		if(isvalid[4] = (pot + mynode->potcontrib[4] < STACKSIZE)) numa++;
-		if(isvalid[3] = (pot + mynode->potcontrib[3] < STACKSIZE)) numa++;
+		if((isvalid[7] = (pot + mynode->potcontrib[7] < STACKSIZE))) numa++;
+		if((isvalid[6] = (pot + mynode->potcontrib[6] < STACKSIZE))) numa++;
+		if((isvalid[5] = (pot + mynode->potcontrib[5] < STACKSIZE))) numa++;
+		if((isvalid[4] = (pot + mynode->potcontrib[4] < STACKSIZE))) numa++;
+		if((isvalid[3] = (pot + mynode->potcontrib[3] < STACKSIZE))) numa++;
 	case 3:
-		if(isvalid[2] = (pot + mynode->potcontrib[2] < STACKSIZE)) numa++;
+		if((isvalid[2] = (pot + mynode->potcontrib[2] < STACKSIZE))) numa++;
 	case 2:
-		if(isvalid[1] = (pot + mynode->potcontrib[1] < STACKSIZE)) numa++;
-		if(isvalid[0] = (pot + mynode->potcontrib[0] < STACKSIZE)) numa++;
+		if((isvalid[1] = (pot + mynode->potcontrib[1] < STACKSIZE))) numa++;
+		if((isvalid[0] = (pot + mynode->potcontrib[0] < STACKSIZE))) numa++;
 	}
 
 	return numa;
@@ -369,7 +369,7 @@ inline int getvalidity(const int &pot, betnode const * mynode, bool isvalid[9])
 //grabs a betnode from the trees, and condenses it down to one that does
 //not waste actions, filling in the betnode parameter &bn.
 //used by all the code in the whole solution.
-inline void getnode(int gr, int pot, int beti, betnode &bn)
+void getnode(int gr, int pot, int beti, betnode &bn)
 {
 	//fill in compressed node fromr actual tree node
 	const betnode * treenode = gettree(gr, beti); //the actual tree node

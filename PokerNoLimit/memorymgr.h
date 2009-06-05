@@ -45,7 +45,7 @@ template <int N> struct stratN_t
 				if(temp == 256) temp = 255; //will happen if ratio is exactly one
 				if(temp < 0 || temp > 255)
 					REPORT("failure to divide");
-				strat[a] = unsigned char(temp);
+				strat[a] = (unsigned char)temp;
 			}
 		}
 	}
@@ -71,8 +71,7 @@ extern dataN_t<2> * data2[4];
 
 //used to obtain the correct pointers to the data from the above arrays, 
 //so that other code doesn't need to worry about it.
-extern inline void dataindexing(int gr, int nacts, int actioni, int cardsi, 
-						 float* &stratn, float* &stratd, float* &regret);
+void dataindexing(int gr, int nacts, int actioni, int cardsi, float* &stratn, float* &stratd, float* &regret);
 void initmem();
 void closemem();
 void savestratresult(const char * const filename);

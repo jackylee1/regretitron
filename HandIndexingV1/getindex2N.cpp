@@ -23,7 +23,7 @@ inline bool operator < (const suitrep &a, const suitrep &b)
 //will return 0 when k>n or when n==0
 inline int nchoosek(const int n, const int k)
 {
-	if(!(n>=0 && k>=0)) {std::cout << "invalid n choose k"; system("PAUSE"); exit(1);}
+	if(!(n>=0 && k>=0)) REPORT("invalid n choose k");
 	int ans=1;
 	for(int i=0; i<k; i++)
 	{
@@ -125,9 +125,7 @@ inline int getindex7(const suitrep n[])
 			+ N4*M31 + N3*N2*M21 + M32*N1 + N5*M21 + N4*N2*N1 + M23*N1 + N3*M22 + N6*N1 + N5*N2 + N4*N3;
 
 	default:
-		std::cout << "You called getindex2N with wrong N"; 
-		system("PAUSE"); 
-		exit(1);
+                REPORT("You called getindex2N with wrong N");
 	}
 }
 
@@ -176,9 +174,7 @@ inline int getindex6(const suitrep n[])
 			+ N3*M31 + M22*M21 + N4*M21 + N3*N2*N1 + M32 + N5*N1 + N4*N2 + M23;
 
 	default:
-		std::cout << "You called getindex2N with wrong N"; 
-		system("PAUSE"); 
-		exit(1);
+		REPORT("You called getindex2N with wrong N"); 
 	}
 }
 
@@ -210,9 +206,7 @@ inline int getindex5(const suitrep n[])
 		return n[3].ranki + N2*M31 + N3*M21 + M22*N1 + N4*N1 + N3*N2;
 
 	default:
-		std::cout << "You called getindex2N with wrong N"; 
-		system("PAUSE"); 
-		exit(1);
+		REPORT("You called getindex2N with wrong N");
 	}
 }
 
@@ -361,9 +355,7 @@ int getindex2N(const CardMask& mine, const CardMask& board, const int boardcards
 		break;
 		
 	default:
-		std::cout << "You called getindex2N with wrong N"; 
-		system("PAUSE"); 
-		exit(1);
+                REPORT("You called getindex2N with wrong N");
 	}
 
 	return ret;

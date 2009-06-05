@@ -3,6 +3,7 @@
 #include "../PokerLibrary/constants.h"
 #include "../PokerLibrary/treenolimit.h"
 #include "../PokerLibrary/binstorage.h"
+#include "../portability.h"
 using namespace std;
 
 //global data handles
@@ -20,8 +21,7 @@ int actionmax[4][MAX_ACTIONS-1]; //minus one because single-action nodes don't e
 
 //used to obtain the correct pointers to the data from the above arrays, 
 //so that other code doesn't need to worry about it.
-inline void dataindexing(int gr, int nacts, int actioni, int cardsi, 
-						 float* &stratn, float* &stratd, float* &regret)
+void dataindexing(int gr, int nacts, int actioni, int cardsi, float* &stratn, float* &stratd, float* &regret)
 {
 	switch(nacts)
 	{
@@ -105,12 +105,12 @@ string space(long long bytes)
 	ostringstream o;
 	if(bytes < 1024)
 		o << bytes << " bytes.";
-	else if(bytes < 1024*1024i64)
+	else if(bytes < INT64(1024)*1024)
 		o << fixed << setprecision(1) << (double)bytes / 1024 << "KB";
-	else if(bytes < 1024*1024*1024i64)
-		o << fixed << setprecision(1) << (double)bytes / (1024*1024) << "MB";
-	else if(bytes < 1024*1024*1024*1024i64)
-		o << fixed << setprecision(1) << (double)bytes / (1024*1024*1024) << "GB";
+	else if(bytes < INT64(1024)*1024*1024)
+		o << fixed << setprecision(1) << (double)bytes / (INT64(1024)*1024) << "MB";
+	else if(bytes < INT64(1024)*1024*1024*1024)
+		o << fixed << setprecision(1) << (double)bytes / (INT64(1024)*1024*1024) << "GB";
 	else
 		o << "DAYM that's a lotta memory!";
 	return o.str();
@@ -161,13 +161,13 @@ void initmem()
 	cout << BIN_RIVER_MAX << " river bins use: " << space(rbinbytes) << endl;
 
 	cout << "total: " << space(fbinbytes+tbinbytes+rbinbytes+actionbytes) << endl;
-	system("pause");
+
+        PAUSE();
 
 	for(int gr=PREFLOP; gr<=RIVER; gr++)
 	{
 #define ALLOC(i) data##i[gr] = (actionmax[gr][i-2]>0) ? \
-	new dataN_t<i>[actionmax[gr][i-2]*cards[gr]] : \
-	NULL
+	new dataN_t<i>[actionmax[gr][i-2]*cards[gr]] : NULL
 		ALLOC(9);
 		ALLOC(8);
 		ALLOC(7);

@@ -1,4 +1,5 @@
 #include "poker_defs.h"
+#include "../../portability.h"
 
 /* 
  * Table StdDeck_maskRankTable
@@ -12,17 +13,17 @@ a specific rank.
  */
 
 StdDeck_CardMask StdDeck_maskRankTable[13] = { 
-      { 0xfffefffefffefffei64 }  ,
-      { 0xfffdfffdfffdfffdi64 }  ,
-      { 0xfffbfffbfffbfffbi64 }  ,
-      { 0xfff7fff7fff7fff7i64 }  ,
-      { 0xffefffefffefffefi64 }  ,
-      { 0xffdfffdfffdfffdfi64 }  ,
-      { 0xffbfffbfffbfffbfi64 }  ,
-      { 0xff7fff7fff7fff7fi64 }  ,
-      { 0xfefffefffefffeffi64 }  ,
-      { 0xfdfffdfffdfffdffi64 }  ,
-      { 0xfbfffbfffbfffbffi64 }  ,
-      { 0xf7fff7fff7fff7ffi64 }  ,
-      { 0xefffefffefffefffi64 }  
+      { INT64(0xfffefffefffefffe) }  ,
+      { INT64(0xfffdfffdfffdfffd) }  ,
+      { INT64(0xfffbfffbfffbfffb) }  ,
+      { INT64(0xfff7fff7fff7fff7) }  ,
+      { INT64(0xffefffefffefffef) }  ,
+      { INT64(0xffdfffdfffdfffdf) }  ,
+      { INT64(0xffbfffbfffbfffbf) }  ,
+      { INT64(0xff7fff7fff7fff7f) }  ,
+      { INT64(0xfefffefffefffeff) }  ,
+      { INT64(0xfdfffdfffdfffdff) }  ,
+      { INT64(0xfbfffbfffbfffbff) }  ,
+      { INT64(0xf7fff7fff7fff7ff) }  ,
+      { INT64(0xefffefffefffefff) }  
 };

@@ -14,7 +14,6 @@
 #include <iostream> //cout
 #include <fstream> //needed for saving the strategy file.
 #include <stdio.h>
-#include <tchar.h>
 #include <bitset> //needed for bitsets!
 #include <sstream> //for formatting strings more easily
 #include <string> //needed for some of the rephands shenanigans
@@ -22,20 +21,29 @@
 #include <time.h> //needed benchmark timing
 #include <vector> //for recording exit node table needed for player
 #include <float.h> //for floating point epsilon
+#ifndef _WIN32
+#include <stdlib.h> //for LINUX exit function exit(int)
+#endif
 
 // TinyXML
 #define TIXML_USE_TICPP
 #include "../TinyXML++/ticpp.h"
 
 // PokerEval
-#include "poker_defs.h"
-#include "inlines/eval.h"
+#include <poker_defs.h>
+#include <inlines/eval.h>
 
 // custom global macros
+#include "../portability.h"
 #define REPORT(chars) do{ \
 	std::cout << chars << std::endl; \
-	_asm {int 3}; \
+	ASMBRK; \
 	exit(1); \
+}while(0)
+
+#define PAUSE() do{ \
+   std::cout << "Press enter to continue . . ."; \
+   getchar(); \
 }while(0)
 
 #define PRINTMASK(c) GenericDeck_maskString(&StdDeck, &c)

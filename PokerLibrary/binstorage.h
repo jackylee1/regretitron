@@ -1,6 +1,8 @@
 #ifndef __binstorage_h__
 #define __binstorage_h__
 
+#include "../portability.h"
+
 //takes the total number of bins, bin_max, and returns the minimum number
 //of bits it takes to represent numbers in the range 0..bin_max-1. 
 //we shift out bin_max-1 until no bits are left, counting how many times it takes.
@@ -60,7 +62,7 @@ inline int retrieve(unsigned long long * dataarr, int i, int bin_max)
 	int binsperword = 64/nbits;
 	unsigned long long word = dataarr[i/binsperword];
 	word>>=nbits*(i%binsperword);
-	word&=~(0xffffffffffffffffui64<<nbits);
+	word&=~(UINT64(0xffffffffffffffff)<<nbits);
 	return (int)word;
 }
 
@@ -82,8 +84,8 @@ inline void store(unsigned long long * dataarr, int i, int bin, int bin_max)
 	int binsperword = 64/nbits;
 	int position = i%binsperword;
 	
-	unsigned long long zeromask = 0xffffffffffffffffui64<<(nbits*(position+1));
-	zeromask |= ~(0xffffffffffffffffui64<<(nbits*position));
+	unsigned long long zeromask = UINT64(0xffffffffffffffff)<<(nbits*(position+1));
+	zeromask |= ~(UINT64(0xffffffffffffffff)<<(nbits*position));
 	dataarr[i/binsperword] &= zeromask; //zeroes out the old value
 	
 	unsigned long long bin_bits = bin;

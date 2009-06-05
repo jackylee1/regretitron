@@ -170,9 +170,13 @@ string iterstring(long long iter)
 string timestring(time_t mytime)
 {
 	char mytimestr[32];
+#ifdef _WIN32 //avoid deprecation warning
 	tm mytm;
 	localtime_s(&mytm, &mytime);
 	strftime(mytimestr, 32, "%A, %I:%M %p", &mytm); //Thursday 5:54 PM
+#else
+	strftime(mytimestr, 32, "%A, %I:%M %p", localtime(&mytime)); //Thursday 5:54 PM
+#endif
 	return string(mytimestr);
 }
 
@@ -189,7 +193,6 @@ void simulate(long long iter)
 	clock_t c = clock();
 	for(long long i=0; i<iter; i++)
 	{
-		//system("pause");
 		gs.dealnewgame();
 		for(int i=0; i<4; i++) 
 			for(int j=0; j<MAX_ACTIONS-1; j++)
@@ -248,6 +251,8 @@ int main(int argc, char* argv[])
 
 	closemem();
 	closebins();
+#endif
+#ifdef _WIN32 //in windows, the window will close right away
 	system("PAUSE");
 #endif
 	return 0;
