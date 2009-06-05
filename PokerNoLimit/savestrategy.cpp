@@ -24,11 +24,11 @@ void printfirstnodestrat(char const * const filename)
 	ofstream log(filename);
 	log << fixed << setprecision(5);
 
-	float strataccum;
+	double strataccum;
 	for(int cardsi=CARDSI_PFLOP_MAX-1; cardsi>=0; cardsi--)
 	{
 		//data stuff
-		float * stratn, * stratd, * regret;
+		fp_type * stratn, * stratd, * regret;
 		dataindexing(PREFLOP, numa, 0, cardsi, stratn, stratd, regret);
 
 #if PUSHFOLD
@@ -43,7 +43,7 @@ void printfirstnodestrat(char const * const filename)
 		strataccum=0;
 		for (int a=0; a<numa-1; a++)
 		{
-			float myprob = stratn[a]/stratd[a];
+			double myprob = (double)stratn[a] / *stratd;
 
 			strataccum+=myprob;
 #if PUSHFOLD
@@ -51,7 +51,7 @@ void printfirstnodestrat(char const * const filename)
 			else if (myprob>0.02F)
 #endif
 			log << setw(14) << actionstring(PREFLOP,a,mynode,1.0)+": "
-				<< 100*stratn[a]/stratd[a] << "%" << endl;
+				<< 100*stratn[a] / *stratd << "%" << endl;
 		}
 		//finally, handle the last strat
 #if PUSHFOLD

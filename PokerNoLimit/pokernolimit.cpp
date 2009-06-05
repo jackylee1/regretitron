@@ -13,8 +13,38 @@ GameState gs;
 //counters to help index arrays by walker intances
 int actioncounters[4][MAX_ACTIONS-1]; //minus one because single-action nodes don't exist
 
+//basically the same function as used by memorymgr to only increment actioncounters
+void dummywalker(int gr, int pot, int beti)
+{
+	betnode mynode;
+	getnode(gr, pot, beti, mynode);
+	int numa = mynode.numacts; //for ease of typing
 
-float walker(int gr, int pot, int beti, float prob0, float prob1)
+	actioncounters[gr][numa-2]++;
+
+	for(int a=0; a<numa; a++)
+	{
+		switch(mynode.result[a])
+		{
+		case NA:
+			REPORT("invalid tree");
+		case FD:
+		case AI:
+			continue;
+		case GO:
+			if(gr!=RIVER)
+				dummywalker(gr+1, pot+mynode.potcontrib[a], 0);
+			continue;
+
+		default://child node
+			dummywalker(gr, pot, mynode.result[a]);
+			continue;
+		}
+	}
+}
+
+
+double walker(int gr, int pot, int beti, double prob0, double prob1)
 {
 
 	//obtain definition of possible bets for this turn
@@ -25,7 +55,7 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 
 	//obtain pointers to data for this turn
 
-	float * stratn, * stratd, * regret;
+	fp_type * stratn, * stratd, * regret;
 	dataindexing(gr, numa, actioncounters[gr][numa-2]++, gs.getcardsi((Player)mynode.playertoact, gr), 
 		stratn, stratd, regret);
 
@@ -34,35 +64,53 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 
 	//find total regret
 
-	float totalregret=0;
+	double totalregret=0;
 
 	for(int i=0; i<numa; i++)
 		if (regret[i]>0) totalregret += regret[i];
 
 	//set strategy proportional to positive regret, or 1/numa if no positive regret
 
-	float stratt[MAX_ACTIONS];
+	double stratt[MAX_ACTIONS];
 
 	if (totalregret > 0)
 		for(int i=0; i<numa; i++)
 			(regret[i]>0) ? stratt[i] = regret[i] / totalregret : stratt[i] = 0;
 	else
 		for(int i=0; i<numa; i++)
-			stratt[i] = (float)1/numa;
+			stratt[i] = (double)1/numa;
 
 
 	//NOW, WE WANT TO FIND THE UTILITY OF EACH ACTION. 
 	//WE OFTEN DO THIS BY CALLING WALKER RECURSIVELY.
 
-	float utility[MAX_ACTIONS];
-	float avgutility=0;
+	double utility[MAX_ACTIONS];
+	double avgutility=0;
 
 	for(int i=0; i<numa; i++)
 	{
-		/**** need to call dummy walker here 
+		//utility will be unused, children's regret will be unaffected
+		//performance hack
 		if(stratt[i]==0 && ((mynode.playertoact==0 && prob1==0) || (mynode.playertoact==1 && prob0==0)) )
-			call dummy walker
-			for performance hack ******/
+		{
+			//same code as in dummywalker
+			switch(mynode.result[i])
+			{
+			case NA:
+				REPORT("invalid tree");
+			case FD:
+			case AI:
+				continue;
+			case GO:
+				if(gr!=RIVER)
+					dummywalker(gr+1, pot+mynode.potcontrib[i], 0);
+				continue;
+
+			default://child node
+				dummywalker(gr, pot, mynode.result[i]);
+				continue;
+			}
+		}
 
 		switch(mynode.result[i])
 		{
@@ -110,10 +158,8 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 		if(prob0!=0)
 		{
 			for(int a=0; a<numa-1; a++)
-			{
 				stratn[a] += prob0 * stratt[a];
-				stratd[a] += prob0;
-			}
+			*stratd += prob0;
 		}
 
 		//shortcut
@@ -128,10 +174,8 @@ float walker(int gr, int pot, int beti, float prob0, float prob1)
 		if(prob1!=0)
 		{
 			for(int a=0; a<numa-1; a++)
-			{
 				stratn[a] += prob1 * stratt[a];
-				stratd[a] += prob1;
-			}
+			*stratd += prob1;
 		}
 
 		//shortcut
@@ -222,7 +266,12 @@ inline void playgame()
 		total+=i;
 		cout << "saving log of first node strat." << endl;
 		ostringstream o;
-		o << "output/6ss-256,90,32bins-" << iterstring(total) << "-seed42-testwindivnodes.txt";
+		o << "output/test-doublefloat-dummywalker-" << iterstring(total) 
+#ifdef _WIN32
+			<< "-win.txt";
+#else
+			<< "-linux.txt";
+#endif
 		printfirstnodestrat(o.str().c_str());
 #if SAVESTRATEGYFILE
 		if(total >= 500*THOUSAND)
@@ -234,6 +283,7 @@ inline void playgame()
 		}
 #endif
 		i*=2;
+		if(i>3*MILLION) break;
 	}
 }
 
@@ -253,7 +303,7 @@ int main(int argc, char* argv[])
 	closebins();
 #endif
 #ifdef _WIN32 //in windows, the window will close right away
-	system("PAUSE");
+	PAUSE();
 #endif
 	return 0;
 }

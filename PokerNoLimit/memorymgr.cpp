@@ -21,48 +21,48 @@ int actionmax[4][MAX_ACTIONS-1]; //minus one because single-action nodes don't e
 
 //used to obtain the correct pointers to the data from the above arrays, 
 //so that other code doesn't need to worry about it.
-void dataindexing(int gr, int nacts, int actioni, int cardsi, float* &stratn, float* &stratd, float* &regret)
+void dataindexing(int gr, int nacts, int actioni, int cardsi, fp_type* &stratn, fp_type* &stratd, fp_type* &regret)
 {
 	switch(nacts)
 	{
 	case 9:
 		stratn = data9[gr][cardsi*actionmax[gr][7] + actioni].stratn;
-		stratd = data9[gr][cardsi*actionmax[gr][7] + actioni].stratd;
+		stratd = &(data9[gr][cardsi*actionmax[gr][7] + actioni].stratd);
 		regret = data9[gr][cardsi*actionmax[gr][7] + actioni].regret;
 		return;
 	case 8:
 		stratn = data8[gr][cardsi*actionmax[gr][6] + actioni].stratn;
-		stratd = data8[gr][cardsi*actionmax[gr][6] + actioni].stratd;
+		stratd = &(data8[gr][cardsi*actionmax[gr][6] + actioni].stratd);
 		regret = data8[gr][cardsi*actionmax[gr][6] + actioni].regret;
 		return;
 	case 7:
 		stratn = data7[gr][cardsi*actionmax[gr][5] + actioni].stratn;
-		stratd = data7[gr][cardsi*actionmax[gr][5] + actioni].stratd;
+		stratd = &(data7[gr][cardsi*actionmax[gr][5] + actioni].stratd);
 		regret = data7[gr][cardsi*actionmax[gr][5] + actioni].regret;
 		return;
 	case 6:
 		stratn = data6[gr][cardsi*actionmax[gr][4] + actioni].stratn;
-		stratd = data6[gr][cardsi*actionmax[gr][4] + actioni].stratd;
+		stratd = &(data6[gr][cardsi*actionmax[gr][4] + actioni].stratd);
 		regret = data6[gr][cardsi*actionmax[gr][4] + actioni].regret;
 		return;
 	case 5:
 		stratn = data5[gr][cardsi*actionmax[gr][3] + actioni].stratn;
-		stratd = data5[gr][cardsi*actionmax[gr][3] + actioni].stratd;
+		stratd = &(data5[gr][cardsi*actionmax[gr][3] + actioni].stratd);
 		regret = data5[gr][cardsi*actionmax[gr][3] + actioni].regret;
 		return;
 	case 4:
 		stratn = data4[gr][cardsi*actionmax[gr][2] + actioni].stratn;
-		stratd = data4[gr][cardsi*actionmax[gr][2] + actioni].stratd;
+		stratd = &(data4[gr][cardsi*actionmax[gr][2] + actioni].stratd);
 		regret = data4[gr][cardsi*actionmax[gr][2] + actioni].regret;
 		return;
 	case 3:
 		stratn = data3[gr][cardsi*actionmax[gr][1] + actioni].stratn;
-		stratd = data3[gr][cardsi*actionmax[gr][1] + actioni].stratd;
+		stratd = &(data3[gr][cardsi*actionmax[gr][1] + actioni].stratd);
 		regret = data3[gr][cardsi*actionmax[gr][1] + actioni].regret;
 		return;
 	case 2:
 		stratn = data2[gr][cardsi*actionmax[gr][0] + actioni].stratn;
-		stratd = data2[gr][cardsi*actionmax[gr][0] + actioni].stratd;
+		stratd = &(data2[gr][cardsi*actionmax[gr][0] + actioni].stratd);
 		regret = data2[gr][cardsi*actionmax[gr][0] + actioni].regret;
 		return;
 	default:

@@ -4,6 +4,9 @@
 //below constants depend on these constants.
 #include "../HandIndexingV1/constants.h"
 
+//the datatype used for all calculation data. precision vs memory usage
+typedef float fp_type;
+
 const int PREFLOP = 0;
 const int FLOP = 1;
 const int TURN = 2;

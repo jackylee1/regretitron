@@ -25,6 +25,9 @@
 #include <stdlib.h> //for LINUX exit function exit(int)
 #endif
 
+//things specific to Windows and Linux
+#include "../portability.h" //needed for ASMBRK below, PAUSE(), etc..
+
 // TinyXML
 #define TIXML_USE_TICPP
 #include "../TinyXML++/ticpp.h"
@@ -34,16 +37,10 @@
 #include <inlines/eval.h>
 
 // custom global macros
-#include "../portability.h"
 #define REPORT(chars) do{ \
 	std::cout << chars << std::endl; \
 	ASMBRK; \
 	exit(1); \
-}while(0)
-
-#define PAUSE() do{ \
-   std::cout << "Press enter to continue . . ."; \
-   getchar(); \
 }while(0)
 
 #define PRINTMASK(c) GenericDeck_maskString(&StdDeck, &c)
