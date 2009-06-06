@@ -4,13 +4,15 @@
 //below constants depend on these constants.
 #include "../HandIndexingV1/constants.h"
 
-//the datatype used for all calculation data. precision vs memory usage
+//the datatype used for all calculation data. precision vs memory usage & performance
 typedef long double fpworking_type; //for intermediate types used by walker (affects performance)
-typedef double fpstore_type; //for storage in data arrays managed by memorymgr (affects memory usage)
-const char SAVENAME[] = "test-w80,s64";
+typedef float fpstore_type; //for storage in data arrays managed by memorymgr (affects memory usage)
+const char SAVENAME[] = "test-w80,s64-multithread1";
 
 #define STORENTHSTRAT 1 //whether we store the Nth strategy value, or calculate it assuming all add to one.
 #define PRINTSUM 1 //only affects printfirstnodestrat and only if STORENTHSTRAT is on
+
+#define NUM_THREADS 1
 
 const int PREFLOP = 0;
 const int FLOP = 1;

@@ -8,19 +8,22 @@
 #include "../mymersenne.h"
 using namespace std;
 
-//global gamestate class instance.
-GameState gs;
-//counters to help index arrays by walker intances
-int actioncounters[4][MAX_ACTIONS-1]; //minus one because single-action nodes don't exist
+//needs to be accessible by dummywalker and actual walker
+struct threaddata_t
+{
+	int cardsi[4][2]; // 4 gamerounds, 2 players.
+	int twoprob0wins;
+	int actioncounters[4][MAX_ACTIONS-1]; //minus one because single-action nodes don't exist
+} threaddata[NUM_THREADS];
 
 //basically the same function as used by memorymgr to only increment actioncounters
-void dummywalker(int gr, int pot, int beti)
+void dummywalker(int id, int gr, int pot, int beti)
 {
 	betnode mynode;
 	getnode(gr, pot, beti, mynode);
 	int numa = mynode.numacts; //for ease of typing
 
-	actioncounters[gr][numa-2]++;
+	threaddata[id].actioncounters[gr][numa-2]++;
 
 	for(int a=0; a<numa; a++)
 	{
@@ -33,18 +36,18 @@ void dummywalker(int gr, int pot, int beti)
 			continue;
 		case GO:
 			if(gr!=RIVER)
-				dummywalker(gr+1, pot+mynode.potcontrib[a], 0);
+				dummywalker(id, gr+1, pot+mynode.potcontrib[a], 0);
 			continue;
 
 		default://child node
-			dummywalker(gr, pot, mynode.result[a]);
+			dummywalker(id, gr, pot, mynode.result[a]);
 			continue;
 		}
 	}
 }
 
 
-fpworking_type walker(int gr, int pot, int beti, fpworking_type prob0, fpworking_type prob1)
+fpworking_type walker(int id, int gr, int pot, int beti, fpworking_type prob0, fpworking_type prob1)
 {
 
 	//obtain definition of possible bets for this turn
@@ -56,7 +59,9 @@ fpworking_type walker(int gr, int pot, int beti, fpworking_type prob0, fpworking
 	//obtain pointers to data for this turn
 
 	fpstore_type * stratn, * stratd, * regret;
-	dataindexing(gr, numa, actioncounters[gr][numa-2]++, gs.getcardsi((Player)mynode.playertoact, gr), 
+	dataindexing(gr, numa, 
+		threaddata[id].actioncounters[gr][numa-2]++, 
+		threaddata[id].cardsi[gr][(int)mynode.playertoact], 
 		stratn, stratd, regret);
 
 
@@ -103,11 +108,11 @@ fpworking_type walker(int gr, int pot, int beti, fpworking_type prob0, fpworking
 				continue;
 			case GO:
 				if(gr!=RIVER)
-					dummywalker(gr+1, pot+mynode.potcontrib[i], 0);
+					dummywalker(id, gr+1, pot+mynode.potcontrib[i], 0);
 				continue;
 
 			default://child node
-				dummywalker(gr, pot, mynode.result[i]);
+				dummywalker(id, gr, pot, mynode.result[i]);
 				continue;
 			}
 		}
@@ -118,18 +123,18 @@ fpworking_type walker(int gr, int pot, int beti, fpworking_type prob0, fpworking
 			REPORT("Invalid betting tree node action reached."); //will exit
 
 		case AI: //called allin
-			utility[i] = STACKSIZE * (gs.gettwoprob0wins()-1);
+			utility[i] = STACKSIZE * (threaddata[id].twoprob0wins-1);
 			break;
 
 		case GO: //next game round
 			if(gr==RIVER)// showdown
-				utility[i] = (pot+mynode.potcontrib[i]) * (gs.gettwoprob0wins()-1);
+				utility[i] = (pot+mynode.potcontrib[i]) * (threaddata[id].twoprob0wins-1);
 			else 
 			{
 				if(mynode.playertoact==0)
-					utility[i] = walker(gr+1, pot+mynode.potcontrib[i], 0, prob0*stratt[i], prob1);
+					utility[i] = walker(id, gr+1, pot+mynode.potcontrib[i], 0, prob0*stratt[i], prob1);
 				else
-					utility[i] = walker(gr+1, pot+mynode.potcontrib[i], 0, prob0, prob1*stratt[i]);
+					utility[i] = walker(id, gr+1, pot+mynode.potcontrib[i], 0, prob0, prob1*stratt[i]);
 			}
 			break;
 
@@ -139,9 +144,9 @@ fpworking_type walker(int gr, int pot, int beti, fpworking_type prob0, fpworking
 
 		default: //child node within this game round
 			if(mynode.playertoact==0)
-				utility[i] = walker(gr, pot, mynode.result[i], prob0*stratt[i], prob1);
+				utility[i] = walker(id, gr, pot, mynode.result[i], prob0*stratt[i], prob1);
 			else
-				utility[i] = walker(gr, pot, mynode.result[i], prob0, prob1*stratt[i]);
+				utility[i] = walker(id, gr, pot, mynode.result[i], prob0, prob1*stratt[i]);
 		}
 
 		avgutility += stratt[i]*utility[i];
@@ -198,6 +203,117 @@ fpworking_type walker(int gr, int pot, int beti, fpworking_type prob0, fpworking
 	return avgutility;
 }
 
+//-----------------------t h r e a d-------------------------------//
+
+//global gamestate class instance.
+GameState gs;
+
+//number of iterations remaining
+long long iterations;
+
+#if __GNUC__ && NUM_THREADS > 1
+//eventually one lock per player per gameround per cardsi
+pthread_mutex_t * cardsilocks[4];
+pthread_mutex_t threaddatalock;
+
+void initlocks()
+{
+	cardsilocks[PREFLOP] = new pthread_mutex_t[2*CARDSI_PFLOP_MAX];
+	cardsilocks[FLOP] = new pthread_mutex_t[2*CARDSI_FLOP_MAX];
+	cardsilocks[TURN] = new pthread_mutex_t[2*CARDSI_TURN_MAX];
+	cardsilocks[RIVER] = new pthread_mutex_t[2*CARDSI_RIVER_MAX];
+	for(int i=0; i<2*CARDSI_PFLOP_MAX; i++)
+		pthread_mutex_init(&cardsilocks[PREFLOP][i], NULL);
+	for(int i=0; i<2*CARDSI_FLOP_MAX; i++)
+		pthread_mutex_init(&cardsilocks[FLOP][i], NULL);
+	for(int i=0; i<2*CARDSI_TURN_MAX; i++)
+		pthread_mutex_init(&cardsilocks[TURN][i], NULL);
+	for(int i=0; i<2*CARDSI_RIVER_MAX; i++)
+		pthread_mutex_init(&cardsilocks[RIVER][i], NULL);
+	pthread_mutex_init(&threaddatalock, NULL);
+}
+#endif
+
+void* threadloop(void* threadnum)
+{
+	long myid = (long)threadnum;
+	if(myid<0 || myid>=NUM_THREADS)
+		REPORT("failure of pointer casting");
+	int id = (int)myid;
+
+	for(int i=0; i<4; i++) 
+		for(int j=0; j<MAX_ACTIONS-1; j++)
+			threaddata[id].actioncounters[i][j] = 0;
+
+	while(1)
+	{
+#if __GNUC__ && NUM_THREADS > 1
+		pthread_mutex_lock(&threaddatalock);
+#endif
+		if(iterations==0)
+		{
+#if __GNUC__ && NUM_THREADS > 1
+			pthread_mutex_unlock(&threaddatalock);
+#endif
+			break; //nothing left to be done
+		}
+		iterations--;
+		gs.dealnewgame();
+		for(int gr=PREFLOP; gr<=RIVER; gr++)
+		{
+			threaddata[id].cardsi[gr][P0] = gs.getcardsi(P0,gr);
+			threaddata[id].cardsi[gr][P1] = gs.getcardsi(P1,gr);
+		}
+		threaddata[id].twoprob0wins = gs.gettwoprob0wins();
+#if __GNUC__ && NUM_THREADS > 1
+		pthread_mutex_lock(&cardsilocks[PREFLOP][threaddata[id].cardsi[PREFLOP][P0]*2 + P0]);
+		pthread_mutex_lock(&cardsilocks[PREFLOP][threaddata[id].cardsi[PREFLOP][P1]*2 + P1]);
+		pthread_mutex_lock(&cardsilocks[FLOP][threaddata[id].cardsi[FLOP][P0]*2 + P0]);
+		pthread_mutex_lock(&cardsilocks[FLOP][threaddata[id].cardsi[FLOP][P1]*2 + P1]);
+		pthread_mutex_lock(&cardsilocks[TURN][threaddata[id].cardsi[TURN][P0]*2 + P0]);
+		pthread_mutex_lock(&cardsilocks[TURN][threaddata[id].cardsi[TURN][P1]*2 + P1]);
+		pthread_mutex_lock(&cardsilocks[RIVER][threaddata[id].cardsi[RIVER][P0]*2 + P0]);
+		pthread_mutex_lock(&cardsilocks[RIVER][threaddata[id].cardsi[RIVER][P1]*2 + P1]);
+		pthread_mutex_unlock(&threaddatalock);
+#endif
+		walker((int)myid,PREFLOP,0,0,1,1);
+#if __GNUC__ && NUM_THREADS > 1
+		pthread_mutex_unlock(&cardsilocks[PREFLOP][threaddata[id].cardsi[PREFLOP][P0]*2 + P0]);
+		pthread_mutex_unlock(&cardsilocks[PREFLOP][threaddata[id].cardsi[PREFLOP][P1]*2 + P1]);
+		pthread_mutex_unlock(&cardsilocks[FLOP][threaddata[id].cardsi[FLOP][P0]*2 + P0]);
+		pthread_mutex_unlock(&cardsilocks[FLOP][threaddata[id].cardsi[FLOP][P1]*2 + P1]);
+		pthread_mutex_unlock(&cardsilocks[TURN][threaddata[id].cardsi[TURN][P0]*2 + P0]);
+		pthread_mutex_unlock(&cardsilocks[TURN][threaddata[id].cardsi[TURN][P1]*2 + P1]);
+		pthread_mutex_unlock(&cardsilocks[RIVER][threaddata[id].cardsi[RIVER][P0]*2 + P0]);
+		pthread_mutex_unlock(&cardsilocks[RIVER][threaddata[id].cardsi[RIVER][P1]*2 + P1]);
+#endif
+		for(int i=0; i<4; i++) 
+			for(int j=0; j<MAX_ACTIONS-1; j++)
+				threaddata[id].actioncounters[i][j] = 0;
+	}
+	return NULL;
+}
+
+void doloops(long long iter)
+{
+	iterations = iter; //set the number of iterations to do
+#if __GNUC__ && NUM_THREADS>1
+	//pop those babies off
+	pthread_t threads[NUM_THREADS-1];
+	for(int i=0; i<NUM_THREADS-1; i++)
+		if(pthread_create(&(threads[i]), NULL, threadloop, (void *)i))
+			REPORT("error creating thread");
+#endif
+	//use current thread too
+	threadloop((void*)(NUM_THREADS-1)); //the nth thread is the main one
+#if __GNUC__ && NUM_THREADS>1
+	//wait for them all to return
+	for(int i=0; i<NUM_THREADS-1; i++)
+		if(pthread_join(threads[i],NULL))
+			REPORT("error joining thread");
+#endif
+}
+
 
 //------------------------ p l a y g a m e -------------------------//
 const long long MILLION = 1000000;
@@ -240,19 +356,12 @@ void simulate(long long iter)
 		cout << "Expect to finish on " 
 			<< timestring(time(NULL)+iter/prevrate) << endl;
 
-	clock_t c = clock();
-	for(long long i=0; i<iter; i++)
-	{
-		gs.dealnewgame();
-		for(int i=0; i<4; i++) 
-			for(int j=0; j<MAX_ACTIONS-1; j++)
-				actioncounters[i][j] = 0;
-		walker(PREFLOP,0,0,1,1);
-	}
-	clock_t diff = clock()-c;
-	prevrate = (float) iter * CLOCKS_PER_SEC / (float) diff;
+	time_t t = time(NULL);
+	doloops(iter);
+	double diff = difftime(time(NULL), t);
+	prevrate = iter / diff;
 
-	cout << "...took " << float(diff)/CLOCKS_PER_SEC << " seconds. ("
+	cout << "...took " << diff << " seconds. ("
 		<< prevrate << " per second)." << endl;
 }
 
@@ -264,8 +373,8 @@ inline void playgame()
 	cout << "starting work..." << endl;
 	long long i=25*THOUSAND;
 	long long total=0;
-	simulate(100);
-	simulate(i-100);
+	simulate(1000);
+	simulate(i-1000);
 	total+=i;
 	while(1)
 	{
@@ -301,6 +410,9 @@ int main(int argc, char* argv[])
 	initbettingtrees();
 	initmem();
 	initbins();
+#if __GNUC__ && NUM_THREADS > 1
+	initlocks();
+#endif
 
 	mersenne.seed(42);
 

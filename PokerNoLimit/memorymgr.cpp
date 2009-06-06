@@ -149,9 +149,12 @@ void initmem()
 		for(int a=0; a<MAX_ACTIONS-1; a++)
 		{
 			long long mybytes = actionmax[gr][a]*size[a]*cards[gr];
-			actionbytes += mybytes;
-			cout << "round " << gr << " uses " << actionmax[gr][a] << " nodes with " << a+2 
-				<< " members for a total of " << space(mybytes) << endl;
+			if(mybytes>0)
+			{
+				actionbytes += mybytes;
+				cout << "round " << gr << " uses " << actionmax[gr][a] << " nodes with " << a+2 
+					<< " members for a total of " << space(mybytes) << endl;
+			}
 		}
 	}
 

@@ -22,7 +22,9 @@
 #include <vector> //for recording exit node table needed for player
 #include <float.h> //for floating point epsilon
 #include <numeric> //for accumulate
-#ifndef _WIN32
+#if __GNUC__ && NUM_THREADS > 1
+#include <pthread.h> //for THREADS!!
+#elif __GNUC__
 #include <stdlib.h> //for LINUX exit function exit(int)
 #endif
 

@@ -15,7 +15,7 @@ endif
 # define library paths in addition to /usr/lib
 LFLAGS := -Llib
 # define any libraries to link into executable:
-LFLAGS += -lticpp$(CFGFLAG)
+LFLAGS += -lticpp$(CFGFLAG) -lpthread
 
 # define the output executable file
 # OUT is used by clean. MYOUT is used for compiling to.
