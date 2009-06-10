@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "getindex2N.h"
 #include "constants.h"
+#include "../utility.h"
 
 struct suitrep //represents cards in a certain suit by number of cards and their ranks
 {

@@ -41,7 +41,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="../pokereval/include;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;TIXML_USE_STL"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -126,7 +126,7 @@
 				FavorSizeOrSpeed="0"
 				OmitFramePointers="true"
 				AdditionalIncludeDirectories="../pokereval/include;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				PreprocessorDefinitions="TIXML_USE_STL;WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
@@ -194,15 +194,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\mymersenne.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\PokerNoLimit.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\savestrategy.cpp"
+				RelativePath=".\solver.cpp"
 				>
 			</File>
 			<File
@@ -236,23 +232,19 @@
 				>
 			</File>
 			<File
-				RelativePath="..\mymersenne.h"
+				RelativePath=".\solveparams.h"
 				>
 			</File>
 			<File
-				RelativePath="..\portability.h"
-				>
-			</File>
-			<File
-				RelativePath="..\SharedCode\report.h"
-				>
-			</File>
-			<File
-				RelativePath=".\savestrategy.h"
+				RelativePath=".\solver.h"
 				>
 			</File>
 			<File
 				RelativePath=".\stdafx.h"
+				>
+			</File>
+			<File
+				RelativePath="..\utility.h"
 				>
 			</File>
 		</Filter>

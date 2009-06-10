@@ -1,178 +1,125 @@
 #include "stdafx.h"
 #include "memorymgr.h"
-#include "../PokerLibrary/constants.h"
+#include "../PokerLibrary/cardmachine.h" //for cardsi_max
 #include "../PokerLibrary/treenolimit.h"
-#include "../PokerLibrary/binstorage.h"
-#include "../portability.h"
+#include "../utility.h"
+#include <iostream> //for allocate function
+#include <fstream> //for save function
+#include <sstream> //for space function
+#include <iomanip> //for space function
+#include <numeric> //for accumulate
 using namespace std;
 
-//global data handles
-dataN_t<9> * data9[4];
-dataN_t<8> * data8[4];
-dataN_t<7> * data7[4];
-dataN_t<6> * data6[4];
-dataN_t<5> * data5[4];
-dataN_t<4> * data4[4];
-dataN_t<3> * data3[4];
-dataN_t<2> * data2[4];
-
-//needed to be saved later for lookup table to traverse tree during real game
-int actionmax[4][MAX_ACTIONS-1]; //minus one because single-action nodes don't exist
-
-//used to obtain the correct pointers to the data from the above arrays, 
-//so that other code doesn't need to worry about it.
-void dataindexing(int gr, int nacts, int actioni, int cardsi, fpstore_type* &stratn, fpstore_type* &stratd, fpstore_type* &regret)
+template <int N>
+dataN_t<N>::dataN_t() //initialize all to zero
 {
-	switch(nacts)
-	{
-	case 9:
-		stratn = data9[gr][cardsi*actionmax[gr][7] + actioni].stratn;
-		stratd = &(data9[gr][cardsi*actionmax[gr][7] + actioni].stratd);
-		regret = data9[gr][cardsi*actionmax[gr][7] + actioni].regret;
-		return;
-	case 8:
-		stratn = data8[gr][cardsi*actionmax[gr][6] + actioni].stratn;
-		stratd = &(data8[gr][cardsi*actionmax[gr][6] + actioni].stratd);
-		regret = data8[gr][cardsi*actionmax[gr][6] + actioni].regret;
-		return;
-	case 7:
-		stratn = data7[gr][cardsi*actionmax[gr][5] + actioni].stratn;
-		stratd = &(data7[gr][cardsi*actionmax[gr][5] + actioni].stratd);
-		regret = data7[gr][cardsi*actionmax[gr][5] + actioni].regret;
-		return;
-	case 6:
-		stratn = data6[gr][cardsi*actionmax[gr][4] + actioni].stratn;
-		stratd = &(data6[gr][cardsi*actionmax[gr][4] + actioni].stratd);
-		regret = data6[gr][cardsi*actionmax[gr][4] + actioni].regret;
-		return;
-	case 5:
-		stratn = data5[gr][cardsi*actionmax[gr][3] + actioni].stratn;
-		stratd = &(data5[gr][cardsi*actionmax[gr][3] + actioni].stratd);
-		regret = data5[gr][cardsi*actionmax[gr][3] + actioni].regret;
-		return;
-	case 4:
-		stratn = data4[gr][cardsi*actionmax[gr][2] + actioni].stratn;
-		stratd = &(data4[gr][cardsi*actionmax[gr][2] + actioni].stratd);
-		regret = data4[gr][cardsi*actionmax[gr][2] + actioni].regret;
-		return;
-	case 3:
-		stratn = data3[gr][cardsi*actionmax[gr][1] + actioni].stratn;
-		stratd = &(data3[gr][cardsi*actionmax[gr][1] + actioni].stratd);
-		regret = data3[gr][cardsi*actionmax[gr][1] + actioni].regret;
-		return;
-	case 2:
-		stratn = data2[gr][cardsi*actionmax[gr][0] + actioni].stratn;
-		stratd = &(data2[gr][cardsi*actionmax[gr][0] + actioni].stratd);
-		regret = data2[gr][cardsi*actionmax[gr][0] + actioni].regret;
-		return;
-	default:
-		REPORT("invalid number of actions");
-	}
+	for(int a=0; a<N; a++)
+		regret[a] = stratn[a] = 0;
+#if STORE_DENOM
+	stratd = 0;
+#endif
 }
 
-//helper recursive function for initmem
-void walkercount(int gr, int pot, int beti)
+//probability 0 is mapped to 0
+//probability 1 is mapped to 256
+//then is rounded down, to yeild number 0-255, with all number used equally.
+template <int N>
+stratN_t<N>::stratN_t(const dataN_t<N> &data)
 {
-	betnode mynode;
-	getnode(gr, pot, beti, mynode);
-	int numa = mynode.numacts; //for ease of typing
+	fpworking_type denominator = accumulate(data.stratn, data.stratn+N, (fpworking_type)0);
 
-	actionmax[gr][numa-2]++;
-
-	for(int a=0; a<numa; a++)
+	for(int a=0; a<N-1; a++)
 	{
-		switch(mynode.result[a])
+		//if we just didn't get there, then the numerator would also be zero
+		if (denominator==0 && data.stratn[a]!=0) 
+			REPORT("zero denominator!");
+		//could have just never gotten there, will happen for short iteration runs
+		else if(denominator==0 && data.stratn[a]==0) 
+			strat[a] = 0; //would evaluate to infinity otherwise
+		else
 		{
-		case NA:
-			REPORT("invalid tree");
-		case FD:
-		case AI:
-			continue;
-		case GO:
-			if(gr!=RIVER)
-				walkercount(gr+1, pot+mynode.potcontrib[a], 0);
-			continue;
-
-		default://child node
-			walkercount(gr, pot, mynode.result[a]);
+			int temp = int((fpworking_type)256.0 * data.stratn[a] / denominator);
+			if(temp == 256) temp = 255; //will happen if ratio is exactly one
+			if(temp < 0 || temp > 255)
+				REPORT("failure to divide");
+			strat[a] = (unsigned char)temp;
 		}
 	}
 }
 
 //pretty formatted bytes printing
-string space(long long bytes)
+//used by below function
+string space(int64 bytes)
 {
 	ostringstream o;
 	if(bytes < 1024)
 		o << bytes << " bytes.";
-	else if(bytes < 1024LL*1024)
+	else if(bytes < 1024*1024)
 		o << fixed << setprecision(1) << (double)bytes / 1024 << "KB";
-	else if(bytes < 1024LL*1024*1024)
-		o << fixed << setprecision(1) << (double)bytes / (1024LL*1024) << "MB";
-	else if(bytes < 1024LL*1024*1024*1024)
-		o << fixed << setprecision(1) << (double)bytes / (1024LL*1024*1024) << "GB";
+	else if(bytes < 1024*1024*1024)
+		o << fixed << setprecision(1) << (double)bytes / (1024*1024) << "MB";
+	else if(bytes < 1024LL*1024LL*1024LL*1024LL)
+		o << fixed << setprecision(1) << (double)bytes / (1024*1024*1024) << "GB";
 	else
 		o << "DAYM that's a lotta memory!";
 	return o.str();
 }
 	
 //cout how much memory will use, then allocate it
-void initmem()
+MemoryManager::MemoryManager(const BettingTree &tree, const CardMachine &cardmach)
 {
-	clock_t c = clock();
-	walkercount(0,0,0);
-	clock_t diff = clock()-c;
-	cout << "...took " << (float)diff/CLOCKS_PER_SEC << " seconds." << endl;
+	GetTreeSize(tree, actionmax); //fills actionmax from the tree
+
+	//print out space requirements, then pause
 
 	cout << "floating point type fpstore_type uses " << sizeof(fpstore_type) << " bytes." << endl;
 
-	long long actionbytes = 0;
-	long long size[MAX_ACTIONS-1];
-	size[7] = sizeof(dataN_t<9>);
-	size[6] = sizeof(dataN_t<8>);
-	size[5] = sizeof(dataN_t<7>);
-	size[4] = sizeof(dataN_t<6>);
-	size[3] = sizeof(dataN_t<5>);
-	size[2] = sizeof(dataN_t<4>);
-	size[1] = sizeof(dataN_t<3>);
-	size[0] = sizeof(dataN_t<2>);
-	long long cards[4];
-	cards[0] = CARDSI_PFLOP_MAX;
-	cards[1] = CARDSI_FLOP_MAX;
-	cards[2] = CARDSI_TURN_MAX;
-	cards[3] = CARDSI_RIVER_MAX;
-
-	for(int gr=PREFLOP; gr<=RIVER; gr++)
+	const int64 size[MAX_NODETYPES] =  //for ease of coding
 	{
-		cout << "round " << gr << " uses " << cards[gr] << " card indexings..." << endl;
+		sizeof(dataN_t<2>),
+		sizeof(dataN_t<3>),
+		sizeof(dataN_t<4>),
+		sizeof(dataN_t<5>),
+		sizeof(dataN_t<6>),
+		sizeof(dataN_t<7>),
+		sizeof(dataN_t<8>),
+		sizeof(dataN_t<9>)
+	};
 
-		for(int a=0; a<MAX_ACTIONS-1; a++)
+	int64 totalbytes = 0;
+
+	for(int gr=0; gr<4; gr++)
+	{
+		cout << "round " << gr << " uses " << cardmach.getcardsimax(gr) << " card indexings..." << endl;
+
+		for(int a=0; a<MAX_NODETYPES; a++)
 		{
-			long long mybytes = actionmax[gr][a]*size[a]*cards[gr];
+			int64 mybytes = actionmax[gr][a]*size[a]*cardmach.getcardsimax(gr);
 			if(mybytes>0)
 			{
-				actionbytes += mybytes;
+				totalbytes += mybytes;
 				cout << "round " << gr << " uses " << actionmax[gr][a] << " nodes with " << a+2 
 					<< " members for a total of " << space(mybytes) << endl;
 			}
 		}
 	}
 
-	long long fbinbytes = binfilesize(BIN_FLOP_MAX, INDEX23_MAX);
-	long long tbinbytes = binfilesize(BIN_TURN_MAX, INDEX24_MAX);
-	long long rbinbytes = binfilesize(BIN_RIVER_MAX, INDEX25_MAX);
-	cout << BIN_FLOP_MAX << " flop bins use: " << space(fbinbytes) << endl;
-	cout << BIN_TURN_MAX << " turn bins use: " << space(tbinbytes) << endl;
-	cout << BIN_RIVER_MAX << " river bins use: " << space(rbinbytes) << endl;
+	for(int gr=1; gr<4; gr++)
+	{
+		cout << CARDSETTINGS.bin_max[gr] << " rnd" << gr << " bins use: " << space(CARDSETTINGS.filesize[gr]) << endl;
+		totalbytes += CARDSETTINGS.filesize[gr];
+	}
 
-	cout << "total: " << space(fbinbytes+tbinbytes+rbinbytes+actionbytes) << endl;
+	cout << "total: " << space(totalbytes) << endl;
 
 	PAUSE();
+
+	//now allocate memory
 
 	for(int gr=PREFLOP; gr<=RIVER; gr++)
 	{
 #define ALLOC(i) data##i[gr] = (actionmax[gr][i-2]>0) ? \
-	new dataN_t<i>[actionmax[gr][i-2]*cards[gr]] : NULL
+	new dataN_t<i>[actionmax[gr][i-2]*cardmach.getcardsimax(gr)] : NULL
 		ALLOC(9);
 		ALLOC(8);
 		ALLOC(7);
@@ -185,7 +132,7 @@ void initmem()
 	}
 }
 
-void closemem()
+MemoryManager::~MemoryManager()
 {
 	for(int gr=PREFLOP; gr<=RIVER; gr++)
 	{
@@ -204,75 +151,45 @@ void closemem()
 
 
 
-/*
-void savestratresult(const char * const filename)
+#define WRITEDATA(numa) do{ \
+	/* seek to beginning and write the offset */ \
+	f.seekp(tableoffset); \
+	f.write((char*)&dataoffset, 8); \
+ \
+	/* seek to end and write the data */ \
+	f.seekp(dataoffset); \
+	for(int k=0; k<actionmax[gr][numa-2]*cardmach.getcardsimax(gr); k++) \
+	{ \
+		stratN_t<numa> thisnode(data##numa[gr][k]); \
+		f.write((char*)thisnode.strat, numa-1); \
+	} \
+	dataoffset = f.tellp(); \
+}while(0);
+
+int64 MemoryManager::save(const string &filename, const CardMachine &cardmach)
 {
-	ofstream f(filename, ofstream::binary);
-	int a;
-	
-	//length of preflop exit node table
-	a = pfexitnodes.size();
-	f.write((char*)&a, sizeof(int));
-	//the preflop exit node table
-	for(unsigned int i=0; i<pfexitnodes.size(); i++)
-		f.put(pfexitnodes[i]);
+	ofstream f(("strategy/" + filename + ".strat").c_str(), ofstream::binary);
 
-	//length of flop exit node table
-	a = fexitnodes.size();
-	f.write((char*)&a, sizeof(int));
-	//the flop exit node table
-	for(unsigned int i=0; i<fexitnodes.size(); i++)
+	//this starts at zero, the beginning of the file
+	int64 tableoffset=0;
+
+	//this starts at the size of the table: one 8-byte offset integer per data-array
+	int64 dataoffset= 4 * MAX_NODETYPES * 8;
+
+	for(int gr=0; gr<4; gr++)
 	{
-		f.put(fexitnodes[i].x);
-		f.put(fexitnodes[i].y);
+		WRITEDATA(9);
+		WRITEDATA(8);
+		WRITEDATA(7);
+		WRITEDATA(6);
+		WRITEDATA(5);
+		WRITEDATA(4);
+		WRITEDATA(3);
+		WRITEDATA(2);
 	}
 
-	//length of turn exit node table
-	a = texitnodes.size();
-	f.write((char*)&a, sizeof(int));
-	//the flop exit node table
-	for(unsigned int i=0; i<texitnodes.size(); i++)
-	{
-		f.put(texitnodes[i].x);
-		f.put(texitnodes[i].y);
-		f.put(texitnodes[i].z);
-	}
+	f.close();
 
-	//the preflop betting tree
-	for(int c=0; c<CARDSI_PFLOP_MAX; c++)
-	{
-		treestrat_t mystrat(pftreebase->treedata[c]);
-		f.write((char*)&mystrat, sizeof(treestrat_t));
-	}
-
-	//the flop betting trees
-	for(unsigned int b=0; b<pfexitnodes.size(); b++)
-	{
-		for(int c=0; c<CARDSI_FLOP_MAX; c++)
-		{
-			treestrat_t mystrat(ftreebase[b].treedata[c]);
-			f.write((char*)&mystrat, sizeof(treestrat_t));
-		}
-	}
-
-	//the turn betting trees
-	for(unsigned int b=0; b<fexitnodes.size(); b++)
-	{
-		for(int c=0; c<CARDSI_TURN_MAX; c++)
-		{
-			treestrat_t mystrat(ttreebase[b].treedata[c]);
-			f.write((char*)&mystrat, sizeof(treestrat_t));
-		}
-	}
-
-	//the river betting trees
-	for(unsigned int b=0; b<texitnodes.size(); b++)
-	{
-		for(int c=0; c<CARDSI_RIVER_MAX; c++)
-		{
-			treestrat_t mystrat(rtreebase[b].treedata[c]);
-			f.write((char*)&mystrat, sizeof(treestrat_t));
-		}
-	}
+	return dataoffset;
 }
-*/
+

@@ -1,32 +1,100 @@
 #ifndef _treenolimit_h_
 #define _treenolimit_h_
 
-#include "constants.h"
+#include "constants.h" //needed for MAX_ACTIONS and gamerounds
+#include <vector> //needed for GetTreeSize
+#include <string>
+using namespace std;
 
 
-//the data in this struct defines which actions are available at any point
-//and what the consequences of an action are.
-struct betnode
+//used to set the betting values, and hence the entire tree shape
+struct treesettings_t
+{
+	unsigned char sblind, bblind;
+	unsigned char bets[6];
+	unsigned char raises[6][6];
+	unsigned char stacksize;
+	bool pushfold;
+};
+
+struct BetNode
 {  
 	char playertoact; // zero or one, may be casted to Player type
 	char numacts; // the total number of actions available at this node
 
-	//FD for fold, GO is next round, AI is called all-in, child number for more betting
+	//this is hardcoded in the tree
 	unsigned char result[MAX_ACTIONS]; 
 
-	//how much is needed for this action, 
-	//same as how much the pot gains if this action ends the round
+	//values used for result[], if not a child node
+	static const unsigned char NA=0xFF; //invalid action
+	static const unsigned char AI=0xFE; //action is called all-in
+	static const unsigned char FD=0xFD; //action is fold
+	static const unsigned char GO=0xFC; //action ends betting for this round
+
+	//how much is needed for this action / how much pot gains if betting ends
 	unsigned char potcontrib[MAX_ACTIONS]; 
 };
 
-//used to get a condensed betnode type structure.
-void getnode(int gr, int pot, int beti, betnode &bn);
+class BettingTree
+{
+public:
 
-//must be called before anything else
-void initbettingtrees();
+	BettingTree(const treesettings_t &mysettings);
+	~BettingTree();
 
-//tells you if a node is betting all in based on the result and potcontrib values
-bool isallin(int result, int potcontrib, int gr);
+	//given a beti, pot, and gameround, gives you available bets
+	//including children (of actions) referenced by beti
+	inline void getnode(int gr, int pot, int beti, BetNode &bn) const;
+
+	bool isallin(int result, int potcontrib, int gr) const;
+	string actionstring(int gr, int action, const BetNode &bn, double multiplier) const;
+	inline int getstacksize() const { return stacksize; }
+	inline bool ispushfold() const { return pushfold; }
+
+private:
+	//none of these are altered after the constructor is done
+	BetNode * tree[4];
+	const int sblind;
+	const int bblind;
+	const int stacksize;
+	const bool pushfold;
+
+	//the size of the betting tree
+	static const int N_NODES = 172;
+};
+
+inline void BettingTree::getnode(int gr, int pot, int beti, BetNode &bn) const
+{
+	bn.playertoact = tree[gr][beti].playertoact;
+	bn.numacts = 0;
+	for(int i=0; i < tree[gr][beti].numacts; i++)
+	{
+		if(pot + tree[gr][beti].potcontrib[i] < stacksize)
+		{
+			bn.potcontrib[(int)bn.numacts] = tree[gr][beti].potcontrib[i];
+			bn.result[(int)bn.numacts] = tree[gr][beti].result[i];
+			bn.numacts++;
+		}
+	}
+}
+
+class GetTreeSize
+{
+public:
+	GetTreeSize(const BettingTree &tree, vector<vector<int> > &actionmax);
+private:
+	void walkercount(int gr, int pot, int beti);
+	const BettingTree &mytree;
+	vector<vector<int> > &myactionmax;
+};
+
+
+
+
+
+
+
+//------------------- code i may use in future --------------------
 
 // may switch to this type of system in the future
 #if 0

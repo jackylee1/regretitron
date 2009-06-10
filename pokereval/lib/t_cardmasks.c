@@ -1,5 +1,4 @@
 #include "poker_defs.h"
-#include "../../portability.h"
 
 /* 
  * Table StdDeck_cardMasksTable

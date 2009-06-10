@@ -166,47 +166,6 @@ void printriverhands(ostream &out, int bin, int riverscore, int n)
 }
 
 
-//takes an action index, the gameround, a pointer to the relevant
-//betting tree node, and a multiplier.
-//returns a string that reports info on what that action represents.
-//it's units are the native ones for the poker engine (SB = 1) times
-//the multiplier.
-//used by diagnostics window (in PokerPlayer) 
-//and by printfirstnodestrat (savestrategy.cpp of PokerNoLimit)
-string actionstring(int gr, int action, const betnode &bn, double multiplier)
-{
-	stringstream str;
-	str << fixed << setprecision(2);
-
-	switch(bn.result[action])
-	{
-	case FD:
-		str << "Fold";
-		break;
-	case GO:
-		if(bn.potcontrib[action]==0 || (gr==PREFLOP && bn.potcontrib[action]==BB))
-			str << "Check";
-		else
-			str << "Call $" << multiplier*(bn.potcontrib[action]);
-		break;
-	case AI:
-		str << "Call All-In";
-		break;
-	default:
-		if(isallin(bn.result[action], bn.potcontrib[action], gr))
-			str << "All-In";
-		else if(bn.potcontrib[action]==0)
-			str << "Check";
-		else if(gr==PREFLOP && bn.potcontrib[action]==BB)
-			str << "Call $" << multiplier*(bn.potcontrib[action]);
-		else
-			str << "Bet $" << multiplier*(bn.potcontrib[action]);
-		break;
-	}
-
-	return str.str();
-}
-
 //takes a floating point pot value and returns the nearest integer
 //which is also a multiple of big blinds.
 //used by BotAPI and diagnostics window (both in PokerPlayer)

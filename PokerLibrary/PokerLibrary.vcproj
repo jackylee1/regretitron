@@ -149,19 +149,11 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\determinebins.cpp"
+				RelativePath="..\PokerNoLimit\cardmachine.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\flopalyzer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\gamestate.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\rephands.cpp"
 				>
 			</File>
 			<File
@@ -199,23 +191,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PokerNoLimit\cardmachine.h"
+				>
+			</File>
+			<File
 				RelativePath=".\constants.h"
 				>
 			</File>
 			<File
-				RelativePath=".\determinebins.h"
-				>
-			</File>
-			<File
 				RelativePath=".\flopalyzer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\gamestate.h"
-				>
-			</File>
-			<File
-				RelativePath=".\rephands.h"
 				>
 			</File>
 			<File
@@ -224,6 +208,10 @@
 			</File>
 			<File
 				RelativePath=".\treenolimit.h"
+				>
+			</File>
+			<File
+				RelativePath="..\utility.h"
 				>
 			</File>
 		</Filter>

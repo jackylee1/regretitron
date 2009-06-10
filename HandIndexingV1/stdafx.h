@@ -16,11 +16,3 @@
 #include <assert.h> //required for assert
 #include <poker_defs.h> //required to use PokerEval tables and datatypes
 
-//pop up a message box on error
-#include "../portability.h"
-#define REPORT(chars) do{ \
-	std::cout << chars << std::endl; \
-	ASMBRK; \
-	exit(1); \
-}while(0)
-

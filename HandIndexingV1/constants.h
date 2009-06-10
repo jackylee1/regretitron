@@ -18,9 +18,8 @@
 #define INDEX7_MAX (N4*M31 + N3*N2*M21 + M32*N1 + N5*M21 + N4*N2*N1 + M23*N1 + N3*M22 + N6*N1 + N5*N2 + N4*N3 + N7)
 #define INDEX6_MAX (N3*M31 + M22*M21 + N4*M21 + N3*N2*N1 + M32 + N5*N1 + N4*N2 + M23 + N6)
 #define INDEX5_MAX (N2*M31 + N3*M21 + M22*N1 + N4*N1 + N3*N2 + N5)
-const int INDEX2_MAX = M21 + N2; //this is extern.
 
-//these are declared as externs to the outside world
+const int INDEX2_MAX = M21 + N2; 
 const int INDEX25_MAX = INDEX7_MAX*((7*6)/(2*1)); //7 choose 2 additional combos to specify which are mine
 const int INDEX24_MAX = INDEX6_MAX*((6*5)/(2*1)); //6 choose 2 additional combos to specify which are mine
 const int INDEX23_MAX = INDEX5_MAX*((5*4)/(2*1)); //5 choose 2 additional combos to specify which are mine
