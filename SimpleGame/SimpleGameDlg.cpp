@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "SimpleGame.h"
 #include "SimpleGameDlg.h"
-#include "../PokerLibrary/rephands.h" //has card filename getter
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -173,8 +172,8 @@ HCURSOR CSimpleGameDlg::OnQueryDragIcon()
 
 void CSimpleGameDlg::printbotcards()
 {
-	bCard0.LoadFromFile(CSTR(cardfilename(botcm0)));
-	bCard1.LoadFromFile(CSTR(cardfilename(botcm1)));
+	bCard0.LoadFromCardMask(botcm0);
+	bCard1.LoadFromCardMask(botcm1);
 }
 void CSimpleGameDlg::printbotcardbacks()
 {
@@ -183,22 +182,22 @@ void CSimpleGameDlg::printbotcardbacks()
 }
 void CSimpleGameDlg::printhumancards()
 {
-	hCard0.LoadFromFile(CSTR(cardfilename(humancm0)));
-	hCard1.LoadFromFile(CSTR(cardfilename(humancm1)));
+	hCard0.LoadFromCardMask(humancm0);
+	hCard1.LoadFromCardMask(humancm1);
 }
 void CSimpleGameDlg::printflop()
 {
-	cCard0.LoadFromFile(CSTR(cardfilename(flop0)));
-	cCard1.LoadFromFile(CSTR(cardfilename(flop1)));
-	cCard2.LoadFromFile(CSTR(cardfilename(flop2)));
+	cCard0.LoadFromCardMask(flop0);
+	cCard1.LoadFromCardMask(flop1);
+	cCard2.LoadFromCardMask(flop2);
 }
 void CSimpleGameDlg::printturn()
 {
-	cCard3.LoadFromFile(CSTR(cardfilename(turn)));
+	cCard3.LoadFromCardMask(turn);
 }
 void CSimpleGameDlg::printriver()
 {
-	cCard4.LoadFromFile(CSTR(cardfilename(river)));
+	cCard4.LoadFromCardMask(river);
 }
 void CSimpleGameDlg::eraseboard()
 {
@@ -263,7 +262,7 @@ void CSimpleGameDlg::docall(Player pl)
 {
 	//inform bot unless game is over
 	if(!isallin && gameround != RIVER)
-		MyBot.advancetree(pl,CALL,invested[1-pl]);
+		MyBot.doaction(pl,CALL,invested[1-pl]);
 	//increase pot
 	pot += invested[1-pl];
 	updatepot();
@@ -295,17 +294,17 @@ void CSimpleGameDlg::docall(Player pl)
 	{
 	//for the first three rounds, we just inform the bot and then print the cards.
 	case PREFLOP: 
-		MyBot.setflop(flop, pot); 
+		MyBot.setnextround(FLOP, flop, pot); 
 		printflop();
 		break;
 
 	case FLOP: 
-		MyBot.setturn(turn, pot); 
+		MyBot.setnextround(TURN, turn, pot); 
 		printturn();
 		break;
 
 	case TURN: 
-		MyBot.setriver(river, pot); 
+		MyBot.setnextround(RIVER, river, pot); 
 		printriver();
 		break;
 
@@ -334,7 +333,7 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 		REPORT("someone bet an illegal amount.");
 
 	//inform the bot
-	MyBot.advancetree(pl,BET,amount);
+	MyBot.doaction(pl,BET,amount);
 	//set our invested amount
 	invested[pl] = amount;
 	updateinvested();
@@ -344,7 +343,7 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 void CSimpleGameDlg::doallin(Player pl)
 {
 	//inform the bot
-	MyBot.advancetree(pl, ALLIN, 0);
+	MyBot.doaction(pl, ALLIN, 0);
 	isallin=true;
 	//set our invested amount
 	invested[pl]=STACKSIZE-pot;
@@ -582,6 +581,7 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	updateinvested();
 
 	//deal out the cards randomly.
+	MTRand &mersenne = cardrandom; //alias random for macros.
 	CardMask_RESET(usedcards);
 	//set the cm's corresponding to individual cards (for displaying)
 #define DEALANDOR(card) MONTECARLO_N_CARDS_D(card, usedcards, 1, 1, ); CardMask_OR(usedcards, usedcards, card);
@@ -643,7 +643,7 @@ void CSimpleGameDlg::OnBnClickedButton6()
 	double val;
 	Action act;
 	//get answer from bot
-	act = MyBot.getanswer(val);
+	act = MyBot.getbotaction(val);
 
 	//the bot uses the same semantics, so this is easy
 	switch(act)

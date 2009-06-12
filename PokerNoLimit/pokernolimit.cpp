@@ -56,8 +56,6 @@ void simulate(int64 iter)
 #endif
 }
 
-#define SAVESTRATEGYFILE 0
-
 int main(int argc, char* argv[])
 {
 	Solver::initsolver();
@@ -70,10 +68,11 @@ int main(int argc, char* argv[])
 		simulate(i);
 		Solver::save(
 			string(SAVENAME)+"-"+iterstring(Solver::gettotal()), 
-			(Solver::gettotal() >= 500*THOUSAND && SAVESTRATEGYFILE));
+			(Solver::gettotal() >= SAVEAFTER));
 		i*=2;
 		if(i>STOPAFTER || TESTXML) break;
 	}
+	Solver::destructsolver();
 
 #ifdef _WIN32 //in windows, the window will close right away
 	PAUSE();

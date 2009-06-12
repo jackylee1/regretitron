@@ -149,11 +149,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath="..\PokerNoLimit\cardmachine.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\flopalyzer.cpp"
+				RelativePath=".\cardmachine.cpp"
 				>
 			</File>
 			<File
@@ -191,15 +187,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\PokerNoLimit\cardmachine.h"
+				RelativePath=".\cardmachine.h"
 				>
 			</File>
 			<File
 				RelativePath=".\constants.h"
-				>
-			</File>
-			<File
-				RelativePath=".\flopalyzer.h"
 				>
 			</File>
 			<File

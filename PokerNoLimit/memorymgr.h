@@ -53,6 +53,10 @@ public:
 	int64 save(const string &filename, const CardMachine &cardmach); //returns length of file written
 	
 private:
+	//we do not support copying.
+	MemoryManager(const MemoryManager& rhs);
+	MemoryManager& operator=(const MemoryManager& rhs);
+
 	//each is a pointer to a large array allocated on the heap
 	//one such array per gameround per type of node.
 	//used as 2-dimensional arrays
@@ -71,15 +75,15 @@ private:
 
 #if STORE_DENOM
 #define CASENINDEXING(nacts) case nacts: do{\
-	stratn = data##nacts[gr][cardsi*actionmax[gr][nacts-2] + actioni].stratn; \
-	regret = data##nacts[gr][cardsi*actionmax[gr][nacts-2] + actioni].regret; \
-	stratd = &(data##nacts[gr][cardsi*actionmax[gr][nacts-2] + actioni].stratd); \
+	stratn = data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].stratn; \
+	regret = data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].regret; \
+	stratd = &(data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].stratd); \
 	return; \
 }while(0)
 #else
 #define CASENINDEXING(nacts) case nacts: do{\
-	stratn = data##nacts[gr][cardsi*actionmax[gr][nacts-2] + actioni].stratn; \
-	regret = data##nacts[gr][cardsi*actionmax[gr][nacts-2] + actioni].regret; \
+	stratn = data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].stratn; \
+	regret = data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].regret; \
 	return; \
 }while(0)
 #endif

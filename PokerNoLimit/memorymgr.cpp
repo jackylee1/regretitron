@@ -155,6 +155,7 @@ MemoryManager::~MemoryManager()
 	/* seek to beginning and write the offset */ \
 	f.seekp(tableoffset); \
 	f.write((char*)&dataoffset, 8); \
+	tableoffset += 8; \
  \
 	/* seek to end and write the data */ \
 	f.seekp(dataoffset); \

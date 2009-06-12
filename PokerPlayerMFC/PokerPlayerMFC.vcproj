@@ -47,6 +47,7 @@
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="2"
+				PrecompiledHeaderFile="C:\Windows\Temp\$(ConfigurationName)$(TargetName).pch"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
@@ -109,6 +110,7 @@
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="2"
+				PrecompiledHeaderFile="C:\Windows\Temp\$(ConfigurationName)$(TargetName).pch"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
@@ -159,19 +161,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\dodiagnostics.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\lookupanswer.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\PictureCtrl.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\readstrategy.cpp"
 				>
 			</File>
 			<File
@@ -194,6 +184,10 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath=".\strategy.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -209,15 +203,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\lookupanswer.h"
-				>
-			</File>
-			<File
 				RelativePath="..\PictureCtrl.h"
-				>
-			</File>
-			<File
-				RelativePath=".\readstrategy.h"
 				>
 			</File>
 			<File
@@ -226,6 +212,10 @@
 			</File>
 			<File
 				RelativePath=".\stdafx.h"
+				>
+			</File>
+			<File
+				RelativePath=".\strategy.h"
 				>
 			</File>
 		</Filter>

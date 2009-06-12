@@ -32,25 +32,19 @@
 
 #include <afx.h>
 #include <afxwin.h>         // MFC core and standard components
+#include <afxext.h>         // MFC extensions
 
-//#include <iostream>
 #include <fstream>
 #include <algorithm> //has min_element
 #include <numeric> //has accumulate
 #include <limits> //has infinity
+#include <utility> //has pair
+#include <vector> //has vector
 
 // TinyXML
-#define TIXML_USE_TICPP
+#define TIXML_USE_TICPP //must ensure TinyXML++ is compiled with that flag too
 #include "../TinyXML++/ticpp.h"
 
-//randomness
-#include "../mymersenne.h"
-
 //Pokereval
-#include "poker_defs.h"
+#include <poker_defs.h>
 
-//pop up message box on error
-#define REPORT(chars) do{ \
-    AfxMessageBox(TEXT(chars));\
-	_asm {int 3}; \
-}while(0)

@@ -3,10 +3,12 @@
 
 #include "stdafx.h"
 #include "DiagnosticsPage.h"
-#include "../PokerLibrary/rephands.h" //needed for card printing utilities
-//converts from std::string to Cstring
-#define CSTR(stdstr) CString((stdstr).c_str())
+#include "../utility.h"
 #include "../PokerLibrary/constants.h"
+#include "../PokerLibrary/cardmachine.h"
+#include <poker_defs.h>
+#include <vector>
+using std::vector;
 
 
 // DiagnosticsPage dialog
@@ -15,9 +17,9 @@ IMPLEMENT_DYNAMIC(DiagnosticsPage, CDialog)
 
 DiagnosticsPage::DiagnosticsPage(CWnd* pParent /*=NULL*/)
 	: CDialog(DiagnosticsPage::IDD, pParent)
-	//i initialize these to -1 so that if RefreshHands is called prematurely,
-	//before sethandindices, it will see they are -1 and not use garbage data.
-	, mygr(-1), myhandi(-1), myboardi(-1)
+	//i initialize these to -1 so that if RefreshCards is called prematurely,
+	//before setcardstoshow, it will see they are -1 and not use garbage data.
+	, mygr(-1)
 {
 	//this is the code to actually make this page display when it is created via new.
 	//Boom: http://www.codeproject.com/KB/dialog/gettingmodeless.aspx
@@ -36,7 +38,7 @@ DiagnosticsPage::~DiagnosticsPage()
 void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
-	DDX_Control(pDX, IDC_TEXT0, PotSizes);
+	DDX_Control(pDX, IDC_TEXT0, PotSize);
 	DDX_Control(pDX, IDC_TEXT1, Bethist[0]);
 	DDX_Control(pDX, IDC_TEXT2, Bethist[1]);
 	DDX_Control(pDX, IDC_TEXT3, Bethist[2]);
@@ -108,91 +110,98 @@ void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 
 
 BEGIN_MESSAGE_MAP(DiagnosticsPage, CDialog)
-	ON_BN_CLICKED(IDC_REFRESH, &DiagnosticsPage::RefreshHands)
+	ON_BN_CLICKED(IDC_REFRESH, &DiagnosticsPage::RefreshCards)
 END_MESSAGE_MAP()
 
 
 //this function is called first (on change of bot state) to set these indices
 //this is the way that teh BotAPI communicates with the diagnostics page,
-//so that the RefreshHands handler doesn't have to call into BotAPI or something
-void DiagnosticsPage::sethandindices(int gr, int handi, int boardi)
+//so that the RefreshCards handler doesn't have to call into BotAPI or something
+void DiagnosticsPage::setcardstoshow(Strategy * currstrat, int gr, int handi, int boardi)
 {
+	mycurrstrat = currstrat;
 	mygr = gr;
 	myhandi = handi;
 	myboardi = boardi;
 }
 
-//this is a helper function for RefreshHands it simply decomposes
-// the cardmask hand into 2 cardmasks each with a single card, and then
-// prints them to the appropriate fields using the cardfilename function in rephands
-void DiagnosticsPage::drawpreflop(int whichset, CardMask hand)
-{
-	CardMask singles[2];
-	decomposecm(hand, singles);
-	Card[whichset][0].LoadFromFile(CSTR(cardfilename(singles[0])));
-	Card[whichset][1].LoadFromFile(CSTR(cardfilename(singles[1])));
-}
-
-//this is a helper function for RefreshHands. it decomposes teh flop
-//into 3 cardmasks wit a single card each, and prints them to the appropriate fields
-void DiagnosticsPage::drawflop(int whichset, CardMask flop)
-{
-	CardMask singles[3];
-	decomposecm(flop, singles);
-	Card[whichset][2].LoadFromFile(CSTR(cardfilename(singles[0])));
-	Card[whichset][3].LoadFromFile(CSTR(cardfilename(singles[1])));
-	Card[whichset][4].LoadFromFile(CSTR(cardfilename(singles[2])));
-}
-
-// DiagnosticsPage message handlers
-
 //this is the event handler for the refresh button. it gets the information it needs
-//from the private data set by sethandindices(). that function must be called first.
+//from the private data set by setcardstoshow(). that function must be called first.
 //it uses the two helper functions above to help print the preflop and cthe flop,
 //since those muste be decomposed, but does the turn and river itself for each case.
-void DiagnosticsPage::RefreshHands()
+void DiagnosticsPage::RefreshCards()
 {
 	//we have had no info sent to us yet.
 	if(mygr == -1) return;
+
+	vector<CardMask> cards; //to be filled by call to CardMachine
 
 	for(int n=0; n<5; n++) //5 sets of hands
 	{
 		if(mygr==PREFLOP)
 		{
-			drawpreflop(n, findpreflophand(myhandi));
+			mycurrstrat->getcardmach().findexamplehand(mygr, myhandi, myboardi, cards);
+			drawpreflop(n, cards[PREFLOP]);
 			for(int i=2; i<7; i++)
 				Card[n][i].FreeData();
 		}
 		else if(mygr==FLOP)
 		{
-			CardMask hand, flop;
-			findflophand(myhandi, myboardi, hand, flop);
-			drawpreflop(n, hand);
-			drawflop(n, flop);
+			mycurrstrat->getcardmach().findexamplehand(mygr, myhandi, myboardi, cards);
+			drawpreflop(n, cards[PREFLOP]);
+			drawflop(n, cards[FLOP]);
 			Card[n][5].FreeData();
 			Card[n][6].FreeData();
 		}
 		else if(mygr==TURN)
 		{
-			CardMask hand, flop, turn;
-			findturnhand(myhandi, myboardi, hand, flop, turn);
-			drawpreflop(n, hand);
-			drawflop(n, flop);
-			Card[n][5].LoadFromFile(CSTR(cardfilename(turn)));
+			mycurrstrat->getcardmach().findexamplehand(mygr, myhandi, myboardi, cards);
+			drawpreflop(n, cards[PREFLOP]);
+			drawflop(n, cards[FLOP]);
+			Card[n][5].LoadFromCardMask(cards[TURN]);
 			Card[n][6].FreeData();
 		}
 		else if(mygr==RIVER)
 		{
-			CardMask hand, flop, turn, river;
-			findriverhand(myhandi, myboardi, hand, flop, turn, river);
-			drawpreflop(n, hand);
-			drawflop(n, flop);
-			Card[n][5].LoadFromFile(CSTR(cardfilename(turn)));
-			Card[n][6].LoadFromFile(CSTR(cardfilename(river)));
+			mycurrstrat->getcardmach().findexamplehand(mygr, myhandi, myboardi, cards);
+			drawpreflop(n, cards[PREFLOP]);
+			drawflop(n, cards[FLOP]);
+			Card[n][5].LoadFromCardMask(cards[TURN]);
+			Card[n][6].LoadFromCardMask(cards[RIVER]);
 		}
 		else
 			REPORT("Invalid gameround in refresh hands");
-
-		//this->RedrawWindow(); //removes cards that have been Free'd
 	}
+}
+
+//takes a cardmask  and returns a randomly ordered array of cardmasks with 1 card in each. 
+void DiagnosticsPage::decomposecm(CardMask in, vector<CardMask> &out)
+{
+	out.clear();
+
+	for(int i=0; i<52; i++)
+		if (StdDeck_CardMask_CARD_IS_SET(in, i))
+			out.insert(out.begin()+rand()%(out.size()+1), StdDeck_MASK(i));
+}
+
+//this is a helper function for RefreshCards it simply decomposes
+// the cardmask hand into 2 cardmasks each with a single card, and then
+// prints them to the appropriate fields using the cardfilename function in rephands
+void DiagnosticsPage::drawpreflop(int whichset, CardMask hand)
+{
+	vector<CardMask> singles;
+	decomposecm(hand, singles);
+	Card[whichset][0].LoadFromCardMask(singles[0]);
+	Card[whichset][1].LoadFromCardMask(singles[1]);
+}
+
+//this is a helper function for RefreshCards. it decomposes teh flop
+//into 3 cardmasks wit a single card each, and prints them to the appropriate fields
+void DiagnosticsPage::drawflop(int whichset, CardMask flop)
+{
+	vector<CardMask> singles;
+	decomposecm(flop, singles);
+	Card[whichset][2].LoadFromCardMask(singles[0]);
+	Card[whichset][3].LoadFromCardMask(singles[1]);
+	Card[whichset][4].LoadFromCardMask(singles[2]);
 }

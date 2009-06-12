@@ -12,31 +12,54 @@
 //static non-integral data member initialization
 const int CardMachine::FLOPALYZER_MAX[4]= { 1, 6, 17, 37 };
 
-CardMachine::CardMachine(cardsettings_t cardsettings, bool seedrand, int seedwith) : mersenne() //seeds with time and shit
+CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, bool seedrand, int seedwith) : 
+	myparams(cardsettings),
+	solving(issolver),
+	randforsolver(), //seeds with time and shit
+	randforexamplehands() //seeds with time and shit
 {
-	if(seedrand) //override random time seed
-		mersenne.seed(seedwith);
+
+	//seed rand if requested
+
+	if(seedrand)
+		randforsolver.seed(seedwith);
+
+	//load the bin files
 
 	for(int gr=0; gr<4; gr++)
 	{
-		cardsi_max[gr] = cardsettings.bin_max[gr] * FLOPALYZER_MAX[gr];
-		bin_max[gr] = cardsettings.bin_max[gr];
+		cardsi_max[gr] = myparams.bin_max[gr] * FLOPALYZER_MAX[gr];
+		bindata[gr] = NULL;
 
-		if(strlen(cardsettings.filename[gr]) == 0)  //this means there is no file
-			bindata[gr] = NULL;
-		else
+		if(myparams.filename[gr].length() != 0)
 		{
-			if(cardsettings.filesize[gr] == 0) REPORT("you have a bin file but it's size is set to zero");
-			if(cardsettings.filesize[gr]%8 != 0) REPORT("Your file is not a multiple of 8 bytes.");
-			bindata[gr] = new uint64[cardsettings.filesize[gr]/8];
+			if(myparams.filesize[gr] == 0) REPORT("you have a bin file but it's size is set to zero");
+			if(myparams.filesize[gr]%8 != 0) REPORT("Your file is not a multiple of 8 bytes.");
 
-			//open the file, read it in, and close it
+			//open the file
 
-			std::ifstream f(cardsettings.filename[gr], std::ifstream::binary);
-			f.read((char*)bindata[gr], cardsettings.filesize[gr]);
-			if(f.gcount()!=cardsettings.filesize[gr] || f.eof() || EOF!=f.peek())
-				REPORT(cardsettings.filename[gr]<<" could not be found, or is not the right size.");
-			f.close();
+			filepointers[gr].open(myparams.filename[gr].c_str(), std::ifstream::binary);
+
+			if(solving)
+			{
+				//load into memory and close
+
+				bindata[gr] = new uint64[myparams.filesize[gr]/8];
+				filepointers[gr].read((char*)bindata[gr], myparams.filesize[gr]);
+				if(filepointers[gr].gcount()!=myparams.filesize[gr] || filepointers[gr].eof() || EOF!=filepointers[gr].peek())
+					REPORT("a bin file could not be found, or is not the right size.");
+				filepointers[gr].close();
+			}
+			else
+			{
+				//just check to make sure it's okay
+
+				if(!filepointers[gr].good() || !filepointers[gr].is_open())
+					REPORT("bin file not found");
+				filepointers[gr].seekg(0, ios::end);
+				if(!filepointers[gr].good() || (uint64)filepointers[gr].tellg()!=myparams.filesize[gr])
+					REPORT("bin file found but not correct size");
+			}
 		}
 	}
 }
@@ -44,11 +67,21 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool seedrand, int seedwit
 CardMachine::~CardMachine()
 {
 	for(int gr=0; gr<4; gr++)
-		if(bindata[gr] != NULL) delete[] bindata[gr];
+	{
+		if(bindata[gr] != NULL) 
+			delete[] bindata[gr];
+		if(!solving)
+			filepointers[gr].close();
+	}
 }
 
 void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 {
+	if(!solving) REPORT("I didn't expect PokerPlayer to call this function");
+
+	//alias our MTRand object so I can control which rand the archaic macros use
+
+	MTRand &mersenne = randforsolver;
 
 	//deal out the cards randomly.
 
@@ -75,25 +108,25 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 	//lookup binnumbers
 
 	CardMask board;
-	int binP0f = BinRoutines::retrieve(bindata[FLOP], getindex2N(priv0, flop, 3), bin_max[FLOP]);
-	int binP1f = BinRoutines::retrieve(bindata[FLOP], getindex2N(priv1, flop, 3), bin_max[FLOP]);
+	int binP0f = BinRoutines::retrieve(bindata[FLOP], getindex2N(priv0, flop, 3), myparams.bin_max[FLOP]);
+	int binP1f = BinRoutines::retrieve(bindata[FLOP], getindex2N(priv1, flop, 3), myparams.bin_max[FLOP]);
 	CardMask_OR(board, flop, turn);
-	int binP0t = BinRoutines::retrieve(bindata[TURN], getindex2N(priv0, board, 4), bin_max[TURN]);
-	int binP1t = BinRoutines::retrieve(bindata[TURN], getindex2N(priv1, board, 4), bin_max[TURN]);
+	int binP0t = BinRoutines::retrieve(bindata[TURN], getindex2N(priv0, board, 4), myparams.bin_max[TURN]);
+	int binP1t = BinRoutines::retrieve(bindata[TURN], getindex2N(priv1, board, 4), myparams.bin_max[TURN]);
 	CardMask_OR(board, board, river);
-	int binP0r = BinRoutines::retrieve(bindata[RIVER], getindex2N(priv0, board, 5), bin_max[RIVER]);
-	int binP1r = BinRoutines::retrieve(bindata[RIVER], getindex2N(priv1, board, 5), bin_max[RIVER]);
+	int binP0r = BinRoutines::retrieve(bindata[RIVER], getindex2N(priv0, board, 5), myparams.bin_max[RIVER]);
+	int binP1r = BinRoutines::retrieve(bindata[RIVER], getindex2N(priv1, board, 5), myparams.bin_max[RIVER]);
 
 	//compute the cardsi
 
 	cardsi[PREFLOP][P0] = getindex2(priv0);
 	cardsi[PREFLOP][P1] = getindex2(priv1);
-	cardsi[FLOP][P0] = COMBINE(flopscore, binP0f, bin_max[FLOP]);
-	cardsi[FLOP][P1] = COMBINE(flopscore, binP1f, bin_max[FLOP]);
-	cardsi[TURN][P0] = COMBINE(turnscore, binP0t, bin_max[TURN]);
-	cardsi[TURN][P1] = COMBINE(turnscore, binP1t, bin_max[TURN]);
-	cardsi[RIVER][P0] = COMBINE(riverscore, binP0r, bin_max[RIVER]);
-	cardsi[RIVER][P1] = COMBINE(riverscore, binP1r, bin_max[RIVER]);
+	cardsi[FLOP][P0] = COMBINE(flopscore, binP0f, myparams.bin_max[FLOP]);
+	cardsi[FLOP][P1] = COMBINE(flopscore, binP1f, myparams.bin_max[FLOP]);
+	cardsi[TURN][P0] = COMBINE(turnscore, binP0t, myparams.bin_max[TURN]);
+	cardsi[TURN][P1] = COMBINE(turnscore, binP1t, myparams.bin_max[TURN]);
+	cardsi[RIVER][P0] = COMBINE(riverscore, binP0r, myparams.bin_max[RIVER]);
+	cardsi[RIVER][P1] = COMBINE(riverscore, binP1r, myparams.bin_max[RIVER]);
 
 	//compute would-be winner for twoprob0wins
 
@@ -110,6 +143,159 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 		twoprob0wins = 0;
 	else
 		twoprob0wins = 1;
+}
+
+int CardMachine::getindices(int gr, const vector<CardMask> &cards, int &handi, int &boardi)
+{
+	switch(gr)
+	{
+		case PREFLOP:
+			handi = getindex2(cards[PREFLOP]);
+			boardi = 1;
+			return getindex2(cards[PREFLOP]);
+
+		case FLOP:
+		{
+			handi = readbintable(FLOP, getindex2N(cards[PREFLOP],cards[FLOP],3));
+			boardi = flopalyzer(cards[FLOP]);
+			return COMBINE(boardi, handi, myparams.bin_max[FLOP]);
+		}
+
+		case TURN:
+		{
+			CardMask board;
+			CardMask_OR(board, cards[FLOP], cards[TURN]);
+			handi = readbintable(TURN, getindex2N(cards[PREFLOP],board,4));
+			boardi = turnalyzer(cards[FLOP], cards[TURN]);
+			return COMBINE(boardi, handi, myparams.bin_max[TURN]);
+		}
+
+		case RIVER:
+		{
+			CardMask board;
+			CardMask_OR(board, cards[FLOP], cards[TURN]);
+			CardMask_OR(board, board, cards[RIVER]);
+			handi = readbintable(RIVER, getindex2N(cards[PREFLOP],board,5));
+			boardi = rivalyzer(cards[FLOP], cards[TURN], cards[RIVER]);
+			return COMBINE(boardi, handi, myparams.bin_max[RIVER]);
+		}
+
+		default:
+			REPORT("invalid gameround");
+	}
+}
+
+void CardMachine::findexamplehand(int gr, int handi, int boardi, vector<CardMask> &cards)
+{
+	cards.resize(4);
+	CardMask_RESET(cards[PREFLOP]);
+	CardMask_RESET(cards[FLOP]);
+	CardMask_RESET(cards[TURN]);
+	CardMask_RESET(cards[RIVER]);
+
+	MTRand &mersenne = randforexamplehands; //alias rand so the macros use one of my choosing (without altering them).
+
+	CardMask usedcards;
+	CardMask_RESET(usedcards);
+
+	//find an example board
+
+	switch(gr)
+	{
+	case PREFLOP: 
+		break;
+
+	case FLOP:
+		while(1)
+		{
+			MONTECARLO_N_CARDS_D(cards[FLOP], usedcards, 3, 1, );
+			if(flopalyzer(cards[FLOP]) == boardi)
+				break;
+		}
+		usedcards = cards[FLOP];
+		break;
+
+	case TURN:
+		while(1)
+		{
+			MONTECARLO_N_CARDS_D(cards[FLOP], usedcards, 3, 1, );
+			MONTECARLO_N_CARDS_D(cards[TURN], cards[FLOP], 1, 1, );
+			if(turnalyzer(cards[FLOP],cards[TURN]) == boardi)
+				break;
+		}
+		CardMask_OR(usedcards, cards[FLOP], cards[TURN]);
+		break;
+
+	case RIVER:
+		while(1)
+		{
+			CardMask_RESET(usedcards);
+			MONTECARLO_N_CARDS_D(cards[FLOP], usedcards, 3, 1, );
+			MONTECARLO_N_CARDS_D(cards[TURN], cards[FLOP], 1, 1, );
+			CardMask_OR(usedcards, cards[FLOP], cards[TURN]);
+			MONTECARLO_N_CARDS_D(cards[RIVER], usedcards, 1, 1, );
+			if(rivalyzer(cards[FLOP],cards[TURN],cards[RIVER]) == boardi)
+				break;
+		}
+		CardMask_OR(usedcards, usedcards, cards[RIVER]);
+		break;
+
+	default:
+		REPORT("invalid gameround");
+	}
+
+	//find an example private hole cards
+
+	while(1)
+	{
+		MONTECARLO_N_CARDS_D(cards[PREFLOP], usedcards, 2, 1, );
+		int testhandi, testboardi;
+		getindices(gr, cards, testhandi, testboardi);
+		if(testhandi == handi)
+			return;
+	}
+}
+
+string CardMachine::preflophandstring(int index)
+{
+	string ret("");
+	char * mask;
+	vector<CardMask> cards;
+	findexamplehand(PREFLOP, index, 1, cards);
+
+	mask = GenericDeck_maskString(&StdDeck, &cards[PREFLOP]);
+
+	ret += mask[0]; //first rank
+	ret += mask[3]; //second rank
+	if(ret[0] < ret[1]) std::swap(ret[0], ret[1]);
+	if(mask[1] == mask[4]) ret += 's'; //suited
+
+	return ret;
+}
+
+int CardMachine::readbintable(const int gr, const int index)
+{
+	if(index<0 || myparams.bin_max[gr]<=0)
+		REPORT("invalid parameters to readbintable");
+
+	if(solving)
+		return BinRoutines::retrieve(bindata[gr], index, myparams.bin_max[gr]);
+	else
+	{
+		int binsperword = (64/BinRoutines::bitsperbin(myparams.bin_max[gr]));
+
+		//read the word from the file
+
+		uint64 word;
+		filepointers[gr].seekg(8 * (index/binsperword)); //go to data we need
+		filepointers[gr].read((char*)&word, 8); //read data we need
+		if(filepointers[gr].gcount()!=8 || filepointers[gr].eof())
+			REPORT("a bin file could not be read");
+
+		//make use of the bit shifting logic from retrieve function
+
+		return BinRoutines::retrieve(&word, index%binsperword, myparams.bin_max[gr]);
+	}
 }
 
 //macros for flopalyzer code and its breathren
@@ -264,7 +450,6 @@ int CardMachine::turnalyzer(const CardMask flop, const CardMask turn)
 		REPORT("invalid flop index in turnalyzer");
 	}
 }
-
 
 int CardMachine::rivalyzer(const CardMask flop, const CardMask turn, const CardMask river)
 {

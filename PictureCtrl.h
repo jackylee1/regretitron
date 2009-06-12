@@ -16,6 +16,7 @@
 
 #pragma once
 #include "afxwin.h"
+#include <poker_defs.h> //for CardMask
 
 class CPictureCtrl :
 	public CStatic
@@ -29,6 +30,9 @@ public:
 	~CPictureCtrl(void);
 
 public:
+
+	//Loads an image from a CardMask
+	BOOL LoadFromCardMask(CardMask mycard);
 
 	//Loads an image from a file
 	BOOL LoadFromFile(CString szFilePath);

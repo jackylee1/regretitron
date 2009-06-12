@@ -12,7 +12,7 @@ typedef unsigned __int64 uint64;
 	LARGE_INTEGER ticksPerSecond, tick; \
 	QueryPerformanceFrequency(&ticksPerSecond); \
 	QueryPerformanceCounter(&tick); \
-	seconds = (double)tick.QuadPart/ticksPerSecond.QuadPart \
+	seconds = (double)tick.QuadPart/ticksPerSecond.QuadPart; \
 } while(0)
 
 #elif __GNUC__
@@ -39,21 +39,31 @@ typedef uint64_t uint64;
 #endif
 
 
+#if defined _MFC_VER //if MFC we can pop up a sweet message box
 
-#ifdef USE_MFC //if MFC we can pop up a sweet message box
-#define REPORT(chars) do{ \
-    AfxMessageBox(TEXT(chars));\
-	ASMBRK; \
-	exit(-1); \
-}while(0)
+#define POPUP(text) AfxMessageBox(text)
+#define WARN(text) AfxMessageBox(CString("Warning: ") + text)
+#define CSTR(stdstr) CString((stdstr).c_str())
+
+#elif defined _MSC_VER
+
+#include <windows.h> // for QueryPerformanceCounter
+#define POPUP(text) MessageBox(NULL, text, TEXT("Problem."), MB_OK)
+
 #else
+
 #include <iostream>
-#define REPORT(chars) do{ \
-	std::cout << chars << std::endl; \
+#define POPUP(text) std::cout << text << std::endl
+#define WARN(text) std::cout << "Warning: " << text << std::endl
+
+#endif
+
+#define REPORT(text) do{ \
+    POPUP(text);\
 	ASMBRK; \
 	exit(-1); \
 }while(0)
-#endif
+
 
 #define COMPILE_ASSERT(x) extern int __dummy[(int)x]
 COMPILE_ASSERT(sizeof(int64) == 8 && sizeof(uint64) == 8);

@@ -48,16 +48,16 @@ public:
 
 	bool isallin(int result, int potcontrib, int gr) const;
 	string actionstring(int gr, int action, const BetNode &bn, double multiplier) const;
-	inline int getstacksize() const { return stacksize; }
-	inline bool ispushfold() const { return pushfold; }
+	inline const treesettings_t& getparams() const { return myparams; }
 
 private:
+	//we do not support copying.
+	BettingTree(const BettingTree& rhs);
+	BettingTree& operator=(const BettingTree& rhs);
+
 	//none of these are altered after the constructor is done
 	BetNode * tree[4];
-	const int sblind;
-	const int bblind;
-	const int stacksize;
-	const bool pushfold;
+	const treesettings_t myparams;
 
 	//the size of the betting tree
 	static const int N_NODES = 172;
@@ -69,7 +69,7 @@ inline void BettingTree::getnode(int gr, int pot, int beti, BetNode &bn) const
 	bn.numacts = 0;
 	for(int i=0; i < tree[gr][beti].numacts; i++)
 	{
-		if(pot + tree[gr][beti].potcontrib[i] < stacksize)
+		if(pot + tree[gr][beti].potcontrib[i] < myparams.stacksize)
 		{
 			bn.potcontrib[(int)bn.numacts] = tree[gr][beti].potcontrib[i];
 			bn.result[(int)bn.numacts] = tree[gr][beti].result[i];

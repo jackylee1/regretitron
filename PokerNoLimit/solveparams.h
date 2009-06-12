@@ -10,18 +10,19 @@
 #define TOSTRING(symb) STRINGIFY(symb)
 
 //main settings
-const char SAVENAME[] = "newesttest3";
+const char SAVENAME[] = "testbotapi1";
 
 //solver settings
-#define FPWORKING_T float
-#define FPSTORE_T float
+#define FPWORKING_T long double
+#define FPSTORE_T long double
 #define STORE_DENOM 1
 #define NUM_THREADS 4
 const bool SEED_RAND = true;
 const int  SEED_WITH = 42;
 
 #define TESTXML 0
-#define STOPAFTER 3*MILLION
+#define STOPAFTER 1*MILLION*MILLION
+#define SAVEAFTER 1*MILLION
 
 //bin settings
 #define FBIN 256
@@ -32,10 +33,10 @@ const cardsettings_t CARDSETTINGS =
 {
 	{ INDEX2_MAX, FBIN, TBIN, RBIN },
 	{
-		"",
-		"bins/flop" TOSTRING(FBIN) "BINS.dat",
-		"bins/turn" TOSTRING(TBIN) "BINS.dat",
-		"bins/river" TOSTRING(RBIN) "BINS.dat",
+		string(""),
+		string("bins/flop" TOSTRING(FBIN) "BINS.dat"),
+		string("bins/turn" TOSTRING(TBIN) "BINS.dat"),
+		string("bins/river" TOSTRING(RBIN) "BINS.dat"),
 	},
 	{
 		0,
@@ -79,7 +80,7 @@ const treesettings_t TREESETTINGS =
 
 #elif SS==13
 	
-#if 1
+#if 1 //most options possible
 	SB, BB,
 	{2, 4, 8, 12,16,20},
 	{{4, 6, 10,14,18,22},
@@ -89,7 +90,7 @@ const treesettings_t TREESETTINGS =
 	 {32,48,99,99,99,99},
 	 {40,99,99,99,99,99}},
 	SS*BB, false
-#else
+#else //smaller tree (same as used for prototype?)
 	SB, BB,
 	{2, 6, 12,20,99,99}, //B
 	{6, 12,20,99,99,99}, //R1

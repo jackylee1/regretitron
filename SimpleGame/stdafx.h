@@ -38,15 +38,8 @@
 #include <afxwin.h>         // MFC core and standard components
 #include <afxext.h>         // MFC extensions
 #include <algorithm>
-#include "poker_defs.h"
-#include "inlines/eval.h"
-#include "../mymersenne.h"
-
-//pop up message box on error
-#define REPORT(chars) do{ \
-    AfxMessageBox(TEXT(chars));\
-	_asm {int 3}; \
-}while(0)
+#include <poker_defs.h>
+#include <inlines/eval.h>
 
 
 #ifndef _AFX_NO_OLE_SUPPORT

@@ -20,11 +20,7 @@ const unsigned char BetNode::GO; //action ends betting for this round
 #endif
 
 //constructor for BettingTree
-BettingTree::BettingTree(const treesettings_t &mysettings) : 
-	sblind(mysettings.sblind),
-	bblind(mysettings.bblind),
-	stacksize(mysettings.stacksize),
-	pushfold(mysettings.pushfold)
+BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings)
 {
 	// the following array (MYTREE) is defined here so that I can use the syntax of array
 	// initialization to define a single tree from the parameters I am passed.
@@ -38,54 +34,54 @@ BettingTree::BettingTree(const treesettings_t &mysettings) :
 	const unsigned char &FD = BetNode::FD;
 	const unsigned char &GO = BetNode::GO;
 
-	const unsigned char &B1 = mysettings.bets[0];
-	const unsigned char &B2 = mysettings.bets[1];
-	const unsigned char &B3 = mysettings.bets[2];
-	const unsigned char &B4 = mysettings.bets[3];
-	const unsigned char &B5 = mysettings.bets[4];
-	const unsigned char &B6 = mysettings.bets[5];
+	const unsigned char &B1 = myparams.bets[0];
+	const unsigned char &B2 = myparams.bets[1];
+	const unsigned char &B3 = myparams.bets[2];
+	const unsigned char &B4 = myparams.bets[3];
+	const unsigned char &B5 = myparams.bets[4];
+	const unsigned char &B6 = myparams.bets[5];
 
-	const unsigned char &R11 = mysettings.raises[0][0];
-	const unsigned char &R12 = mysettings.raises[0][1];
-	const unsigned char &R13 = mysettings.raises[0][2];
-	const unsigned char &R14 = mysettings.raises[0][3];
-	const unsigned char &R15 = mysettings.raises[0][4];
-	const unsigned char &R16 = mysettings.raises[0][5];
+	const unsigned char &R11 = myparams.raises[0][0];
+	const unsigned char &R12 = myparams.raises[0][1];
+	const unsigned char &R13 = myparams.raises[0][2];
+	const unsigned char &R14 = myparams.raises[0][3];
+	const unsigned char &R15 = myparams.raises[0][4];
+	const unsigned char &R16 = myparams.raises[0][5];
 
-	const unsigned char &R21 = mysettings.raises[1][0];
-	const unsigned char &R22 = mysettings.raises[1][1];
-	const unsigned char &R23 = mysettings.raises[1][2];
-	const unsigned char &R24 = mysettings.raises[1][3];
-	const unsigned char &R25 = mysettings.raises[1][4];
-	const unsigned char &R26 = mysettings.raises[1][5];
+	const unsigned char &R21 = myparams.raises[1][0];
+	const unsigned char &R22 = myparams.raises[1][1];
+	const unsigned char &R23 = myparams.raises[1][2];
+	const unsigned char &R24 = myparams.raises[1][3];
+	const unsigned char &R25 = myparams.raises[1][4];
+	const unsigned char &R26 = myparams.raises[1][5];
 
-	const unsigned char &R31 = mysettings.raises[2][0];
-	const unsigned char &R32 = mysettings.raises[2][1];
-	const unsigned char &R33 = mysettings.raises[2][2];
-	const unsigned char &R34 = mysettings.raises[2][3];
-	const unsigned char &R35 = mysettings.raises[2][4];
-	const unsigned char &R36 = mysettings.raises[2][5];
+	const unsigned char &R31 = myparams.raises[2][0];
+	const unsigned char &R32 = myparams.raises[2][1];
+	const unsigned char &R33 = myparams.raises[2][2];
+	const unsigned char &R34 = myparams.raises[2][3];
+	const unsigned char &R35 = myparams.raises[2][4];
+	const unsigned char &R36 = myparams.raises[2][5];
 
-	const unsigned char &R41 = mysettings.raises[3][0];
-	const unsigned char &R42 = mysettings.raises[3][1];
-	const unsigned char &R43 = mysettings.raises[3][2];
-	const unsigned char &R44 = mysettings.raises[3][3];
-	const unsigned char &R45 = mysettings.raises[3][4];
-	const unsigned char &R46 = mysettings.raises[3][5];
+	const unsigned char &R41 = myparams.raises[3][0];
+	const unsigned char &R42 = myparams.raises[3][1];
+	const unsigned char &R43 = myparams.raises[3][2];
+	const unsigned char &R44 = myparams.raises[3][3];
+	const unsigned char &R45 = myparams.raises[3][4];
+	const unsigned char &R46 = myparams.raises[3][5];
 
-	const unsigned char &R51 = mysettings.raises[4][0];
-	const unsigned char &R52 = mysettings.raises[4][1];
-	const unsigned char &R53 = mysettings.raises[4][2];
-	const unsigned char &R54 = mysettings.raises[4][3];
-	const unsigned char &R55 = mysettings.raises[4][4];
-	const unsigned char &R56 = mysettings.raises[4][5];
+	const unsigned char &R51 = myparams.raises[4][0];
+	const unsigned char &R52 = myparams.raises[4][1];
+	const unsigned char &R53 = myparams.raises[4][2];
+	const unsigned char &R54 = myparams.raises[4][3];
+	const unsigned char &R55 = myparams.raises[4][4];
+	const unsigned char &R56 = myparams.raises[4][5];
 
-	const unsigned char &R61 = mysettings.raises[5][0];
-	const unsigned char &R62 = mysettings.raises[5][1];
-	const unsigned char &R63 = mysettings.raises[5][2];
-	const unsigned char &R64 = mysettings.raises[5][3];
-	const unsigned char &R65 = mysettings.raises[5][4];
-	const unsigned char &R66 = mysettings.raises[5][5];
+	const unsigned char &R61 = myparams.raises[5][0];
+	const unsigned char &R62 = myparams.raises[5][1];
+	const unsigned char &R63 = myparams.raises[5][2];
+	const unsigned char &R64 = myparams.raises[5][3];
+	const unsigned char &R65 = myparams.raises[5][4];
+	const unsigned char &R66 = myparams.raises[5][5];
 
 	//Allowed result values: 
 	// FD if the player to act folds.
@@ -344,7 +340,7 @@ BettingTree::BettingTree(const treesettings_t &mysettings) :
 		for(int j=0; j<9; j++)
 		{
 			if(tree[PREFLOP][i].potcontrib[j] != NA && tree[PREFLOP][i].potcontrib[j] != 0)
-				tree[PREFLOP][i].potcontrib[j] += mysettings.bblind;
+				tree[PREFLOP][i].potcontrib[j] += myparams.bblind;
 		}
 	}
 
@@ -359,32 +355,32 @@ BettingTree::BettingTree(const treesettings_t &mysettings) :
 		
 	//... so that we can accomodate the new small blind folding action
 	tree[PREFLOP][0].result[0] = FD;
-	tree[PREFLOP][0].potcontrib[0] = mysettings.sblind;
+	tree[PREFLOP][0].potcontrib[0] = myparams.sblind;
 
 	//change number of actions to 9.
 	tree[PREFLOP][0].numacts = 9;
 
-	if(pushfold)
+	if(myparams.pushfold)
 		//if pushfold, we need to make "calling" big blind amount unavailable.
 		tree[PREFLOP][0].potcontrib[1] = 99;
 	else
 		//otherwise, change 'checking' value to 'calling' big blind amount
-		tree[PREFLOP][0].potcontrib[1] = mysettings.bblind;
+		tree[PREFLOP][0].potcontrib[1] = myparams.bblind;
 
 	//FIX NODE ONE
 	//change 'checking' value to 'calling' big blind amount
-	tree[PREFLOP][1].potcontrib[0] = mysettings.bblind;
+	tree[PREFLOP][1].potcontrib[0] = myparams.bblind;
 
 	//FIX NODES WITH FOLD ZERO (2-13, 98, 99)
 
 	//Now, must change the fold valuations from 0 to big blind.
 	//responses to the six initial bets over bblind, for each player
 	for(int i=2; i<=13; i++)
-		tree[PREFLOP][i].potcontrib[0] = mysettings.bblind;
+		tree[PREFLOP][i].potcontrib[0] = myparams.bblind;
 
 	//and response to all-in over bblind, for each player.
-	tree[PREFLOP][98].potcontrib[0] = mysettings.bblind;
-	tree[PREFLOP][99].potcontrib[0] = mysettings.bblind;
+	tree[PREFLOP][98].potcontrib[0] = myparams.bblind;
+	tree[PREFLOP][99].potcontrib[0] = myparams.bblind;
 }
 
 //destructor for BettingTree
@@ -441,7 +437,7 @@ string BettingTree::actionstring(int gr, int action, const BetNode &bn, double m
 		str << "Fold";
 		break;
 	case BetNode::GO:
-		if(bn.potcontrib[action]==0 || (gr==PREFLOP && bn.potcontrib[action]==bblind))
+		if(bn.potcontrib[action]==0 || (gr==PREFLOP && bn.potcontrib[action]==myparams.bblind))
 			str << "Check";
 		else
 			str << "Call $" << multiplier*(bn.potcontrib[action]);
@@ -454,7 +450,7 @@ string BettingTree::actionstring(int gr, int action, const BetNode &bn, double m
 			str << "All-In";
 		else if(bn.potcontrib[action]==0)
 			str << "Check";
-		else if(gr==PREFLOP && bn.potcontrib[action]==bblind)
+		else if(gr==PREFLOP && bn.potcontrib[action]==myparams.bblind)
 			str << "Call $" << multiplier*(bn.potcontrib[action]);
 		else
 			str << "Bet $" << multiplier*(bn.potcontrib[action]);

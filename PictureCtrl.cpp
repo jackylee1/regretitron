@@ -17,6 +17,7 @@
 #include "StdAfx.h"
 #include "PictureCtrl.h"
 #include <GdiPlus.h>
+#include <sstream>
 using namespace Gdiplus;
 
 //Macro to release COM Components
@@ -128,6 +129,25 @@ BOOL CPictureCtrl::LoadFromStream(BYTE* pData, size_t nSize)
 	RedrawWindow();
 
 	return TRUE;
+}
+
+//Loads an image from a CardMask
+//takes a cardmask assumed to have 1 card in it and 
+//computes the string to my special files that hold the png images
+//of cards. it then calls LoadFromFile on that filename. 
+//I could think of no better place for this code, as application
+//specific as it is.
+//used by the GUI's: diagnostics window (in PokerPlayer) and by 
+//the game window (in SimpleGame).
+BOOL CPictureCtrl::LoadFromCardMask(CardMask mycard)
+{
+	int i;
+	std::ostringstream file;
+	for(i=0; i<52; i++)
+		if (StdDeck_CardMask_CARD_IS_SET(mycard, i)) break;
+	i = 1 + (12-StdDeck_RANK(i))*4 + StdDeck_SUIT(i);
+	file << "cards/" << i << ".png";
+	return LoadFromFile(CString(file.str().c_str()));
 }
 
 BOOL CPictureCtrl::LoadFromFile(CString szFilePath)

@@ -10,9 +10,9 @@ using namespace std;
 int64 Solver::iterations; //number of iterations remaining
 int64 Solver::total = 0; //number of iterations done total
 double Solver::inittime;
-CardMachine Solver::cardmachine(CARDSETTINGS, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
-BettingTree Solver::tree(TREESETTINGS); //the settings are taken from solveparams.h
-MemoryManager Solver::memory(Solver::tree, Solver::cardmachine);
+CardMachine * Solver::cardmachine = NULL;
+BettingTree * Solver::tree = NULL;
+MemoryManager * Solver::memory = NULL;
 #ifdef DO_THREADS
 pthread_mutex_t * Solver::cardsilocks[4] = {NULL,NULL,NULL,NULL}; //one lock per player per gameround per cardsi
 pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
@@ -21,14 +21,29 @@ pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
 
 void Solver::initsolver()
 {
+	cardmachine = new CardMachine(CARDSETTINGS, true, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
+	tree = new BettingTree(TREESETTINGS); //the settings are taken from solveparams.h
+	memory = new MemoryManager(*tree, *cardmachine);
 	GETDBLTIME(inittime);
+
 #ifdef DO_THREADS
 	for(int gr=0; gr<4; gr++)
 	{
-		cardsilocks[gr] = new pthread_mutex_t[2*cardmachine.getcardsimax(gr)];
-		for(int i=0; i<2*cardmachine.getcardsimax(gr); i++)
+		cardsilocks[gr] = new pthread_mutex_t[2*cardmachine->getcardsimax(gr)];
+		for(int i=0; i<2*cardmachine->getcardsimax(gr); i++)
 			pthread_mutex_init(&cardsilocks[gr][i], NULL);
 	}
+#endif
+}
+
+void Solver::destructsolver()
+{
+	delete cardmachine;
+	delete tree;
+	delete memory;
+#ifdef DO_THREADS
+	for(int gr=0; gr<4; gr++)
+		delete[] cardsilocks[gr];
 #endif
 }
 
@@ -67,7 +82,7 @@ void Solver::save(const string &filename, bool writedata)
 
 	// save the data first to get the filesize
 
-	int64 stratfilesize = writedata ? memory.save(filename, cardmachine) : 0;
+	int64 stratfilesize = writedata ? memory->save(filename, *cardmachine) : 0;
 
 	// open up the xml
 
@@ -241,9 +256,9 @@ void Solver::save(const string &filename, bool writedata)
 	ostringstream text;
 	text << endl << endl;
 	BetNode mynode;
-	tree.getnode(PREFLOP, 0, 0, mynode);
+	tree->getnode(PREFLOP, 0, 0, mynode);
 	const int &numa = mynode.numacts;
-	for(int cardsi=cardmachine.getcardsimax(PREFLOP)-1; cardsi>=0; cardsi--)
+	for(int cardsi=cardmachine->getcardsimax(PREFLOP)-1; cardsi>=0; cardsi--)
 	{
 
 		//get pointers to data
@@ -252,7 +267,7 @@ void Solver::save(const string &filename, bool writedata)
 #if STORE_DENOM
 		fpstore_type * stratd;
 #endif
-		memory.dataindexing(PREFLOP, numa, 0, cardsi, stratn, regret
+		memory->dataindexing(PREFLOP, numa, 0, cardsi, stratn, regret
 #if STORE_DENOM
 				, stratd
 #endif
@@ -260,10 +275,13 @@ void Solver::save(const string &filename, bool writedata)
 
 		//print out a heading including example hand
 
-		if(tree.ispushfold())
-			text << setw(5) << left << ":";
+		if(tree->getparams().pushfold)
+			text << setw(5) << left << ":" << cardmachine->preflophandstring(cardsi);
 		else
-			text << endl << "cardsi: " << cardsi << ":" << endl << ":" << endl;
+		{
+			text << endl << "cardsi: " << cardsi << ":" << endl;
+			text << cardmachine->preflophandstring(cardsi) << ":" << endl;
+		}
 
 		//compute the denominator
 		
@@ -276,12 +294,12 @@ void Solver::save(const string &filename, bool writedata)
 			fpworking_type myprob = (fpworking_type)stratn[a] / denominator;
 
 			//aiming for http://www.daimi.au.dk/~bromille/pokerdata/SingleHandSmallBlind/SHSB.4000
-			if(tree.ispushfold() && myprob>0.98 && a==numa-1) 
+			if(tree->getparams().pushfold && myprob>0.98 && a==numa-1) 
 				text << "jam" << endl;
-			else if(tree.ispushfold() && myprob>0.98) 
+			else if(tree->getparams().pushfold && myprob>0.98) 
 				text << "fold" << endl;
-			else if(!tree.ispushfold() || myprob>0.02)
-				text << setw(14) << tree.actionstring(PREFLOP,a,mynode,1.0)+": " << 100*myprob << "%" << endl;
+			else if(!tree->getparams().pushfold || myprob>0.02)
+				text << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100*myprob << "%" << endl;
 		}
 
 		//print out denominator info if exists
@@ -334,7 +352,7 @@ void Solver::threadloop()
 			break; //nothing left to be done
 		}
 		iterations--;
-		cardmachine.getnewgame(cardsi, twoprob0wins);
+		cardmachine->getnewgame(cardsi, twoprob0wins);
 #ifdef DO_THREADS
 		pthread_mutex_lock(&cardsilocks[PREFLOP][cardsi[PREFLOP][P0]*2 + P0]);
 		pthread_mutex_lock(&cardsilocks[PREFLOP][cardsi[PREFLOP][P1]*2 + P1]);
@@ -367,7 +385,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 	//obtain definition of possible bets for this turn
 
 	BetNode mynode;
-	tree.getnode(gr, pot, beti, mynode);
+	tree->getnode(gr, pot, beti, mynode);
 	const int &numa = mynode.numacts; //for ease of typing
 
 	//obtain pointers to data for this turn
@@ -377,7 +395,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 	fpstore_type * stratd;
 #endif
 	if(numa-2 < 0 || numa-2 >= MAX_NODETYPES) REPORT("gcc was right.");
-	memory.dataindexing(gr, numa, actioncounters[gr][numa-2]++, cardsi[gr][(int)mynode.playertoact], 
+	memory->dataindexing(gr, numa, actioncounters[gr][numa-2]++, cardsi[gr][(int)mynode.playertoact], 
 		stratn, regret
 #if STORE_DENOM
 		, stratd
@@ -443,7 +461,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 			REPORT("Invalid betting tree node action reached."); //will exit
 
 		case BetNode::AI: //called allin
-			utility[i] = tree.getstacksize() * (twoprob0wins-1);
+			utility[i] = tree->getparams().stacksize * (twoprob0wins-1);
 			break;
 
 		case BetNode::GO: //next game round
@@ -524,7 +542,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 void Solver::dummywalker(int gr, int pot, int beti)
 {
 	BetNode mynode;
-	tree.getnode(gr, pot, beti, mynode);
+	tree->getnode(gr, pot, beti, mynode);
 	const int &numa = mynode.numacts;
 
 	if(numa-2 < 0 || numa-2 >= MAX_NODETYPES) REPORT("gcc was right.");
