@@ -118,11 +118,11 @@ void Solver::save(const string &filename, bool writedata)
 	ostringstream timestr;
 	timestr << fixed << setprecision(1);
 	if(elapsed > 60.0*60.0*24.0*2.5)
-		timestr << elapsed / (60.0*60.0*24.0*2.5) << " days";
+		timestr << elapsed / (60.0*60.0*24.0) << " days";
 	else if(elapsed > 60.0*60.0*2.0)
-		timestr << elapsed / (60.0*60.0*2.0) << " hours";
+		timestr << elapsed / (60.0*60.0) << " hours";
 	else if(elapsed > 60.0*2.0)
-		timestr << elapsed / (60.0*2.0) << " mins";
+		timestr << elapsed / (60.0) << " mins";
 	else
 		timestr << elapsed << " secs";
 	run->SetAttribute("totaltime", timestr.str());
