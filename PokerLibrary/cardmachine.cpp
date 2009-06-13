@@ -5,7 +5,6 @@
 #include "../utility.h" //has COMBINE, REPORT...
 #include "../PokerLibrary/constants.h"
 #include <fstream>
-#include <cstring> //for strlen
 #include <poker_defs.h>
 #include <inlines/eval.h>
 

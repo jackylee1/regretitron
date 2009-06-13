@@ -161,7 +161,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\PictureCtrl.cpp"
+				RelativePath=".\PictureCtrl.cpp"
 				>
 			</File>
 			<File
@@ -203,7 +203,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\PictureCtrl.h"
+				RelativePath=".\PictureCtrl.h"
 				>
 			</File>
 			<File

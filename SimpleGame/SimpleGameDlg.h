@@ -4,7 +4,7 @@
 #pragma once
 
 #include "../PokerPlayerMFC/botapi.h"
-#include "../picturectrl.h"
+#include "../PokerPlayerMFC/picturectrl.h"
 #include "afxwin.h"
 
 #define PREFLOP 0

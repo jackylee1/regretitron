@@ -1,6 +1,6 @@
 #pragma once
 #include "afxwin.h"
-#include "../picturectrl.h"
+#include "picturectrl.h"
 #include "strategy.h"
 #include <vector>
 using std::vector;

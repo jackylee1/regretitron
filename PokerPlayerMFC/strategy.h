@@ -13,7 +13,6 @@ using namespace std;
 class CardMachine;
 class BettingTree;
 
-typedef vector< pair<int,int> > betihist_t;
 
 class Strategy
 {
@@ -29,7 +28,7 @@ public:
 	inline CardMachine& getcardmach() const { return *cardmach; }
 
 	//my own strategy file reading implementation
-	void getprobs(const betihist_t &bh, const vector<CardMask> &cards, vector<double> &probs);
+	void getprobs(int gr, int actioni, int numa, const vector<CardMask> &cards, vector<double> &probs);
 
 private:
 	//we do not support copying.
@@ -46,21 +45,6 @@ private:
 	//the strategy file
 	ifstream strategyfile;
 	vector< vector<int64> > dataoffset;
-
-	//another walker incarnation used for indexing
-	class Indexer
-	{
-		public:
-			Indexer(const betihist_t &betihist, Strategy * strat);
-			inline pair<int,int> getindex() { return go(0,0,0); }
-
-		private:
-			pair<int,int> go(int gr, int pot, int beti);
-			int depth;
-			const betihist_t &bh;
-			vector< vector<int> > counters;
-			Strategy * thisstrat;
-	};
 };
 
 #endif

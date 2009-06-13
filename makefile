@@ -6,6 +6,10 @@ ifeq ($(PEDANTIC),y)
    CPP += -ansi -pedantic
 endif
 
+ifeq ($(WEXTRA),y)
+   CPP += -Wextra
+endif
+
 # define the output executable file
 # OUT is used by clean. MYOUT is used for compiling to.
 OUT := bin/PokerNoLimit

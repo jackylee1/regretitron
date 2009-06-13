@@ -110,24 +110,17 @@ Strategy::~Strategy()
 	delete tree;
 }
 
-void Strategy::getprobs(const betihist_t &bh, const vector<CardMask> &cards, vector<double> &probs)
+void Strategy::getprobs(int gr, int actioni, int numa, const vector<CardMask> &cards, vector<double> &probs)
 {
-
-	// get the action index
-
-	Indexer myindexer(bh, this);
-	pair<int,int> numaacti = myindexer.getindex();
-	const int &numa = numaacti.first;
-	const int &actioni = numaacti.second;
-	const int &gr = bh.back().first;
 
 	//get the cardi 
 
-	int cardsi = cardmach->getcardsi(gr, cards); //bh.back().first is the current gr
+	int cardsi = cardmach->getcardsi(gr, cards);
 
 	//read the char probabilities, matching the offset to the memorymgr code.
 	
 	unsigned char charprobs[MAX_ACTIONS-1];
+	//seekg ( offset + combinedindex * sizeofeachdata )
 	strategyfile.seekg( dataoffset[gr][numa-2] + COMBINE(cardsi, actioni, actionmax[gr][numa-2]) * (numa-1) );
 	strategyfile.read((char*)charprobs, numa-1);
 	if(strategyfile.gcount()!=numa-1 || strategyfile.eof())
@@ -143,61 +136,4 @@ void Strategy::getprobs(const betihist_t &bh, const vector<CardMask> &cards, vec
 		probs[i] = (double)charprobs[i]/256.0;
 	}
 	probs[numa-1] = (double)(256-sum)/256.0;
-
 }
-
-Strategy::Indexer::Indexer(const betihist_t &betihist, Strategy * strat) :
-	bh(betihist), 
-	depth(0),
-	counters(4, vector<int>(MAX_NODETYPES, 0)), //2D vector filled with 0's
-	thisstrat(strat)
-{
-	if(bh[depth].first!=PREFLOP || bh[depth].second!=0)
-		REPORT("invalid first node");
-}
-
-//pair is numa and actioni
-pair<int,int> Strategy::Indexer::go(int gr, int pot, int beti)
-{
-	BetNode mynode;
-	thisstrat->tree->getnode(gr, pot, beti, mynode);
-	const int &numa = mynode.numacts; //for ease of typing
-
-	if(++depth == bh.size())
-		return pair<int,int>(numa, counters[gr][numa-2]); //need to get numa out using pair
-	else
-		counters[gr][numa-2]++;
-
-	for(int a=0; a<numa; a++)
-	{
-		//depth points to the index in the vector of the NEXT
-		//action we want to find. 
-		switch(mynode.result[a])
-		{
-		case BetNode::NA:
-				REPORT("invalid tree");
-		case BetNode::FD: //no next action
-		case BetNode::AI: //no next action
-				continue;
-		case BetNode::GO:
-				if(gr!=RIVER)
-				{
-					if(bh[depth].first==gr+1 && bh[depth].second==0)
-						return go(gr+1, pot+mynode.potcontrib[a], 0);
-					else
-						go(gr+1, pot+mynode.potcontrib[a], 0);
-				}
-				continue;
-
-			default://child node
-				if(bh[depth].first==gr && bh[depth].second==mynode.result[a])
-					return go(gr, pot, mynode.result[a]);
-				else
-					go(gr, pot, mynode.result[a]);
-				continue;
-		}
-	}
-
-	REPORT("should have found a suitable action by now.");
-}
-

@@ -17,6 +17,4 @@ enum Player
 const int MAX_ACTIONS = 9;
 const int MAX_NODETYPES = MAX_ACTIONS-1; //because there are no single membered nodes
 
-const int MAX_STRATEGIES = 20; //number of strategies to reserve room for in BotAPI
-
 #endif

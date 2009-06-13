@@ -21,20 +21,18 @@ bool fpequal(double a, double b)
 
 BotAPI::BotAPI(bool diagon)
    : isdiagnosticson(diagon), answer(-1), MyWindow(NULL),
-     num_used_strats(0),
+     mystrats(), //initialize to be empty
 	 currstrat(NULL),
 	 actualinv(2, -1), //size is 2, initial values are -1
 	 perceivedinv(2, -1), //size is 2, initial values are -1
 	 cards(4), //size is 4 (one for each gr), initial values blah
 	 bot_status(INVALID),
-	 actionchooser() //seeds rand with time and clock
+	 actionchooser(), //seeds rand with time and clock
+	 historyindexer(this)
 {
-
 	CFileDialog filechooser(TRUE, "xml", NULL, OFN_NOCHANGEDIR);
 	if(filechooser.DoModal() == IDCANCEL) exit(0);
-	mystrats[num_used_strats++] = new Strategy(string((LPCTSTR)filechooser.GetPathName()));
-
-	if(num_used_strats >= MAX_STRATEGIES) REPORT("not enough room for strategies!");
+	mystrats.push_back(new Strategy(string((LPCTSTR)filechooser.GetPathName())));
 }
 
 BotAPI::~BotAPI()
@@ -54,14 +52,14 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	//find the strategy with the nearest stacksize
 	
 	double besterror = numeric_limits<double>::infinity();
-	for(int i=0; i<num_used_strats; i++)
+	for(unsigned int i=0; i<mystrats.size(); i++)
 	{
 		double error = abs( mystrats[i]->gettree().getparams().stacksize 
 			/ mystrats[i]->gettree().getparams().bblind - stacksize/bblind);
 		if(error < besterror)
 		{
 			besterror = error;
-			currstrat = mystrats[i]; //iterator
+			currstrat = mystrats[i]; //pointer
 		}
 	}
 
@@ -80,13 +78,13 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 
 	currentgr = PREFLOP;
 	currentbeti = 0;
-	betihistory.clear(); //destroy whatever it had
-	betihistory.push_back(pair<int,int>(PREFLOP,currentbeti));
 	currstrat->gettree().getnode(PREFLOP,perceivedpot,currentbeti,mynode);
 
 	offtreebetallins = false;
 	answer = -1;
 	bot_status = WAITING_ACTION;
+
+	historyindexer.reset(); //primes with PREFLOP info
 	processmyturn();
 }
 
@@ -102,18 +100,18 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot)
 
 	//Update the state of our private data members
 
+	perceivedpot += perceivedinv[0]; //both investeds must be the same
 	actualinv[P0] = 0;
 	actualinv[P1] = 0;
 	perceivedinv[P0] = 0;
 	perceivedinv[P1] = 0;
 	actualpot = newpot/multiplier;
-	perceivedpot += perceivedinv[0]; //both investeds must be the same
 	cards[gr] = newboard;
 	currentgr = gr;
 	currentbeti = 0; //ready for P0 to act
-	betihistory.push_back(pair<int,int>(currentgr,currentbeti));
 	currstrat->gettree().getnode(gr,perceivedpot,currentbeti,mynode);
 	bot_status = WAITING_ACTION;
+	historyindexer.push(currentgr, perceivedpot, currentbeti);
 	processmyturn();
 }
 
@@ -297,7 +295,7 @@ void BotAPI::dobet(Player pl, double amount)
 		actualinv[pl] = amount;
 		perceivedinv[pl] = mynode.potcontrib[bestaction];
 		currentbeti = mynode.result[bestaction];
-		betihistory.push_back(pair<int,int>(currentgr,currentbeti));
+		historyindexer.push(currentgr, perceivedpot, currentbeti);
 		currstrat->gettree().getnode(currentgr,perceivedpot,currentbeti,mynode);
 	}
 }
@@ -319,7 +317,7 @@ void BotAPI::doallin(Player pl)
 	actualinv[pl] = currstrat->gettree().getparams().stacksize-actualpot;
 	perceivedinv[pl] = currstrat->gettree().getparams().stacksize-perceivedpot;
 	currentbeti = mynode.result[allinaction];
-	betihistory.push_back(pair<int,int>(currentgr,currentbeti));
+	historyindexer.push(currentgr, perceivedpot, currentbeti);
 	currstrat->gettree().getnode(currentgr,perceivedpot,currentbeti,mynode);
 }
 
@@ -331,14 +329,17 @@ void BotAPI::processmyturn()
 	if(bot_status == WAITING_ACTION && mynode.playertoact == myplayer)
 	{
 		double cumulativeprob = 0, randomprob;
-		vector<double> actionprobability;
-		currstrat->getprobs(betihistory, cards, actionprobability);
+		if(historyindexer.getnuma() != mynode.numacts)
+			REPORT("Indexer has FAILED!"); //only reason for hist indexer getnuma
+		vector<double> probabilities(mynode.numacts);
+		currstrat->getprobs(currentgr, historyindexer.getactioni(),
+			mynode.numacts, cards, probabilities);
 		randomprob = actionchooser.randExc(); //generates the answer!
 		answer = -1;
 		do{
 			for(int a=0; a<mynode.numacts; a++)
 			{
-				cumulativeprob += actionprobability[a];
+				cumulativeprob += probabilities[a];
 				if (cumulativeprob > randomprob)
 				{
 					answer = a;
@@ -350,7 +351,7 @@ void BotAPI::processmyturn()
 
 	//update diagnostics window
 
-	if(isdiagnosticson && bot_status != INVALID) 
+	if(isdiagnosticson)
 		populatewindow();
 }
 
@@ -386,10 +387,13 @@ void BotAPI::populatewindow(CWnd* parentwin)
 
 	//set actions
 
+	if(bot_status == INVALID) return; //can't do nothin with that!
+
 	if(mynode.playertoact == myplayer)
 	{
-		vector<double> probabilities;
-		currstrat->getprobs(betihistory, cards, probabilities);
+		vector<double> probabilities(mynode.numacts);
+		currstrat->getprobs(currentgr, historyindexer.getactioni(),
+			mynode.numacts, cards, probabilities);
 		for(int a=0; a<mynode.numacts; a++)
 		{
 			MyWindow->ActButton[a].SetWindowText(CSTR(currstrat->gettree().actionstring(currentgr,a,mynode,multiplier)));
@@ -483,5 +487,71 @@ void BotAPI::destroywindow()
 		delete MyWindow;
 		MyWindow = NULL;
 	}
+}
+
+void BotAPI::BetHistoryIndexer::push(int gr, int pot, int beti) //or could have go return pot
+{
+	history.push_back(HistoryNode(gr, pot, beti));
+	HistoryNode &prev = history[history.size()-2];
+	if(!go(prev.gr, prev.pot, prev.beti))
+		REPORT("could not find matching node in the tree in BetHistoryIndexer::push()");
+}
+
+void BotAPI::BetHistoryIndexer::reset() //clear and prime with preflop info
+{ 
+	current_actioni = -1;
+	current_numa = -1;
+	history.clear();
+	for(int i=0; i<4; i++) 
+		for(int j=0; j<MAX_NODETYPES; j++) 
+			counters[i][j]=0;
+
+	//now do same as push, but can't call push as don't have previous HistoryNode from history vect.
+	history.push_back(HistoryNode(PREFLOP, 0, 0));
+	if(!go(PREFLOP, 0, 0)) //will just find it right away and set what it needs to set
+		REPORT("could not find matching node in the tree in BetHistoryIndexer::push()");
+
+}
+
+bool BotAPI::BetHistoryIndexer::go(int gr, int pot, int beti)
+{
+	BetNode mynode;
+	parentbotapi->currstrat->gettree().getnode(gr, pot, beti, mynode);
+	const int &numa = mynode.numacts; //for ease of typing
+
+	if(history.back().beti==beti && history.back().gr==gr && history.back().pot==pot)
+	{
+		//need to save at least one of these. we save both for cleanliness and fun. 
+		current_numa = numa;
+		current_actioni = counters[gr][numa-2];
+		return true; //found it!
+	}
+
+	counters[gr][numa-2]++;
+
+	for(int a=0; a<numa; a++) //looking for actions that lead to more play
+	{
+		switch(mynode.result[a])
+		{
+		case BetNode::NA:
+			REPORT("invalid tree");
+		case BetNode::FD: //no next action
+		case BetNode::AI: //no next action
+			continue;
+		case BetNode::GO:
+			if(gr!=RIVER) //RIVER would mean no next action
+				if(go(gr+1, pot+mynode.potcontrib[a], 0)) //run go and test value to see if we found it
+					return true; //found it!
+			continue; //didn't find it (or if RIVER not even a next action), keep trying
+
+		default://child node
+			if(go(gr, pot, mynode.result[a]))
+				return true; //found it!
+			continue; //keep tryin..
+		}
+	}
+
+	//we went through all the actions, and didn't find it.
+	return false;
 }
 

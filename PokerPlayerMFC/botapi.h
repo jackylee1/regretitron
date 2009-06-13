@@ -51,11 +51,13 @@ private:
 	DiagnosticsPage * MyWindow;
 	void populatewindow(CWnd * parentwin = NULL);
 	void destroywindow();
+	bool isdiagnosticson;
 
 	//private data
-	Strategy * mystrats[MAX_STRATEGIES];
-	int num_used_strats;
+	MTRand actionchooser;
+	vector<Strategy*> mystrats;
 	Strategy * currstrat; //pointer from above array
+
 	double multiplier; //ACTUAL big blind amount divided by big blind amount used by strategy
 	vector<double> actualinv; //the invested amount from the ACTUAL game, SCALED by multiplier
 	vector<int> perceivedinv; //the perceived invested amount, as determined by the steps in the betting tree
@@ -67,13 +69,44 @@ private:
 
 	int currentgr;
 	int currentbeti;
-	betihist_t betihistory;
 	BetNode mynode;
 	bool offtreebetallins; //when they bet and my tree doesn't have bets there
-	bool isdiagnosticson;
 	int answer; //updated as soon as its the bot's turn to act
 	enum { INVALID, WAITING_ACTION, WAITING_ROUND } bot_status;
-	MTRand actionchooser;
+	
+	//another walker incarnation used for indexing
+	//only used once by BotAPI, so it is here.
+	class BetHistoryIndexer
+	{
+	public:
+		BetHistoryIndexer(BotAPI * parent) : parentbotapi(parent), history(), 
+			counters(4, vector<int>(MAX_NODETYPES, 0)) {}
+		void push(int gr, int pot, int beti);
+		void reset();
+
+		int getactioni() const { return current_actioni; }
+		int getnuma() const { return current_numa; }
+
+	private:
+
+		BotAPI * parentbotapi;
+
+		bool go(int gr, int pot, int beti);
+
+		struct HistoryNode
+		{   //the betting history is defined by gr and beti, but it's cleaner and allows more
+			//error checking to store pot too.
+			HistoryNode(int gr2, int pot2, int beti2) : gr(gr2), pot(pot2), beti(beti2) {}
+			int gr;
+			int pot;
+			int beti;
+		};
+
+		vector< HistoryNode > history;
+		vector< vector<int> > counters;
+		int current_actioni;
+		int current_numa;
+	} historyindexer;
 };
 
 #endif
