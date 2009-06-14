@@ -31,14 +31,13 @@ public:
 	//directly from BotAPI. No wrapper functions or anything are used. they are
 	//called straight from outside this class
 	CStatic PotSize;
-	CStatic Bethist[3];
 	CButton ActButton[9];
 	CProgressCtrl ActionBars[9];
 	CStatic PerceivedInvestHum;
-	CStatic SceniText;
-	CStatic BetiText;
 	CStatic BinNumber;
 	CStatic BinMax;
+	CStatic BetHistory;
+	CStatic BoardScore;
 
 	//these are the interface for updating the example hands. i did these differently
 	//because i want the button on the page to refresh them. because of that, it makes

@@ -431,18 +431,29 @@ void BotAPI::populatewindow(CWnd* parentwin)
 		}
 	}
 
-	//set sceni beti
+	//set beti history
 
-	text.Format(TEXT("no sceni"));
-	MyWindow->SceniText.SetWindowText(text);
-	text.Format(TEXT("%d"),currentbeti);
-	MyWindow->BetiText.SetWindowText(text);
+	const vector<HistoryNode> &myhist = historyindexer.gethistory();
+	text.Format("(bot = P%d, human = P%d)\n", myplayer, 1-myplayer);
+	for(unsigned int i=0; i<myhist.size(); i++)
+	{
+		if(i==0 || myhist[i].gr != myhist[i-1].gr)
+		{
+			switch(myhist[i].gr)
+			{
+			case PREFLOP: text.Append("Preflop:  "); break;
+			case FLOP: text.Append("\nFlop:  "); break;
+			case TURN: text.Append("\nTurn:  "); break;
+			case RIVER: text.Append("\nRiver:  "); break;
+			default: REPORT("broken Bet History");
+			}
+			text.AppendFormat("%d", myhist[i].beti);
+		}
+		else
+			text.AppendFormat(" - %d", myhist[i].beti);
 
-	//set bethist
-
-	text = TEXT("no bethist");
-	for(int g=PREFLOP; g<RIVER; g++)
-		MyWindow->Bethist[g].SetWindowText(text);
+	}
+	MyWindow->BetHistory.SetWindowText(text);
 
 	//set pot amount
 
@@ -456,7 +467,7 @@ void BotAPI::populatewindow(CWnd* parentwin)
 		multiplier*perceivedinv[1-myplayer]);
 	MyWindow->PerceivedInvestHum.SetWindowText(text);
 
-	//set bin number
+	//set bin number & board score
 
 	int handi, boardi;
 	currstrat->getcardmach().getindices(currentgr, cards, handi, boardi);
@@ -464,6 +475,7 @@ void BotAPI::populatewindow(CWnd* parentwin)
 	{
 		MyWindow->BinMax.SetWindowText(TEXT("Bin number:"));
 		MyWindow->BinNumber.SetWindowText(TEXT("-"));
+		MyWindow->BoardScore.SetWindowText(TEXT("-"));
 	}
 	else
 	{
@@ -471,6 +483,8 @@ void BotAPI::populatewindow(CWnd* parentwin)
 		MyWindow->BinMax.SetWindowText(text);
 		text.Format(TEXT("%d"),handi);
 		MyWindow->BinNumber.SetWindowText(text);
+		text.Format(TEXT("%d"),boardi);
+		MyWindow->BoardScore.SetWindowText(text);
 	}
 
 	//send cards and our strategy to MyWindow, so that it can draw the cards as it needs
@@ -500,6 +514,14 @@ void BotAPI::BetHistoryIndexer::push(int gr, int pot, int beti) //or could have 
 	HistoryNode &prev = history[history.size()-2];
 	if(!go(prev.gr, prev.pot, prev.beti))
 		REPORT("could not find matching node in the tree in BetHistoryIndexer::push()");
+	for(int i=0; i<4; i++) 
+		for(int j=0; j<MAX_NODETYPES; j++) 
+			if(counters[i][j]<0 || counters[i][j]>parentbotapi->currstrat->getactionmax(i,j))
+				REPORT("counters too high!");
+	if(current_actioni < 0 || current_actioni >= parentbotapi->currstrat->getactionmax(gr, current_numa-2))
+		REPORT("current_actioni is bad!");
+	if(current_actioni != counters[gr][current_numa-2])
+		REPORT("huh?");
 }
 
 void BotAPI::BetHistoryIndexer::reset() //clear and prime with preflop info

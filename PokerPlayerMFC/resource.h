@@ -76,6 +76,7 @@
 #define IDC_SCENI                       1059
 #define IDC_CARD30                      1060
 #define IDC_BETI                        1060
+#define IDC_BOARD                       1060
 #define IDC_CARD31                      1061
 #define IDC_PROGRESS1                   1061
 #define IDC_CARD32                      1062
@@ -85,6 +86,7 @@
 #define IDC_CARD35                      1065
 #define IDC_BINNUM                      1065
 #define IDC_MAXBIN                      1066
+#define IDC_BETIHIST                    1067
 #define IDC_PROGRESS3                   1068
 #define IDC_PROGRESS4                   1069
 #define IDC_PROGRESS5                   1070
@@ -99,7 +101,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        102
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1067
+#define _APS_NEXT_CONTROL_VALUE         1068
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

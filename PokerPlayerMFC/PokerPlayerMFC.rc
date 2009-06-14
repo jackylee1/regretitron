@@ -102,25 +102,16 @@ BEGIN
     CONTROL         "Radio1",IDC_RADIO8,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,268,223,45,8,WS_EX_RIGHT
     CONTROL         "Radio1",IDC_RADIO9,"Button",BS_AUTORADIOBUTTON | BS_RIGHT | BS_MULTILINE,268,236,45,8,WS_EX_RIGHT
     PUSHBUTTON      "Refresh Hands",IDC_REFRESH,117,7,59,10
-    RTEXT           "$0.00 - $0.00",IDC_TEXT0,330,73,56,8
-    RTEXT           "Known pot size:",IDC_STATIC,262,73,66,8
-    RTEXT           "Preflop bet style:",IDC_STATIC,262,87,66,8
-    RTEXT           "preflop style",IDC_TEXT1,330,87,56,8
-    RTEXT           "flop style",IDC_TEXT2,330,96,56,8
-    RTEXT           "turn style",IDC_TEXT3,330,105,56,8
+    RTEXT           "$0.00",IDC_TEXT0,344,50,47,8
+    RTEXT           "Perceived pot size:",IDC_STATIC,267,50,66,8
+    RTEXT           "Beti History:",IDC_STATIC,267,62,66,8
     LTEXT           "Random cards with same index:",IDC_STATIC,7,8,99,8
-    RTEXT           "Perceived Invested:",IDC_STATIC,262,49,66,8
-    RTEXT           "Human: $0.00",IDC_INVESTHUM,330,49,56,18
+    RTEXT           "Perceived Invested:",IDC_STATIC,267,30,66,8
+    RTEXT           "Human: $0.00",IDC_INVESTHUM,335,30,56,18
     GROUPBOX        "Hole cards",IDC_STATIC,7,21,70,227
     GROUPBOX        "Flop",IDC_STATIC,79,21,100,227
     GROUPBOX        "Turn",IDC_STATIC,181,21,38,227
     GROUPBOX        "River",IDC_STATIC,221,21,39,227
-    RTEXT           "Flop bet style:",IDC_STATIC,262,96,66,8
-    RTEXT           "Turn bet style:",IDC_STATIC,262,105,66,8
-    RTEXT           "Scenario index:",IDC_STATIC,262,7,66,8
-    RTEXT           "Bet index:",IDC_STATIC,262,20,66,8
-    RTEXT           "beti",IDC_BETI,330,20,56,8
-    RTEXT           "sceni",IDC_SCENI,330,7,56,8
     CONTROL         "",IDC_PROGRESS1,"msctls_progress32",0x1,318,132,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
     CONTROL         "",IDC_PROGRESS2,"msctls_progress32",0x1,318,145,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
     CONTROL         "",IDC_PROGRESS3,"msctls_progress32",0x1,318,158,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
@@ -131,8 +122,11 @@ BEGIN
     CONTROL         "",IDC_PROGRESS8,"msctls_progress32",0x1,318,223,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
     CONTROL         "",IDC_PROGRESS9,"msctls_progress32",0x1,318,236,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
     GROUPBOX        "Actions, including randomly chosen one:",IDC_STATIC,265,121,138,127
-    RTEXT           "Bin number:",IDC_MAXBIN,262,35,66,8
-    RTEXT           "bin",IDC_BINNUM,330,35,56,8
+    RTEXT           "Bin number:",IDC_MAXBIN,267,7,66,8
+    RTEXT           "bin",IDC_BINNUM,343,7,48,8
+    RTEXT           "Board score:",IDC_STATIC,293,18,40,8
+    RTEXT           "board",IDC_BOARD,352,18,39,8
+    RTEXT           "Static",IDC_BETIHIST,276,75,115,42
 END
 
 

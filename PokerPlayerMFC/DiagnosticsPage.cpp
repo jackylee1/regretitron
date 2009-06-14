@@ -39,9 +39,6 @@ void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_TEXT0, PotSize);
-	DDX_Control(pDX, IDC_TEXT1, Bethist[0]);
-	DDX_Control(pDX, IDC_TEXT2, Bethist[1]);
-	DDX_Control(pDX, IDC_TEXT3, Bethist[2]);
 
 	DDX_Control(pDX, IDC_CARD00, Card[0][0]);
 	DDX_Control(pDX, IDC_CARD01, Card[0][1]);
@@ -93,8 +90,6 @@ void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RADIO8, ActButton[7]);
 	DDX_Control(pDX, IDC_RADIO9, ActButton[8]);
 	DDX_Control(pDX, IDC_INVESTHUM, PerceivedInvestHum);
-	DDX_Control(pDX, IDC_SCENI, SceniText);
-	DDX_Control(pDX, IDC_BETI, BetiText);
 	DDX_Control(pDX, IDC_PROGRESS1, ActionBars[0]);
 	DDX_Control(pDX, IDC_PROGRESS2, ActionBars[1]);
 	DDX_Control(pDX, IDC_PROGRESS3, ActionBars[2]);
@@ -106,6 +101,8 @@ void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_PROGRESS9, ActionBars[8]);
 	DDX_Control(pDX, IDC_BINNUM, BinNumber);
 	DDX_Control(pDX, IDC_MAXBIN, BinMax);
+	DDX_Control(pDX, IDC_BETIHIST, BetHistory);
+	DDX_Control(pDX, IDC_BOARD, BoardScore);
 }
 
 

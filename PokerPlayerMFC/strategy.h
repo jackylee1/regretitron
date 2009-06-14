@@ -30,6 +30,8 @@ public:
 	//my own strategy file reading implementation
 	void getprobs(int gr, int actioni, int numa, const vector<CardMask> &cards, vector<double> &probs);
 
+	int getactionmax(int gr, int nodei) const { return actionmax[gr][nodei]; }
+
 private:
 	//we do not support copying.
 	Strategy(const Strategy& rhs);
