@@ -175,9 +175,13 @@ void Solver::save(const string &filename, bool writedata)
 
 	// tree parameters
 
+	TiXmlElement * mytree = new TiXmlElement("tree");
+	root->LinkEndChild(mytree);
+
 	TiXmlElement * blinds = new TiXmlElement("blinds");
 	blinds->SetAttribute("sblind", (int)tree->getparams().sblind);
 	blinds->SetAttribute("bblind", (int)tree->getparams().bblind);
+	mytree->LinkEndChild(blinds);
 
 	TiXmlElement * bets = new TiXmlElement("bets");
 	bets->SetAttribute("B1", (int)tree->getparams().bets[0]);
@@ -186,70 +190,26 @@ void Solver::save(const string &filename, bool writedata)
 	bets->SetAttribute("B4", (int)tree->getparams().bets[3]);
 	bets->SetAttribute("B5", (int)tree->getparams().bets[4]);
 	bets->SetAttribute("B6", (int)tree->getparams().bets[5]);
+	mytree->LinkEndChild(bets);
 
-	TiXmlElement * raise1 = new TiXmlElement("raise1");
-	raise1->SetAttribute("R11", (int)tree->getparams().raises[0][0]);
-	raise1->SetAttribute("R12", (int)tree->getparams().raises[0][1]);
-	raise1->SetAttribute("R13", (int)tree->getparams().raises[0][2]);
-	raise1->SetAttribute("R14", (int)tree->getparams().raises[0][3]);
-	raise1->SetAttribute("R15", (int)tree->getparams().raises[0][4]);
-	raise1->SetAttribute("R16", (int)tree->getparams().raises[0][5]);
-
-	TiXmlElement * raise2 = new TiXmlElement("raise2");
-	raise2->SetAttribute("R21", (int)tree->getparams().raises[1][0]);
-	raise2->SetAttribute("R22", (int)tree->getparams().raises[1][1]);
-	raise2->SetAttribute("R23", (int)tree->getparams().raises[1][2]);
-	raise2->SetAttribute("R24", (int)tree->getparams().raises[1][3]);
-	raise2->SetAttribute("R25", (int)tree->getparams().raises[1][4]);
-	raise2->SetAttribute("R26", (int)tree->getparams().raises[1][5]);
-
-	TiXmlElement * raise3 = new TiXmlElement("raise3");
-	raise3->SetAttribute("R31", (int)tree->getparams().raises[2][0]);
-	raise3->SetAttribute("R32", (int)tree->getparams().raises[2][1]);
-	raise3->SetAttribute("R33", (int)tree->getparams().raises[2][2]);
-	raise3->SetAttribute("R34", (int)tree->getparams().raises[2][3]);
-	raise3->SetAttribute("R35", (int)tree->getparams().raises[2][4]);
-	raise3->SetAttribute("R36", (int)tree->getparams().raises[2][5]);
-
-	TiXmlElement * raise4 = new TiXmlElement("raise4");
-	raise4->SetAttribute("R41", (int)tree->getparams().raises[3][0]);
-	raise4->SetAttribute("R42", (int)tree->getparams().raises[3][1]);
-	raise4->SetAttribute("R43", (int)tree->getparams().raises[3][2]);
-	raise4->SetAttribute("R44", (int)tree->getparams().raises[3][3]);
-	raise4->SetAttribute("R45", (int)tree->getparams().raises[3][4]);
-	raise4->SetAttribute("R46", (int)tree->getparams().raises[3][5]);
-
-	TiXmlElement * raise5 = new TiXmlElement("raise5");
-	raise5->SetAttribute("R51", (int)tree->getparams().raises[4][0]);
-	raise5->SetAttribute("R52", (int)tree->getparams().raises[4][1]);
-	raise5->SetAttribute("R53", (int)tree->getparams().raises[4][2]);
-	raise5->SetAttribute("R54", (int)tree->getparams().raises[4][3]);
-	raise5->SetAttribute("R55", (int)tree->getparams().raises[4][4]);
-	raise5->SetAttribute("R56", (int)tree->getparams().raises[4][5]);
-
-	TiXmlElement * raise6 = new TiXmlElement("raise6");
-	raise6->SetAttribute("R61", (int)tree->getparams().raises[5][0]);
-	raise6->SetAttribute("R62", (int)tree->getparams().raises[5][1]);
-	raise6->SetAttribute("R63", (int)tree->getparams().raises[5][2]);
-	raise6->SetAttribute("R64", (int)tree->getparams().raises[5][3]);
-	raise6->SetAttribute("R65", (int)tree->getparams().raises[5][4]);
-	raise6->SetAttribute("R66", (int)tree->getparams().raises[5][5]);
+	for(int N=0; N<6; N++)
+	{
+		ostringstream raiseN;
+		raiseN << "raise" << N+1;
+		TiXmlElement * raise = new TiXmlElement(raiseN.str());
+		for(int M=0; M<6; M++)
+		{
+			ostringstream RNM;
+			RNM << 'R' << N+1 << M+1;
+			raise->SetAttribute(RNM.str(), (int)tree->getparams().raises[N][M]);
+		}
+		mytree->LinkEndChild(raise);
+	}
 
 	TiXmlElement * sspushfold = new TiXmlElement("sspf");
 	sspushfold->SetAttribute("stacksize", (int)tree->getparams().stacksize);
 	sspushfold->SetAttribute("pushfold", tree->getparams().pushfold);
-
-	TiXmlElement * mytree = new TiXmlElement("tree");
-	mytree->LinkEndChild(blinds);
-	mytree->LinkEndChild(bets);
-	mytree->LinkEndChild(raise1);
-	mytree->LinkEndChild(raise2);
-	mytree->LinkEndChild(raise3);
-	mytree->LinkEndChild(raise4);
-	mytree->LinkEndChild(raise5);
-	mytree->LinkEndChild(raise6);
 	mytree->LinkEndChild(sspushfold);
-	root->LinkEndChild(mytree);
 
 	// print the first node strategy to an ostringstream
 
