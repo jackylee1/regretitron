@@ -2,7 +2,6 @@
 #include "solver.h"
 #include <sstream>
 #include <iomanip>
-#include <numeric> //for accumulate
 #include "../TinyXML++/tinyxml.h"
 using namespace std;
 
@@ -89,7 +88,8 @@ void Solver::save(const string &filename, bool writedata)
 	TiXmlDocument doc;
 	TiXmlDeclaration * decl = new TiXmlDeclaration("1.0","","");  
 	doc.LinkEndChild(decl);
-	TiXmlElement * root = new TiXmlElement("paramsv1");  
+	TiXmlElement * root = new TiXmlElement("strategy");  
+	root->SetAttribute("version", SAVE_FORMAT_VERSION);
 	doc.LinkEndChild(root);  
 
 	//strategy file, if saved
@@ -245,7 +245,9 @@ void Solver::save(const string &filename, bool writedata)
 
 		//compute the denominator
 		
-		fpworking_type denominator = accumulate(stratn, stratn+numa, (fpworking_type)0);
+		fpworking_type denominator = 0;
+		for(int i=0; i<numa; i++)
+			denominator += stratn[i];
 
 		//print out each action
 

@@ -10,10 +10,10 @@
 #define TOSTRING(symb) STRINGIFY(symb)
 
 //main settings
-const char SAVENAME[] = "testbotapi1";
+const char SAVENAME[] = "testbotapi2";
 #define TESTXML 0
 #define STOPAFTER 1*MILLION*MILLION
-#define SAVEAFTER 1*MILLION
+#define SAVEAFTER 0
 
 //solver settings
 #define FPWORKING_T long double
@@ -56,13 +56,13 @@ const treesettings_t TREESETTINGS =
 #if PUSHFOLD
 
 	SB, BB, //smallblind, bigblind
-	{99,99,99,99,99,99}, //B1 - B6
-	{99,99,99,99,99,99}, //R11 - R16
-	{99,99,99,99,99,99}, //R21 - R26
-	{99,99,99,99,99,99}, //R31 - R36
-	{99,99,99,99,99,99}, //R41 - R46
-	{99,99,99,99,99,99}, //R51 - R56
-	{99,99,99,99,99,99}, //R61 - R66
+	{99,99,99,99,99,99},   //B1 - B6
+	{{99,99,99,99,99,99},  //R11 - R16
+	 {99,99,99,99,99,99},  //R21 - R26
+	 {99,99,99,99,99,99},  //R31 - R36
+	 {99,99,99,99,99,99},  //R41 - R46
+	 {99,99,99,99,99,99},  //R51 - R56
+	 {99,99,99,99,99,99}}, //R61 - R66
 	SS*BB, true //stacksize, pushfold
 
 #elif SS<=8 //all possible options are represented

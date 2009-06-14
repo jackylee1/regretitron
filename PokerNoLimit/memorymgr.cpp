@@ -7,7 +7,7 @@
 #include <fstream> //for save function
 #include <sstream> //for space function
 #include <iomanip> //for space function
-#include <numeric> //for accumulate
+#include <algorithm> //for max_element
 using namespace std;
 
 template <int N>
@@ -20,31 +20,62 @@ dataN_t<N>::dataN_t() //initialize all to zero
 #endif
 }
 
-//probability 0 is mapped to 0
-//probability 1 is mapped to 256
-//then is rounded down, to yeild number 0-255, with all number used equally.
+//each char value represents as equal segment in the floating point range [0, max),
+//with max then mapped to 255.
 template <int N>
 stratN_t<N>::stratN_t(const dataN_t<N> &data)
 {
-	fpworking_type denominator = accumulate(data.stratn, data.stratn+N, (fpworking_type)0);
+	fpstore_type max_value = *max_element(data.stratn, data.stratn+N);
 
-	for(int a=0; a<N-1; a++)
+	if(max_value==0) //algorithm never reached this node.
+		for(int a=0; a<N; a++)
+			weight[a]=1; //assigns equal probability weighting to each
+	else
 	{
-		//if we just didn't get there, then the numerator would also be zero
-		if (denominator==0 && data.stratn[a]!=0) 
-			REPORT("zero denominator!");
-		//could have just never gotten there, will happen for short iteration runs
-		else if(denominator==0 && data.stratn[a]==0) 
-			strat[a] = 0; //would evaluate to infinity otherwise
-		else
+		for(int a=0; a<N; a++)
 		{
-			int temp = int((fpworking_type)256.0 * data.stratn[a] / denominator);
-			if(temp == 256) temp = 255; //will happen if ratio is exactly one
+			//we have values in the range [0.0, max_value]
+			//map them to [0.0, 256.0]
+			//then cast to int. almost always all values will get rounded down,
+			//But max_value will never round down. we change 256 to 255.
+
+			int temp = int((fpworking_type)256.0 * data.stratn[a] / max_value);
+			if(temp == 256) temp = 255;
 			if(temp < 0 || temp > 255)
 				REPORT("failure to divide");
-			strat[a] = (unsigned char)temp;
+			weight[a] = (unsigned char)temp;
 		}
 	}
+
+#if 0 //some logging code that, who knows, i may use again.
+	if(rand()%100000== 0)
+	{
+		ofstream f("randlog.txt", ios_base::app);
+
+		//print stratn
+		for(int i=0; i<N; i++)
+			f << setw(15) << left << data.stratn[i];
+		f << endl;
+
+		//print stratn/sum
+		fpstore_type sum=0;
+		for(int i=0; i<N; i++)
+			sum += data.stratn[i];
+		for(int i=0; i<N; i++)
+			f << setw(15) << left << data.stratn[i]/sum;
+		f << endl;
+
+		//print charweight/sum
+		int charsum=0;
+		for(int i=0; i<N; i++)
+			charsum+=weight[i];
+		for(int i=0; i<N; i++)
+			f << setw(15) << left << (float) weight[i] / charsum;
+		f << endl << endl;
+
+		f.close();
+	}
+#endif
 }
 
 //pretty formatted bytes printing
@@ -162,7 +193,7 @@ MemoryManager::~MemoryManager()
 	for(int k=0; k<actionmax[gr][numa-2]*cardmach.getcardsimax(gr); k++) \
 	{ \
 		stratN_t<numa> thisnode(data##numa[gr][k]); \
-		f.write((char*)thisnode.strat, numa-1); \
+		f.write((char*)thisnode.weight, numa); \
 	} \
 	dataoffset = f.tellp(); \
 }while(0);

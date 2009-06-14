@@ -30,7 +30,7 @@ template <int N>
 struct stratN_t
 {
 	stratN_t(const dataN_t<N> &data); //performs division
-	unsigned char strat[N-1];
+	unsigned char weight[N];
 };
 
 

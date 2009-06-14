@@ -21,6 +21,15 @@ Strategy::Strategy(string xmlfilename) :
 		Document doc(xmlfilename);
 		doc.LoadFile();
 
+		//check version
+
+		Element* root = doc.FirstChildElement("strategy");
+		if(!root->HasAttribute("version") || root->GetAttribute<int>("version") != SAVE_FORMAT_VERSION)
+		{
+			WARN("Unsupported XML file (older/newer version).");
+			exit(-1);
+		}
+
 		//set CardMachine
 
 		cardsettings_t cardsettings;
@@ -28,7 +37,7 @@ Strategy::Strategy(string xmlfilename) :
 		{
 			ostringstream roundname;
 			roundname << "round" << gr;
-			Element* bin = doc.FirstChildElement("paramsv1")->FirstChildElement("bins")->FirstChildElement(roundname.str());
+			Element* bin = doc.FirstChildElement("strategy")->FirstChildElement("bins")->FirstChildElement(roundname.str());
 			cardsettings.filename[gr] = bin->GetTextOrDefault("");
 			cardsettings.filesize[gr] = bin->GetAttribute<uint64>("filesize");
 			cardsettings.bin_max[gr] = bin->GetAttribute<int>("nbins");
@@ -38,7 +47,7 @@ Strategy::Strategy(string xmlfilename) :
 		//set BettingTree
 
 		treesettings_t treesettings;
-		Element* xmltree = doc.FirstChildElement("paramsv1")->FirstChildElement("tree");
+		Element* xmltree = doc.FirstChildElement("strategy")->FirstChildElement("tree");
 		treesettings.sblind = xmltree->FirstChildElement("blinds")->GetAttribute<int>("sblind");
 		treesettings.bblind = xmltree->FirstChildElement("blinds")->GetAttribute<int>("bblind");
 		for(int i=0; i<6; i++)
@@ -64,7 +73,7 @@ Strategy::Strategy(string xmlfilename) :
 
 		//set strategy file
 
-		Element* strat = doc.FirstChildElement("paramsv1")->FirstChildElement("solver")->FirstChildElement("savefile");
+		Element* strat = doc.FirstChildElement("strategy")->FirstChildElement("solver")->FirstChildElement("savefile");
 		if(strat->GetAttribute<uint64>("filesize") == 0)
 		{
 			WARN("the strategy file was not saved for this xml file.");
@@ -119,21 +128,19 @@ void Strategy::getprobs(int gr, int actioni, int numa, const vector<CardMask> &c
 
 	//read the char probabilities, matching the offset to the memorymgr code.
 	
-	unsigned char charprobs[MAX_ACTIONS-1];
+	unsigned char charprobs[MAX_ACTIONS];
 	//seekg ( offset + combinedindex * sizeofeachdata )
-	strategyfile.seekg( dataoffset[gr][numa-2] + COMBINE(cardsi, actioni, actionmax[gr][numa-2]) * (numa-1) );
-	strategyfile.read((char*)charprobs, numa-1);
-	if(strategyfile.gcount()!=numa-1 || strategyfile.eof())
+	strategyfile.seekg( dataoffset[gr][numa-2] + COMBINE(cardsi, actioni, actionmax[gr][numa-2]) * numa );
+	strategyfile.read((char*)charprobs, numa);
+	if(strategyfile.gcount()!=numa || strategyfile.eof())
 		REPORT("strategy file has failed us.");
 
-	//convert the numa-1 chars to numa doubles
+	//convert the numa chars to numa doubles
 
 	probs.resize(numa);
-	unsigned char sum=0;
-	for(int i=0; i<numa-1; i++)
-	{
-		sum+=charprobs[i];
-		probs[i] = (double)charprobs[i]/256.0;
-	}
-	probs[numa-1] = (double)(256-sum)/256.0;
+	int sum=0;
+	for(int i=0; i<numa; i++)
+		sum += charprobs[i];
+	for(int i=0; i<numa; i++)
+		probs[i] = (double)charprobs[i]/sum;
 }
