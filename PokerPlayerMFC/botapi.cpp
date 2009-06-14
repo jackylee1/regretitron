@@ -399,7 +399,12 @@ void BotAPI::populatewindow(CWnd* parentwin)
 			MyWindow->ActButton[a].SetWindowText(CSTR(currstrat->gettree().actionstring(currentgr,a,mynode,multiplier)));
 			MyWindow->ActButton[a].EnableWindow(TRUE);
 			MyWindow->ActionBars[a].ShowWindow(SW_SHOW);
-			MyWindow->ActionBars[a].SetPos((int)(probabilities[a]*100.0)); //maps to 0-99, sometimes 100, should have 0-100
+			int position = (int)(probabilities[a]*101.0);
+			if(position == 101)
+				position = 100;
+			if(position < 0 || position > 100)
+				REPORT("failure of probabilities");
+			MyWindow->ActionBars[a].SetPos(position);
 			if(answer==a)
 				MyWindow->ActButton[a].SetCheck(BST_CHECKED);
 			else
