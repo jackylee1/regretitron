@@ -254,7 +254,7 @@ void BotAPI::dobet(Player pl, double amount)
 	if(amount < mintotalwager() || amount >= currstrat->gettree().getparams().stacksize)
 		REPORT("Invalid bet amount");
 
-	//try to find the best bet action
+	//try to find the bet action that will set the new perceived pot closest to the actual
 
 	int bestaction=-1;
 	double besterror = numeric_limits<double>::infinity();
@@ -262,22 +262,22 @@ void BotAPI::dobet(Player pl, double amount)
 	{
 		switch(mynode.result[a])
 		{
-			case BetNode::FD: 
-			case BetNode::GO: 
-			case BetNode::AI: 
-			case BetNode::NA:
+		case BetNode::FD: 
+		case BetNode::GO: 
+		case BetNode::AI: 
+		case BetNode::NA:
+			continue;
+
+		default:
+			if(currstrat->gettree().isallin(mynode.result[a],mynode.potcontrib[a],currentgr))
 				continue;
 
-			default:
-				if(currstrat->gettree().isallin(mynode.result[a],mynode.potcontrib[a],currentgr))
-					continue;
-
-				double error = abs( (double)(mynode.potcontrib[a]) - amount );
-				if(error < besterror)
-				{
-					bestaction = a;
-					besterror = error;
-				}
+			double error = abs((double)(perceivedpot + mynode.potcontrib[a]) - (actualpot + amount));
+			if(error < besterror)
+			{
+				bestaction = a;
+				besterror = error;
+			}
 		}
 	}
 
@@ -286,7 +286,7 @@ void BotAPI::dobet(Player pl, double amount)
 	if (bestaction == -1)
 	{
 		if(pl == myplayer) REPORT("bot the bot HAD to have bet from the tree. we should find a bet action.");
-		else WARN("the oppenent bet when the tree had to betting actions. off tree -> treating as all-in");
+		else WARN("the oppenent bet when the tree had no betting actions. off tree -> treating as all-in");
 		offtreebetallins = true;
 		doallin(pl);
 	}
