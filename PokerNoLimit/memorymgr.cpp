@@ -106,8 +106,8 @@ MemoryManager::MemoryManager(const BettingTree &tree, const CardMachine &cardmac
 
 	for(int gr=1; gr<4; gr++)
 	{
-		cout << CARDSETTINGS.bin_max[gr] << " rnd" << gr << " bins use: " << space(CARDSETTINGS.filesize[gr]) << endl;
-		totalbytes += CARDSETTINGS.filesize[gr];
+		cout << cardmach.getparams().bin_max[gr] << " rnd" << gr << " bins use: " << space(cardmach.getparams().filesize[gr]) << endl;
+		totalbytes += cardmach.getparams().filesize[gr];
 	}
 
 	cout << "total: " << space(totalbytes) << endl;

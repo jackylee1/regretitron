@@ -166,9 +166,9 @@ void Solver::save(const string &filename, bool writedata)
 		ostringstream o;
 		o << "round" << gr;
 		TiXmlElement * round = new TiXmlElement(o.str());
-		round->SetAttribute("nbins", CARDSETTINGS.bin_max[gr]);
-		round->SetAttribute("filesize", CARDSETTINGS.filesize[gr]);
-		TiXmlText * roundtext = new TiXmlText(CARDSETTINGS.filename[gr]);
+		round->SetAttribute("nbins", cardmachine->getparams().bin_max[gr]);
+		round->SetAttribute("filesize", cardmachine->getparams().filesize[gr]);
+		TiXmlText * roundtext = new TiXmlText(cardmachine->getparams().filename[gr]);
 		round->LinkEndChild(roundtext);
 		bins->LinkEndChild(round);
 	}
@@ -176,68 +176,68 @@ void Solver::save(const string &filename, bool writedata)
 	// tree parameters
 
 	TiXmlElement * blinds = new TiXmlElement("blinds");
-	blinds->SetAttribute("sblind", (int)TREESETTINGS.sblind);
-	blinds->SetAttribute("bblind", (int)TREESETTINGS.bblind);
+	blinds->SetAttribute("sblind", (int)tree->getparams().sblind);
+	blinds->SetAttribute("bblind", (int)tree->getparams().bblind);
 
 	TiXmlElement * bets = new TiXmlElement("bets");
-	bets->SetAttribute("B1", (int)TREESETTINGS.bets[0]);
-	bets->SetAttribute("B2", (int)TREESETTINGS.bets[1]);
-	bets->SetAttribute("B3", (int)TREESETTINGS.bets[2]);
-	bets->SetAttribute("B4", (int)TREESETTINGS.bets[3]);
-	bets->SetAttribute("B5", (int)TREESETTINGS.bets[4]);
-	bets->SetAttribute("B6", (int)TREESETTINGS.bets[5]);
+	bets->SetAttribute("B1", (int)tree->getparams().bets[0]);
+	bets->SetAttribute("B2", (int)tree->getparams().bets[1]);
+	bets->SetAttribute("B3", (int)tree->getparams().bets[2]);
+	bets->SetAttribute("B4", (int)tree->getparams().bets[3]);
+	bets->SetAttribute("B5", (int)tree->getparams().bets[4]);
+	bets->SetAttribute("B6", (int)tree->getparams().bets[5]);
 
 	TiXmlElement * raise1 = new TiXmlElement("raise1");
-	raise1->SetAttribute("R11", (int)TREESETTINGS.raises[0][0]);
-	raise1->SetAttribute("R12", (int)TREESETTINGS.raises[0][1]);
-	raise1->SetAttribute("R13", (int)TREESETTINGS.raises[0][2]);
-	raise1->SetAttribute("R14", (int)TREESETTINGS.raises[0][3]);
-	raise1->SetAttribute("R15", (int)TREESETTINGS.raises[0][4]);
-	raise1->SetAttribute("R16", (int)TREESETTINGS.raises[0][5]);
+	raise1->SetAttribute("R11", (int)tree->getparams().raises[0][0]);
+	raise1->SetAttribute("R12", (int)tree->getparams().raises[0][1]);
+	raise1->SetAttribute("R13", (int)tree->getparams().raises[0][2]);
+	raise1->SetAttribute("R14", (int)tree->getparams().raises[0][3]);
+	raise1->SetAttribute("R15", (int)tree->getparams().raises[0][4]);
+	raise1->SetAttribute("R16", (int)tree->getparams().raises[0][5]);
 
 	TiXmlElement * raise2 = new TiXmlElement("raise2");
-	raise2->SetAttribute("R21", (int)TREESETTINGS.raises[1][0]);
-	raise2->SetAttribute("R22", (int)TREESETTINGS.raises[1][1]);
-	raise2->SetAttribute("R23", (int)TREESETTINGS.raises[1][2]);
-	raise2->SetAttribute("R24", (int)TREESETTINGS.raises[1][3]);
-	raise2->SetAttribute("R25", (int)TREESETTINGS.raises[1][4]);
-	raise2->SetAttribute("R26", (int)TREESETTINGS.raises[1][5]);
+	raise2->SetAttribute("R21", (int)tree->getparams().raises[1][0]);
+	raise2->SetAttribute("R22", (int)tree->getparams().raises[1][1]);
+	raise2->SetAttribute("R23", (int)tree->getparams().raises[1][2]);
+	raise2->SetAttribute("R24", (int)tree->getparams().raises[1][3]);
+	raise2->SetAttribute("R25", (int)tree->getparams().raises[1][4]);
+	raise2->SetAttribute("R26", (int)tree->getparams().raises[1][5]);
 
 	TiXmlElement * raise3 = new TiXmlElement("raise3");
-	raise3->SetAttribute("R31", (int)TREESETTINGS.raises[2][0]);
-	raise3->SetAttribute("R32", (int)TREESETTINGS.raises[2][1]);
-	raise3->SetAttribute("R33", (int)TREESETTINGS.raises[2][2]);
-	raise3->SetAttribute("R34", (int)TREESETTINGS.raises[2][3]);
-	raise3->SetAttribute("R35", (int)TREESETTINGS.raises[2][4]);
-	raise3->SetAttribute("R36", (int)TREESETTINGS.raises[2][5]);
+	raise3->SetAttribute("R31", (int)tree->getparams().raises[2][0]);
+	raise3->SetAttribute("R32", (int)tree->getparams().raises[2][1]);
+	raise3->SetAttribute("R33", (int)tree->getparams().raises[2][2]);
+	raise3->SetAttribute("R34", (int)tree->getparams().raises[2][3]);
+	raise3->SetAttribute("R35", (int)tree->getparams().raises[2][4]);
+	raise3->SetAttribute("R36", (int)tree->getparams().raises[2][5]);
 
 	TiXmlElement * raise4 = new TiXmlElement("raise4");
-	raise4->SetAttribute("R41", (int)TREESETTINGS.raises[3][0]);
-	raise4->SetAttribute("R42", (int)TREESETTINGS.raises[3][1]);
-	raise4->SetAttribute("R43", (int)TREESETTINGS.raises[3][2]);
-	raise4->SetAttribute("R44", (int)TREESETTINGS.raises[3][3]);
-	raise4->SetAttribute("R45", (int)TREESETTINGS.raises[3][4]);
-	raise4->SetAttribute("R46", (int)TREESETTINGS.raises[3][5]);
+	raise4->SetAttribute("R41", (int)tree->getparams().raises[3][0]);
+	raise4->SetAttribute("R42", (int)tree->getparams().raises[3][1]);
+	raise4->SetAttribute("R43", (int)tree->getparams().raises[3][2]);
+	raise4->SetAttribute("R44", (int)tree->getparams().raises[3][3]);
+	raise4->SetAttribute("R45", (int)tree->getparams().raises[3][4]);
+	raise4->SetAttribute("R46", (int)tree->getparams().raises[3][5]);
 
 	TiXmlElement * raise5 = new TiXmlElement("raise5");
-	raise5->SetAttribute("R51", (int)TREESETTINGS.raises[4][0]);
-	raise5->SetAttribute("R52", (int)TREESETTINGS.raises[4][1]);
-	raise5->SetAttribute("R53", (int)TREESETTINGS.raises[4][2]);
-	raise5->SetAttribute("R54", (int)TREESETTINGS.raises[4][3]);
-	raise5->SetAttribute("R55", (int)TREESETTINGS.raises[4][4]);
-	raise5->SetAttribute("R56", (int)TREESETTINGS.raises[4][5]);
+	raise5->SetAttribute("R51", (int)tree->getparams().raises[4][0]);
+	raise5->SetAttribute("R52", (int)tree->getparams().raises[4][1]);
+	raise5->SetAttribute("R53", (int)tree->getparams().raises[4][2]);
+	raise5->SetAttribute("R54", (int)tree->getparams().raises[4][3]);
+	raise5->SetAttribute("R55", (int)tree->getparams().raises[4][4]);
+	raise5->SetAttribute("R56", (int)tree->getparams().raises[4][5]);
 
 	TiXmlElement * raise6 = new TiXmlElement("raise6");
-	raise6->SetAttribute("R61", (int)TREESETTINGS.raises[5][0]);
-	raise6->SetAttribute("R62", (int)TREESETTINGS.raises[5][1]);
-	raise6->SetAttribute("R63", (int)TREESETTINGS.raises[5][2]);
-	raise6->SetAttribute("R64", (int)TREESETTINGS.raises[5][3]);
-	raise6->SetAttribute("R65", (int)TREESETTINGS.raises[5][4]);
-	raise6->SetAttribute("R66", (int)TREESETTINGS.raises[5][5]);
+	raise6->SetAttribute("R61", (int)tree->getparams().raises[5][0]);
+	raise6->SetAttribute("R62", (int)tree->getparams().raises[5][1]);
+	raise6->SetAttribute("R63", (int)tree->getparams().raises[5][2]);
+	raise6->SetAttribute("R64", (int)tree->getparams().raises[5][3]);
+	raise6->SetAttribute("R65", (int)tree->getparams().raises[5][4]);
+	raise6->SetAttribute("R66", (int)tree->getparams().raises[5][5]);
 
 	TiXmlElement * sspushfold = new TiXmlElement("sspf");
-	sspushfold->SetAttribute("stacksize", (int)TREESETTINGS.stacksize);
-	sspushfold->SetAttribute("pushfold", TREESETTINGS.pushfold);
+	sspushfold->SetAttribute("stacksize", (int)tree->getparams().stacksize);
+	sspushfold->SetAttribute("pushfold", tree->getparams().pushfold);
 
 	TiXmlElement * mytree = new TiXmlElement("tree");
 	mytree->LinkEndChild(blinds);

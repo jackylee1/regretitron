@@ -11,6 +11,9 @@
 
 //main settings
 const char SAVENAME[] = "testbotapi1";
+#define TESTXML 0
+#define STOPAFTER 1*MILLION*MILLION
+#define SAVEAFTER 1*MILLION
 
 //solver settings
 #define FPWORKING_T long double
@@ -19,10 +22,6 @@ const char SAVENAME[] = "testbotapi1";
 #define NUM_THREADS 4
 const bool SEED_RAND = true;
 const int  SEED_WITH = 42;
-
-#define TESTXML 0
-#define STOPAFTER 1*MILLION*MILLION
-#define SAVEAFTER 1*MILLION
 
 //bin settings
 #define FBIN 256
