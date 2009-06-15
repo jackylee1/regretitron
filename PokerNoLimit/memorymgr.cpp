@@ -125,6 +125,8 @@ MemoryManager::MemoryManager(const BettingTree &tree, const CardMachine &cardmac
 
 		for(int a=0; a<MAX_NODETYPES; a++)
 		{
+			if((int64)actionmax[gr][a]*(int64)cardmach.getcardsimax(gr) > 0x000000007fffffffLL)
+				REPORT("your indices may overflow. fix that.");
 			int64 mybytes = actionmax[gr][a]*size[a]*cardmach.getcardsimax(gr);
 			if(mybytes>0)
 			{
@@ -144,6 +146,8 @@ MemoryManager::MemoryManager(const BettingTree &tree, const CardMachine &cardmac
 	cout << "total: " << space(totalbytes) << endl;
 
 	PAUSE();
+
+	cout << "allocating memory..." << endl;
 
 	//now allocate memory
 
@@ -200,6 +204,8 @@ MemoryManager::~MemoryManager()
 
 int64 MemoryManager::save(const string &filename, const CardMachine &cardmach)
 {
+	cout << "saving strategy data file..." << endl;
+
 	ofstream f(("strategy/" + filename + ".strat").c_str(), ofstream::binary);
 
 	//this starts at zero, the beginning of the file

@@ -130,7 +130,7 @@ void Strategy::getprobs(int gr, int actioni, int numa, const vector<CardMask> &c
 	
 	unsigned char charprobs[MAX_ACTIONS];
 	//seekg ( offset + combinedindex * sizeofeachdata )
-	strategyfile.seekg( dataoffset[gr][numa-2] + COMBINE(cardsi, actioni, actionmax[gr][numa-2]) * numa );
+	strategyfile.seekg( dataoffset[gr][numa-2] + COMBINE(cardsi, (int64)actioni, actionmax[gr][numa-2]) * (int64)numa );
 	strategyfile.read((char*)charprobs, numa);
 	if(strategyfile.gcount()!=numa || strategyfile.eof())
 		REPORT("strategy file has failed us.");

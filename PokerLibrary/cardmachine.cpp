@@ -41,6 +41,8 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, bool seedra
 
 			if(solving)
 			{
+				cout << "loading " << myparams.filename[gr] << " into memory..." << endl;
+
 				//load into memory and close
 
 				bindata[gr] = new uint64[myparams.filesize[gr]/8];
