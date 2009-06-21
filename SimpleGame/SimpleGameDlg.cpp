@@ -14,10 +14,16 @@
 // CSimpleGameDlg dialog
 CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSimpleGameDlg::IDD, pParent),
-	  totalhumanwon(0), human(P0), bot(P1),
+	  MyBot(false),
+	  cardrandom(),
 	  handsplayed(0),
-	  MyBot(false), //turns off diagnostics (default state of checkbox)
-	  STACKSIZE(MyBot.getstacksizemult()*BBLIND) //gets stacksize of 0'th loaded strategy.
+	  _sblind(5),
+	  _bblind(10),
+	  _stacksize(MyBot.getstacksizemult() * _bblind),
+	  _islimit(MyBot.islimit()),
+	  human(P0), 
+	  bot(P1),
+	  totalhumanwon(0)
 {
 	CardMask_RESET(botcm0); //ensures show bot cards produces jokers if done early
 	CardMask_RESET(botcm1);
@@ -126,6 +132,8 @@ BOOL CSimpleGameDlg::OnInitDialog()
 	// TODO: Add extra initialization here
 	TotalWon.SetWindowText(TEXT("$0.00"));
 	graygameover();
+	if(_islimit)
+		BetAmount.EnableWindow(FALSE);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -229,9 +237,9 @@ void CSimpleGameDlg::updateinvested()
 	InvestedHum.SetWindowText(val);
 	val.Format(TEXT("$%.2f"), invested[bot]);
 	InvestedBot.SetWindowText(val);
-	val.Format(TEXT("You: $%.2f"), STACKSIZE-invested[human]-pot);
+	val.Format(TEXT("You: $%.2f"), _stacksize-invested[human]-pot);
 	HumanStack.SetWindowText(val);
-	val.Format(TEXT("Bot: $%.2f"), STACKSIZE-invested[bot]-pot);
+	val.Format(TEXT("Bot: $%.2f"), _stacksize-invested[bot]-pot);
 	BotStack.SetWindowText(val);
 }
 
@@ -241,28 +249,34 @@ void CSimpleGameDlg::updateinvested()
 
 double CSimpleGameDlg::mintotalwager(Player acting)
 {
-	//calling from the SBLIND is a special case of how much we can wager
-	if(gameround == PREFLOP && invested[acting]==SBLIND)
-		return BBLIND;
+	//calling from the _sblind is a special case of how much we can wager
+	if(_gameround == PREFLOP && invested[acting]==_sblind)
+		return _bblind;
 	
 	//we're going first and nothing's been bet yet
-	if(gameround != PREFLOP && acting==P0 && invested[1-acting]==0)
+	if(_gameround != PREFLOP && acting==P0 && invested[1-acting]==0)
 		return 0;
 
 	//otherwise, this is the standard formula that FullTilt seems to follow
 	double prevwager = invested[1-acting]-invested[acting];
-	return invested[1-acting] + max(BBLIND, prevwager);
+	return invested[1-acting] + max(_bblind, prevwager);
 }
+
+double CSimpleGameDlg::limitbetincrement()
+{
+	return (_gameround == PREFLOP || _gameround == FLOP) ? _bblind : 2*_bblind;
+}
+
 void CSimpleGameDlg::dofold(Player pl)
 {
 	//set the winner to the other player
-	winner = 1-pl; //1-pl returns the other player, since they are 0 and 1
+	_winner = 1-pl; //1-pl returns the other player, since they are 0 and 1
 	dogameover(true);
 }
 void CSimpleGameDlg::docall(Player pl)
 {
 	//inform bot unless game is over
-	if(!isallin && gameround != RIVER)
+	if(!_isallin && _gameround != RIVER)
 		MyBot.doaction(pl,CALL,invested[1-pl]);
 	//increase pot
 	pot += invested[1-pl];
@@ -273,10 +287,10 @@ void CSimpleGameDlg::docall(Player pl)
 
 	//we may be calling an all-in if the previous player bet that.
 	//if so, show our cards and fast forward to the river, 
-	if(isallin)
+	if(_isallin)
 	{
 		printbotcards();
-		switch(gameround) //correct amount of suspense needed.
+		switch(_gameround) //correct amount of suspense needed.
 		{
 		case PREFLOP:
 			Sleep(1000); 
@@ -288,10 +302,10 @@ void CSimpleGameDlg::docall(Player pl)
 			Sleep(1000);
 			printriver();
 		}
-		gameround=RIVER;
+		_gameround=RIVER;
 	}
 
-	switch(gameround)
+	switch(_gameround)
 	{
 	//for the first three rounds, we just inform the bot and then print the cards.
 	case PREFLOP: 
@@ -315,13 +329,13 @@ void CSimpleGameDlg::docall(Player pl)
 		break;
 
 	default:
-		REPORT("invalid gameround in docall");
+		REPORT("invalid _gameround in docall");
 	}
 
-	//finally, move on to the next gameround, rendering it invalid if this was river
-	gameround ++;
+	//finally, move on to the next _gameround, rendering it invalid if this was river
+	_gameround ++;
 
-	if(gameround>RIVER)
+	if(_gameround>RIVER)
 		dogameover(false);
 	else
 		graypostact(P0); //P0 is first to act post flop
@@ -330,7 +344,7 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 {
 	//we can check the amount for validity. This is important since we
 	//will be getting values from the bot here.
-	if (amount < mintotalwager(pl) || amount + pot >= STACKSIZE)
+	if (amount < mintotalwager(pl) || amount + pot >= _stacksize)
 		REPORT("someone bet an illegal amount.");
 
 	//inform the bot
@@ -345,9 +359,9 @@ void CSimpleGameDlg::doallin(Player pl)
 {
 	//inform the bot
 	MyBot.doaction(pl, ALLIN, 0);
-	isallin=true;
+	_isallin=true;
 	//set our invested amount
-	invested[pl]=STACKSIZE-pot;
+	invested[pl]=_stacksize-pot;
 	updateinvested();
 	//other players turn now
 	graypostact(Player(1-pl));
@@ -357,9 +371,9 @@ void CSimpleGameDlg::dogameover(bool fold)
 {
 	//Update the total amount won and print to screeen
 
-	if (winner==human)
+	if (_winner==human)
 		totalhumanwon += (pot + invested[bot]);
-	else if (winner==bot)
+	else if (_winner==bot)
 		totalhumanwon -= (pot + invested[human]);
 	//reprint the total to the screen
 	CString val;
@@ -369,17 +383,17 @@ void CSimpleGameDlg::dogameover(bool fold)
 	//print user friendly hints to invested amounts
 	if(fold)
 	{
-		if (winner==human)
+		if (_winner==human)
 			InvestedBot.SetWindowText(TEXT("FOLD"));
-		else if(winner==bot)
+		else if(_winner==bot)
 			InvestedHum.SetWindowText(TEXT("FOLD"));
 	}
-	else if(winner==human)
+	else if(_winner==human)
 	{
 		InvestedBot.SetWindowText(TEXT("LOSE"));
 		InvestedHum.SetWindowText(TEXT("WIN"));
 	}
-	else if(winner==bot)
+	else if(_winner==bot)
 	{
 		InvestedHum.SetWindowText(TEXT("LOSE"));
 		InvestedBot.SetWindowText(TEXT("WIN"));
@@ -440,13 +454,13 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 		//gray out makebotgo
 		MakeBotGoButton.EnableWindow(FALSE);
 
-		if(isallin) //can't go all in twice
+		if(_isallin || _islimit) //can't go all in twice
 			AllInButton.EnableWindow(FALSE);
 		else
 			AllInButton.EnableWindow(TRUE);
 
-		if(invested[bot]==0 || (gameround == PREFLOP && 
-			        invested[bot]==BBLIND && invested[human]==BBLIND))
+		if(invested[bot]==0 || (_gameround == PREFLOP && 
+			        invested[bot]==_bblind && invested[human]==_bblind))
 		{
 			//set fold/check to check, not grayed
 			FoldCheckButton.SetWindowText(TEXT("Check"));
@@ -463,11 +477,19 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 			CallButton.EnableWindow(TRUE);
 		}
 
-		//if min bet + our pot share < STACKSIZE
-		if(mintotalwager(human) + pot < STACKSIZE)
-			BetRaiseButton.EnableWindow(TRUE);
+		//if min bet + our pot share < _stacksize
+		if(_islimit)
+		{
+			if(invested[1-nexttoact]+0.01 >= 4*limitbetincrement()) //fp compare
+				BetRaiseButton.EnableWindow(FALSE);
+			else
+				BetRaiseButton.EnableWindow(TRUE);
+		}
 		else
-			BetRaiseButton.EnableWindow(FALSE);
+			if(mintotalwager(human) + pot < _stacksize)
+				BetRaiseButton.EnableWindow(TRUE);
+			else
+				BetRaiseButton.EnableWindow(FALSE);
 	}
 }
 
@@ -505,8 +527,8 @@ void CSimpleGameDlg::OnBnClickedButton1()
 	if(invested[bot]==invested[human])
 	{
 		//if we are first to act, then this is a "bet" as the gr continues
-		if((gameround == PREFLOP && human==P1) ||
-			(gameround !=PREFLOP && human == P0))
+		if((_gameround == PREFLOP && human==P1) ||
+			(_gameround !=PREFLOP && human == P0))
 			dobet(human, 0);
 		//otherwise we are second to act. then we are calling a check and the gr ends.
 		else
@@ -524,8 +546,8 @@ void CSimpleGameDlg::OnBnClickedButton2()
 {
 	//if this is preflop and we are calling from the SB, 
 	// then that's actually a "bet" as it doesn't end the gr
-	if(gameround == PREFLOP && invested[human] == SBLIND)
-		dobet(human, BBLIND);
+	if(_gameround == PREFLOP && invested[human] == _sblind)
+		dobet(human, _bblind);
 	//all other cases, a call is a call
 	else
 		docall(human);
@@ -537,16 +559,23 @@ void CSimpleGameDlg::OnBnClickedButton3()
 	//the bet/raise button always has the meaning of betting/raising,
 	// (that is, meaning as defined by my poker api or, rather, BotAPI)
 
-	//first get value of edit box
-	CString valstr;
-	double val;
-	BetAmount.GetWindowText(valstr);
-	BetAmount.SetWindowText(TEXT(""));
-	val = strtod(valstr, NULL); //converts string to double
+	if(_islimit)
+	{
+		dobet(human, invested[bot] + limitbetincrement());
+	}
+	else
+	{
+		//first get value of edit box
+		CString valstr;
+		double val;
+		BetAmount.GetWindowText(valstr);
+		BetAmount.SetWindowText(TEXT(""));
+		val = strtod(valstr, NULL); //converts string to double
 
-	//input checking: make sure it's not too small or too big, then do it.
-	if(val >= mintotalwager(human) && val + pot < STACKSIZE)
-		dobet(human, val);
+		//input checking: make sure it's not too small or too big, then do it.
+		if(val >= mintotalwager(human) && val + pot < _stacksize)
+			dobet(human, val);
+	}
 }
 
 // This is the all-in button
@@ -565,20 +594,20 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	//increment games played
 	CString text;
 	text.Format("SimpleGame - %d hands played", handsplayed);
-	this->SetWindowText(text);
+	SetWindowText(text); //titlebar
 	handsplayed++;
 	//change positions
 	std::swap(human,bot);
-	//set gameround
-	gameround = PREFLOP;
+	//set _gameround
+	_gameround = PREFLOP;
 	//no one is all-in
-	isallin=false;
+	_isallin=false;
 	//reset pot
 	pot = 0;
 	updatepot();
 	//set blinds
-	invested[P0] = BBLIND;
-	invested[P1] = SBLIND;
+	invested[P0] = _bblind;
+	invested[P1] = _sblind;
 	updateinvested();
 
 	//deal out the cards randomly.
@@ -617,14 +646,14 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	r1=Hand_EVAL_N(fullbot, 7);
 
 	if (r0>r1)
-		winner = human;
+		_winner = human;
 	else if(r1>r0)
-		winner = bot;
+		_winner = bot;
 	else
-		winner = -1;
+		_winner = -1;
 
 	//inform bot of the new game
-	MyBot.setnewgame(bot, botcards, SBLIND, BBLIND, STACKSIZE);
+	MyBot.setnewgame(bot, botcards, _sblind, _bblind, _stacksize);
 
 	//display the cards pics
 	eraseboard();

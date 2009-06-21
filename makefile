@@ -13,9 +13,9 @@ endif
 
 # define the output executable file
 # OUT is used by clean. MYOUT is used for compiling to.
-OUT1 := bin/PokerNoLimit
-OUT1D := bin/PokerNoLimitd
-OUT1P := bin/PokerNoLimitp
+OUT1 := bin/solver
+OUT1D := bin/solverd
+OUT1P := bin/solverp
 
 OUT2 := bin/binmaker
 OUT2D := bin/binmakerd

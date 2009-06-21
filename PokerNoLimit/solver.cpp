@@ -202,10 +202,11 @@ void Solver::save(const string &filename, bool writedata)
 		mytree->LinkEndChild(raise);
 	}
 
-	TiXmlElement * sspushfold = new TiXmlElement("sspf");
-	sspushfold->SetAttribute("stacksize", (int)tree->getparams().stacksize);
-	sspushfold->SetAttribute("pushfold", tree->getparams().pushfold);
-	mytree->LinkEndChild(sspushfold);
+	TiXmlElement * metanode = new TiXmlElement("meta");
+	metanode->SetAttribute("stacksize", (int)tree->getparams().stacksize);
+	metanode->SetAttribute("pushfold", tree->getparams().pushfold);
+	metanode->SetAttribute("limit", tree->getparams().limit);
+	mytree->LinkEndChild(metanode);
 
 	// print the first node strategy to an ostringstream
 

@@ -144,8 +144,8 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 		for(int gr=FLOP; gr<4; gr++)
 		{
 			CardMask_OR(fullboard, fullboard, board[gr]);
-			cardsi[gr][P0] = binfiles[gr]->retrieve(getindex2N(priv[P0], board[gr], gr+2)); //gr+2 is number of board cards
-			cardsi[gr][P1] = binfiles[gr]->retrieve(getindex2N(priv[P1], board[gr], gr+2));
+			cardsi[gr][P0] = binfiles[gr]->retrieve(getindex2N(priv[P0], fullboard, gr+2)); //gr+2 is number of board cards
+			cardsi[gr][P1] = binfiles[gr]->retrieve(getindex2N(priv[P1], fullboard, gr+2));
 		}
 	}
 

@@ -29,7 +29,7 @@ Strategy::Strategy(string xmlfilename) :
 
 		//set CardMachine
 
-		Element* cardbins = doc.FirstChildElement("cardbins");
+		Element* cardbins = root->FirstChildElement("cardbins");
 		cardsettings_t cardsettings;
 		cardsettings.usehistory = cardbins->FirstChildElement("meta")->GetAttribute<bool>("usehistory");
 		cardsettings.useflopalyzer = cardbins->FirstChildElement("meta")->GetAttribute<bool>("useflopalyzer");
@@ -37,10 +37,10 @@ Strategy::Strategy(string xmlfilename) :
 		{
 			ostringstream roundname;
 			roundname << "round" << gr;
-			Element* cardbins = doc.FirstChildElement("strategy")->FirstChildElement("cardbins")->FirstChildElement(roundname.str());
-			cardsettings.filename[gr] = cardbins->GetTextOrDefault("");
-			cardsettings.filesize[gr] = cardbins->GetAttribute<uint64>("filesize");
-			cardsettings.bin_max[gr] = cardbins->GetAttribute<int>("nbins");
+			Element* mybin = cardbins->FirstChildElement(roundname.str());
+			cardsettings.filename[gr] = mybin->GetTextOrDefault("");
+			cardsettings.filesize[gr] = mybin->GetAttribute<uint64>("filesize");
+			cardsettings.bin_max[gr] = mybin->GetAttribute<int>("nbins");
 		}
 		cardmach = new CardMachine(cardsettings, false);
 
@@ -63,8 +63,9 @@ Strategy::Strategy(string xmlfilename) :
 				treesettings.raises[i][j] = xmltree->FirstChildElement(raiseN.str())->GetAttribute<int>(RNM.str());
 			}
 		}
-		treesettings.stacksize = xmltree->FirstChildElement("sspf")->GetAttribute<int>("stacksize");
-		treesettings.pushfold = xmltree->FirstChildElement("sspf")->GetAttribute<bool>("pushfold");
+		treesettings.stacksize = xmltree->FirstChildElement("meta")->GetAttribute<int>("stacksize");
+		treesettings.pushfold = xmltree->FirstChildElement("meta")->GetAttribute<bool>("pushfold");
+		treesettings.limit = xmltree->FirstChildElement("meta")->GetAttribute<bool>("limit");
 		tree = new BettingTree(treesettings);
 
 		//set action max

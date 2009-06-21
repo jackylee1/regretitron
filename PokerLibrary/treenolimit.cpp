@@ -22,9 +22,10 @@ const unsigned char BetNode::GO; //action ends betting for this round
 //constructor for BettingTree
 BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings)
 {
-	// the following array (MYTREE) is defined here so that I can use the syntax of array
-	// initialization to define a single tree from the parameters I am passed.
-	// Once it's initialized, I copy it to a dynamically located heap memory location.
+	//used for both trees...
+	
+	if(myparams.limit && myparams.pushfold)
+		REPORT("I can't make a limit pushfold tree...");
 
 	const char P0 = 0;
 	const char P1 = 1;
@@ -33,6 +34,62 @@ BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings
 	const unsigned char &AI = BetNode::AI;
 	const unsigned char &FD = BetNode::FD;
 	const unsigned char &GO = BetNode::GO;
+
+	//define limit tree...
+
+	const unsigned char &SB = myparams.sblind; //for limit
+	const unsigned char &BET = myparams.bblind; //for limit
+	const int N_NODES_LIMIT = 10;
+	const int N_NODES_LIMIT_PFLOP = 8;
+
+	//Allowed result values: 
+	// FD if the player to act folds.
+	// GO if the play goes on in the next game round (including showdowns)
+	// AI if an all-in bet is called
+	// the beti of a child node if the betting continues in the present round
+	// or NA if this action is not used.
+	//   beti's are indexes into these such arrays
+	const BetNode LIMITTREE[10] = 
+	{
+		// {P#, #A, {result}, {potcontrib}}
+		{ P0, 2, {1, 2, NA7}, {0, BET, NA7} }, //0
+		{ P1, 2, {GO, 3, NA7}, {0, BET, NA7} }, //1
+
+		{ P1, 3,  {FD, GO, 4, NA6},  {0*BET, 1*BET, 2*BET, NA6} }, //2
+		{ P0, 3,  {FD, GO, 5, NA6},  {0*BET, 1*BET, 2*BET, NA6} }, //3
+
+		{ P0, 3,  {FD, GO, 6, NA6},  {1*BET, 2*BET, 3*BET, NA6} }, //4
+		{ P1, 3,  {FD, GO, 7, NA6},  {1*BET, 2*BET, 3*BET, NA6} }, //5
+
+		{ P1, 3,  {FD, GO, 8, NA6},  {2*BET, 3*BET, 4*BET, NA6} }, //6
+		{ P0, 3,  {FD, GO, 9, NA6},  {2*BET, 3*BET, 4*BET, NA6} }, //7
+
+		{ P0, 2,  {FD, GO, NA7},  {3*BET, 4*BET, NA7} }, //8
+		{ P1, 2,  {FD, GO, NA7},  {3*BET, 4*BET, NA7} } //9
+	};
+
+	const BetNode LIMITTREEPFLOP[8] = 
+	{
+		// {P#, #A, {result}, {potcontrib}}
+		{ P1, 3, {FD, 1, 2, NA6}, {SB, 1*BET, 2*BET, NA6} }, //0
+		{ P0, 2, {GO, 3, NA7}, {1*BET, 2*BET, NA7} }, //1
+
+		{ P0, 3,  {FD, GO, 4, NA6},  {1*BET, 2*BET, 3*BET, NA6} }, //2
+		{ P1, 3,  {FD, GO, 5, NA6},  {1*BET, 2*BET, 3*BET, NA6} }, //3
+
+		{ P1, 3,  {FD, GO, 6, NA6},  {2*BET, 3*BET, 4*BET, NA6} }, //4
+		{ P0, 3,  {FD, GO, 7, NA6},  {2*BET, 3*BET, 4*BET, NA6} }, //5
+
+		{ P0, 2,  {FD, GO, NA7},  {3*BET, 4*BET, NA7} }, //6
+		{ P1, 2,  {FD, GO, NA7},  {3*BET, 4*BET, NA7} } //7
+	};
+
+
+	// define no limit tree...
+
+	// the following array (MYTREE) is defined here so that I can use the syntax of array
+	// initialization to define a single tree from the parameters I am passed.
+	// Once it's initialized, I copy it to a dynamically located heap memory location.
 
 	const unsigned char &B1 = myparams.bets[0];
 	const unsigned char &B2 = myparams.bets[1];
@@ -83,6 +140,8 @@ BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings
 	const unsigned char &R65 = myparams.raises[5][4];
 	const unsigned char &R66 = myparams.raises[5][5];
 
+	const int N_NODES_NOLIMIT = 172;
+
 	//Allowed result values: 
 	// FD if the player to act folds.
 	// GO if the play goes on in the next game round (including showdowns)
@@ -90,7 +149,7 @@ BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings
 	// the beti of a child node if the betting continues in the present round
 	// or NA if this action is not used.
 	//   beti's are indexes into these such arrays
-	const BetNode MYTREE[N_NODES] =
+	const BetNode MYTREE[N_NODES_NOLIMIT] =
 	{
 		// {P#, #A, {result}, {potcontrib}}
 
@@ -315,72 +374,102 @@ BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings
 		{P0,2, {FD, AI, NA7}, {R66, 0, NA7}}  //171
 	}; 
 
-	//copy this tree into heap memory for flop, turn, and river (no changes needed)
 
-	tree[FLOP] = tree[TURN] = tree[RIVER] = new BetNode[N_NODES];
-	for(int i=0; i<N_NODES; i++)
-		tree[FLOP][i] = MYTREE[i];
-
-	//copy this tree into heap memory for preflop (changes needed)
-
-	tree[PREFLOP] = new BetNode[N_NODES];
-	for(int i=0; i<N_NODES; i++)
+	if(myparams.limit)
 	{
-		tree[PREFLOP][i] = MYTREE[i];
-		//change player to act to reflect reversed order preflop.
-		tree[PREFLOP][i].playertoact = 1-tree[FLOP][i].playertoact;
-	}
 
-	//more changes to preflop tree
+		//preflop - has own tree hard coded above
 
-	//Step 1, bump up all non-NA or 0 (All in, or check/fold nothing) valiues to +bblind, 
-	//to account for the betting floor
-	for(int i=0; i<N_NODES; i++)
-	{
-		for(int j=0; j<9; j++)
+		tree[PREFLOP] = new BetNode[N_NODES_LIMIT_PFLOP];
+		for(int i=0; i<N_NODES_LIMIT_PFLOP; i++)
+			tree[PREFLOP][i] = LIMITTREEPFLOP[i];
+
+		//flop - has own tree hard coded above
+
+		tree[FLOP] = new BetNode[N_NODES_LIMIT];
+		for(int i=0; i<N_NODES_LIMIT; i++)
+			tree[FLOP][i] = LIMITTREE[i];
+
+		//turn and river - has "big bet" must multiply flop tree potcontribs by 2
+
+		tree[TURN] = tree[RIVER] = new BetNode[N_NODES_LIMIT];
+		for(int i=0; i<N_NODES_LIMIT; i++)
 		{
-			if(tree[PREFLOP][i].potcontrib[j] != NA && tree[PREFLOP][i].potcontrib[j] != 0)
-				tree[PREFLOP][i].potcontrib[j] += myparams.bblind;
+			tree[TURN][i] = LIMITTREE[i];
+			for(int j=0; j<tree[TURN][i].numacts; j++)
+				tree[TURN][i].potcontrib[j] *= 2;
 		}
 	}
-
-	//FIX NODE ZERO
-
-	//shift the 8 actions of the first node from 0-7 to 1-8 ...
-	for(int i=8; i>0; i--)
-	{
-		tree[PREFLOP][0].potcontrib[i] = tree[PREFLOP][0].potcontrib[i-1];
-		tree[PREFLOP][0].result[i] = tree[PREFLOP][0].result[i-1];
-	}
-		
-	//... so that we can accomodate the new small blind folding action
-	tree[PREFLOP][0].result[0] = FD;
-	tree[PREFLOP][0].potcontrib[0] = myparams.sblind;
-
-	//change number of actions to 9.
-	tree[PREFLOP][0].numacts = 9;
-
-	if(myparams.pushfold)
-		//if pushfold, we need to make "calling" big blind amount unavailable.
-		tree[PREFLOP][0].potcontrib[1] = 99;
 	else
-		//otherwise, change 'checking' value to 'calling' big blind amount
-		tree[PREFLOP][0].potcontrib[1] = myparams.bblind;
+	{
 
-	//FIX NODE ONE
-	//change 'checking' value to 'calling' big blind amount
-	tree[PREFLOP][1].potcontrib[0] = myparams.bblind;
+		//copy this tree into heap memory for flop, turn, and river (no changes needed)
 
-	//FIX NODES WITH FOLD ZERO (2-13, 98, 99)
+		tree[FLOP] = tree[TURN] = tree[RIVER] = new BetNode[N_NODES_NOLIMIT];
+		for(int i=0; i<N_NODES_NOLIMIT; i++)
+			tree[FLOP][i] = MYTREE[i];
 
-	//Now, must change the fold valuations from 0 to big blind.
-	//responses to the six initial bets over bblind, for each player
-	for(int i=2; i<=13; i++)
-		tree[PREFLOP][i].potcontrib[0] = myparams.bblind;
+		//copy this tree into heap memory for preflop (changes needed)
 
-	//and response to all-in over bblind, for each player.
-	tree[PREFLOP][98].potcontrib[0] = myparams.bblind;
-	tree[PREFLOP][99].potcontrib[0] = myparams.bblind;
+		tree[PREFLOP] = new BetNode[N_NODES_NOLIMIT];
+		for(int i=0; i<N_NODES_NOLIMIT; i++)
+		{
+			tree[PREFLOP][i] = MYTREE[i];
+			//change player to act to reflect reversed order preflop.
+			tree[PREFLOP][i].playertoact = 1-tree[FLOP][i].playertoact;
+		}
+
+		//more changes to preflop tree
+
+		//Step 1, bump up all non-NA or 0 (All in, or check/fold nothing) valiues to +bblind, 
+		//to account for the betting floor
+		for(int i=0; i<N_NODES_NOLIMIT; i++)
+		{
+			for(int j=0; j<9; j++)
+			{
+				if(tree[PREFLOP][i].potcontrib[j] != NA && tree[PREFLOP][i].potcontrib[j] != 0)
+					tree[PREFLOP][i].potcontrib[j] += myparams.bblind;
+			}
+		}
+
+		//FIX NODE ZERO
+
+		//shift the 8 actions of the first node from 0-7 to 1-8 ...
+		for(int i=8; i>0; i--)
+		{
+			tree[PREFLOP][0].potcontrib[i] = tree[PREFLOP][0].potcontrib[i-1];
+			tree[PREFLOP][0].result[i] = tree[PREFLOP][0].result[i-1];
+		}
+
+		//... so that we can accomodate the new small blind folding action
+		tree[PREFLOP][0].result[0] = FD;
+		tree[PREFLOP][0].potcontrib[0] = myparams.sblind;
+
+		//change number of actions to 9.
+		tree[PREFLOP][0].numacts = 9;
+
+		if(myparams.pushfold)
+			//if pushfold, we need to make "calling" big blind amount unavailable.
+			tree[PREFLOP][0].potcontrib[1] = 99;
+		else
+			//otherwise, change 'checking' value to 'calling' big blind amount
+			tree[PREFLOP][0].potcontrib[1] = myparams.bblind;
+
+		//FIX NODE ONE
+		//change 'checking' value to 'calling' big blind amount
+		tree[PREFLOP][1].potcontrib[0] = myparams.bblind;
+
+		//FIX NODES WITH FOLD ZERO (2-13, 98, 99)
+
+		//Now, must change the fold valuations from 0 to big blind.
+		//responses to the six initial bets over bblind, for each player
+		for(int i=2; i<=13; i++)
+			tree[PREFLOP][i].potcontrib[0] = myparams.bblind;
+
+		//and response to all-in over bblind, for each player.
+		tree[PREFLOP][98].potcontrib[0] = myparams.bblind;
+		tree[PREFLOP][99].potcontrib[0] = myparams.bblind;
+	}
 }
 
 //destructor for BettingTree
@@ -388,7 +477,9 @@ BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings
 BettingTree::~BettingTree()
 {
 	delete[] tree[PREFLOP];
-	delete[] tree[FLOP]; //same as TURN and RIVER
+	delete[] tree[FLOP];
+	if(myparams.limit) // limit actually uses different tree. no-limit does not.
+		delete[] tree[TURN];
 }
 
 //since my betting tree can be ambiguous, more extensive tests
@@ -399,6 +490,9 @@ BettingTree::~BettingTree()
 //used by BotAPI (in PokerPlayer) and actionstring in rephands.cpp (of PokerLibrary)
 bool BettingTree::isallin(int result, int potcontrib, int gr) const
 {
+	if(myparams.limit)
+		return false;
+
 	switch(result)
 	{
 	case BetNode::FD:

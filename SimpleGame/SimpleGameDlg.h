@@ -56,6 +56,7 @@ private:
 	void updatepot();
     void updateinvested();
 	double mintotalwager(Player acting);
+	double limitbetincrement();
 	void dofold(Player pl);
 	void docall(Player pl);
 	void dobet(Player pl, double amount);
@@ -64,19 +65,20 @@ private:
 	void graygameover();
 	void graypostact(Player nexttoact);
 	//variables
-	static const int SBLIND = 5;
-	static const int BBLIND = 10;
-	int handsplayed;
-	MTRand cardrandom;
 	BotAPI MyBot;
-	const int STACKSIZE;
+	MTRand cardrandom;
+	int handsplayed;
+	const double _sblind;
+	const double _bblind;
+	const double _stacksize;
+	const bool _islimit;
 	Player human, bot;
 	CardMask humancards, botcards, flop, turn, river;
 	CardMask botcm0, botcm1, humancm0, humancm1;
 	CardMask flop0, flop1, flop2;
-	bool isallin;
-	int winner;
-	int gameround;
+	bool _isallin;
+	int _winner;
+	int _gameround;
 	double invested[2];
 	double totalhumanwon;
 	double pot;

@@ -8,28 +8,28 @@
 #include "../utility.h" // for TOSTRING()
 
 //main settings
-const char SAVENAME[] = "testbotapi2";
+const char SAVENAME[] = "testbotapi3";
 #define TESTXML 0
 #define STOPAFTER 1*MILLION*MILLION
-#define SAVEAFTER 10*MILLION
+#define SAVEAFTER 1*MILLION
 
 //solver settings
 #define FPWORKING_T long double
 #define FPSTORE_T double
 #define STORE_DENOM 1
-#define NUM_THREADS 4
+#define NUM_THREADS 2
 const bool SEED_RAND = true;
 const int  SEED_WITH = 42;
 
 //bin settings
 #define PFBIN 7
-#define FBIN 7
-#define TBIN 7
-#define RBIN 7
+#define FBIN 128
+#define TBIN 90
+#define RBIN 32
 
 const cardsettings_t CARDSETTINGS =
 {
-#if 1 // this for my new binning method with history
+#if 0 // this for my new binning method with history
 
 	{ PFBIN, FBIN, TBIN, RBIN },
 	{
@@ -52,9 +52,9 @@ const cardsettings_t CARDSETTINGS =
 	{ INDEX2_MAX, FBIN, TBIN, RBIN },
 	{
 		string(""),
-		string("bins/flop" TOSTRING(FBIN) "BINS.dat"),
-		string("bins/turn" TOSTRING(TBIN) "BINS.dat"),
-		string("bins/river" TOSTRING(RBIN) "BINS.dat"),
+		string("bins/flop" TOSTRING(FBIN)),
+		string("bins/turn" TOSTRING(TBIN)),
+		string("bins/river" TOSTRING(RBIN)),
 	},
 	{
 		0,
@@ -74,8 +74,10 @@ const cardsettings_t CARDSETTINGS =
 #define BB 2
 #define SS 13 //units of BB
 #define PUSHFOLD 0
+#define LIMIT 1
 const treesettings_t TREESETTINGS = 
 {
+#if !LIMIT
 #if PUSHFOLD
 
 	SB, BB, //smallblind, bigblind
@@ -86,7 +88,7 @@ const treesettings_t TREESETTINGS =
 	 {99,99,99,99,99,99},  //R41 - R46
 	 {99,99,99,99,99,99},  //R51 - R56
 	 {99,99,99,99,99,99}}, //R61 - R66
-	SS*BB, true //stacksize, pushfold
+	SS*BB, true, false //stacksize, pushfold, limit
 
 #elif SS<=8 //all possible options are represented
 
@@ -98,7 +100,7 @@ const treesettings_t TREESETTINGS =
 	 {16,24,32,40,48,56}, //R4n
 	 {20,30,40,50,60,70}, //R5n
 	 {24,36,48,60,72,84}}, //R6n
-	SS*BB, false
+	SS*BB, false, false
 
 #elif SS==13
 	
@@ -111,7 +113,7 @@ const treesettings_t TREESETTINGS =
 	 {24,36,48,99,99,99},
 	 {32,48,99,99,99,99},
 	 {40,99,99,99,99,99}},
-	SS*BB, false
+	SS*BB, false, false
 #else //smaller tree (same as used for prototype?)
 	SB, BB,
 	{2, 6, 12,20,99,99}, //B
@@ -121,7 +123,7 @@ const treesettings_t TREESETTINGS =
 	{99,99,99,99,99,99}, //R4
 	{99,99,99,99,99,99}, //R5
 	{99,99,99,99,99,99}, //R6
-	SS*BB, false
+	SS*BB, false, false
 #endif
 
 #elif SS>=25 && SS<35
@@ -134,7 +136,7 @@ const treesettings_t TREESETTINGS =
 	{34,48,60,99,99,99}, //R4
 	{48,60,99,99,99,99}, //R5
 	{60,99,99,99,99,99}, //R6
-	SS*BB, false
+	SS*BB, false, false
 
 #elif SS>=35
 
@@ -146,7 +148,20 @@ const treesettings_t TREESETTINGS =
 	50,66,99,99,99,99,
 	66,99,99,99,99,99,
 	99,99,99,99,99,99,
-	SS*BB, false
+	SS*BB, false, false
+
+#endif
+#else //limit!
+
+	SB, BB,
+	{0,0,0,0,0,0},
+	{{0,0,0,0,0,0},
+	 {0,0,0,0,0,0},
+	 {0,0,0,0,0,0},
+	 {0,0,0,0,0,0},
+	 {0,0,0,0,0,0},
+	 {0,0,0,0,0,0}},
+	200, false, true
 
 #endif
 };
@@ -156,6 +171,7 @@ const treesettings_t TREESETTINGS =
 #undef SB
 #undef BB
 #undef PUSHFOLD
+#undef LIMIT
 
 //turn off threads for windows
 #if __GNUC__ && NUM_THREADS > 1

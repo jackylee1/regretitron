@@ -15,6 +15,7 @@ struct treesettings_t
 	unsigned char raises[6][6];
 	unsigned char stacksize;
 	bool pushfold;
+	bool limit;
 };
 
 struct BetNode
@@ -58,9 +59,6 @@ private:
 	//none of these are altered after the constructor is done
 	BetNode * tree[4];
 	const treesettings_t myparams;
-
-	//the size of the betting tree
-	static const int N_NODES = 172;
 };
 
 inline void BettingTree::getnode(int gr, int pot, int beti, BetNode &bn) const

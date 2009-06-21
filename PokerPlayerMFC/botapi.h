@@ -35,6 +35,7 @@ public:
 	//diagnostics
 	void setdiagnostics(bool onoff, CWnd* parentwin = NULL); //controls DiagnosticsPage
 	int getstacksizemult() const { return mystrats[0]->gettree().getparams().stacksize / mystrats[0]->gettree().getparams().bblind; }
+	bool islimit() const { return mystrats[0]->gettree().getparams().limit; }
 
 private:
 	//we do not support copying.
