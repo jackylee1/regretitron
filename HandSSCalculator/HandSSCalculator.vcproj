@@ -204,6 +204,10 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath="..\utility.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"

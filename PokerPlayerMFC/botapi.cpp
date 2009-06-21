@@ -11,11 +11,7 @@ bool fpequal(double a, double b)
 {
 	bool isequal = (a > b-0.00001 && a < b+0.00001);
 	if(isequal && a!=b)
-	{
-		CString text;
-		text.Format("fpequal did something! a-b=%f", a-b);
-		WARN(text);
-	}
+		REPORT("fpequal did something! a-b = "+tostring(a)+" - "+tostring(b)+" = "+tostring(a-b), INFO);
 	return isequal;
 }
 
@@ -25,7 +21,7 @@ BotAPI::BotAPI(bool diagon)
 	 currstrat(NULL),
 	 actualinv(2, -1), //size is 2, initial values are -1
 	 perceivedinv(2, -1), //size is 2, initial values are -1
-	 cards(4), //size is 4 (one for each gr), initial values blah
+	 cards(), //size is 0, will be resized
 	 bot_status(INVALID),
 	 actionchooser(), //seeds rand with time and clock
 	 historyindexer(this)
@@ -74,6 +70,7 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	perceivedpot = 0;
 
 	myplayer = playernum;
+	cards.resize(1);
 	cards[PREFLOP] = myhand;
 
 	currentgr = PREFLOP;
@@ -92,7 +89,7 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot)
 {
 	//check input parameters
 
-	if (currentgr != gr-1 || gr < FLOP || gr > RIVER) REPORT("you set the next round at the wrong time");
+	if (cards.size() != gr || currentgr != gr-1 || gr < FLOP || gr > RIVER) REPORT("you set the next round at the wrong time");
 	if (bot_status != WAITING_ROUND) REPORT("you must advancetree before you setflop");
 	if (actualinv[0] != actualinv[1]) REPORT("you both best be betting the same.");
 	if (perceivedinv[0] != perceivedinv[1]) REPORT("perceived state is messed up");
@@ -106,7 +103,7 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot)
 	perceivedinv[P0] = 0;
 	perceivedinv[P1] = 0;
 	actualpot = newpot/multiplier;
-	cards[gr] = newboard;
+	cards.push_back(newboard);
 	currentgr = gr;
 	currentbeti = 0; //ready for P0 to act
 	currstrat->gettree().getnode(gr,perceivedpot,currentbeti,mynode);
@@ -210,7 +207,7 @@ Action BotAPI::getbotaction(double &amount)
 			amount = multiplier * (mynode.potcontrib[answer] + actualinv[1-myplayer]-perceivedinv[1-myplayer]);
 			if(amount < multiplier * mintotalwager())
 			{
-				WARN("bot bet amount was less than multiplier * mintotalwager()");
+				REPORT("bot bet amount was less than multiplier * mintotalwager()", WARN);
 				amount = multiplier * mintotalwager();
 			}
 			myact = BET;
@@ -286,7 +283,7 @@ void BotAPI::dobet(Player pl, double amount)
 	if (bestaction == -1)
 	{
 		if(pl == myplayer) REPORT("bot the bot HAD to have bet from the tree. we should find a bet action.");
-		else WARN("the oppenent bet when the tree had no betting actions. off tree -> treating as all-in");
+		else REPORT("the oppenent bet when the tree had no betting actions. off tree -> treating as all-in", INFO);
 		offtreebetallins = true;
 		doallin(pl);
 	}
@@ -467,25 +464,55 @@ void BotAPI::populatewindow(CWnd* parentwin)
 		multiplier*perceivedinv[1-myplayer]);
 	MyWindow->PerceivedInvestHum.SetWindowText(text);
 
-	//set bin number & board score
+	//get bin number(s) & board score
 
-	int handi, boardi;
+	vector<int> handi; 
+	int boardi;
 	currstrat->getcardmach().getindices(currentgr, cards, handi, boardi);
-	if(currentgr==PREFLOP)
+
+	//set bin number
+
+	if(currstrat->getcardmach().getparams().usehistory)
 	{
-		MyWindow->BinMax.SetWindowText(TEXT("Bin number:"));
-		MyWindow->BinNumber.SetWindowText(TEXT("-"));
-		MyWindow->BoardScore.SetWindowText(TEXT("-"));
+		text.Format("%d", handi[PREFLOP]);
+		for(int i=FLOP; i<=currentgr; i++)
+			text.AppendFormat(" - %d", handi[i]);
 	}
 	else
+		if(currentgr==PREFLOP)
+			text = TEXT("(index)");
+		else
+			text.Format("%d", handi[currentgr]);
+	MyWindow->BinNumber.SetWindowText(text);
+
+	//set bin max
+
+	if(currstrat->getcardmach().getparams().usehistory)
 	{
-		text.Format(TEXT("Bin number(1-%d):"),currstrat->getcardmach().getparams().bin_max[currentgr]);
-		MyWindow->BinMax.SetWindowText(text);
-		text.Format(TEXT("%d"),handi);
-		MyWindow->BinNumber.SetWindowText(text);
-		text.Format(TEXT("%d"),boardi);
-		MyWindow->BoardScore.SetWindowText(text);
+		text.Format(TEXT("Bin num(max %d-%d-%d-%d):"), 
+				currstrat->getcardmach().getparams().bin_max[PREFLOP],
+				currstrat->getcardmach().getparams().bin_max[FLOP],
+				currstrat->getcardmach().getparams().bin_max[TURN],
+				currstrat->getcardmach().getparams().bin_max[RIVER]);
 	}
+	else
+		if(currentgr==PREFLOP)
+			text = TEXT("Bin number:");
+		else
+			text.Format(TEXT("Bin number(1-%d):"),currstrat->getcardmach().getparams().bin_max[currentgr]);
+
+	MyWindow->BinMax.SetWindowText(text);
+
+	//set board score
+
+	if(currstrat->getcardmach().getparams().useflopalyzer)
+		if(currentgr==PREFLOP)
+			text = TEXT("NA");
+		else
+			text.Format("%d", boardi);
+	else
+		text = TEXT("--");
+	MyWindow->BoardScore.SetWindowText(text);
 
 	//send cards and our strategy to MyWindow, so that it can draw the cards as it needs
 

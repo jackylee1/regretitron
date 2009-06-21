@@ -16,7 +16,8 @@ CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSimpleGameDlg::IDD, pParent),
 	  totalhumanwon(0), human(P0), bot(P1),
 	  handsplayed(0),
-	  MyBot(false) //turns off diagnostics (default state of checkbox)
+	  MyBot(false), //turns off diagnostics (default state of checkbox)
+	  STACKSIZE(MyBot.getstacksizemult()*BBLIND) //gets stacksize of 0'th loaded strategy.
 {
 	CardMask_RESET(botcm0); //ensures show bot cards produces jokers if done early
 	CardMask_RESET(botcm1);

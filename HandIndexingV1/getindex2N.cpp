@@ -5,6 +5,7 @@
 
 struct suitrep //represents cards in a certain suit by number of cards and their ranks
 {
+	int suit; //needs to be saved, only for purposes of 231 and 2311 indexing
 	int ranki; //colexi rank index
 	int n_cards;
 	int my[2]; //index of my two cards, -1 if not
@@ -68,8 +69,6 @@ inline int mcolexi(const int &a, const int &b, const int &c)
 
 //easy way to identify the number-of-cards-in-each-suit case.
 #define SUITI(a, b, c, d) ((a) + (b<<4) + (c<<8) + (d<<12))
-#define COMBINE2(x1, x2, n2) ((x1)*(n2) + (x2))
-#define COMBINE3(x1, x2, n2, x3, n3) ((x1)*(n2)*(n3) + (x2)*(n3) + (x3))
 #define MCOL2(i,j) (mcolexi(n[i].ranki, n[j].ranki))
 #define MCOL3(i,j,k) (mcolexi(n[i].ranki, n[j].ranki, n[k].ranki))
 
@@ -80,7 +79,7 @@ inline int getindex7(const suitrep n[])
 		//FIRST, THE SEVEN CARD HANDS
 		//four suited
 	case SUITI(4,1,1,1):
-		return COMBINE2(n[3].ranki, MCOL3(2,1,0), M31);
+		return combine(n[3].ranki, MCOL3(2,1,0), M31);
 
 	case SUITI(3,2,1,1):
 		return n[3].ranki*N2*M21 + n[2].ranki*M21 + mcolexi(n[1].ranki, n[0].ranki) \
@@ -126,7 +125,8 @@ inline int getindex7(const suitrep n[])
 			+ N4*M31 + N3*N2*M21 + M32*N1 + N5*M21 + N4*N2*N1 + M23*N1 + N3*M22 + N6*N1 + N5*N2 + N4*N3;
 
 	default:
-                REPORT("You called getindex2N with wrong N");
+		REPORT("You called getindex2N with wrong N");
+		return -1;
 	}
 }
 
@@ -176,6 +176,7 @@ inline int getindex6(const suitrep n[])
 
 	default:
 		REPORT("You called getindex2N with wrong N"); 
+		return -1;
 	}
 }
 
@@ -208,6 +209,7 @@ inline int getindex5(const suitrep n[])
 
 	default:
 		REPORT("You called getindex2N with wrong N");
+		return -1;
 	}
 }
 
@@ -226,6 +228,7 @@ inline int getindex2(const suitrep n[])
 
 	default:
 		REPORT("You called getindex2 with wrong amount of cards");
+		return -1;
 	}
 }
 
@@ -284,15 +287,24 @@ void masktosuitrep(unsigned int m, unsigned int b, suitrep &sr)
 	sr.ranki = colexi(rank, sr.n_cards);
 }
 
-int getindex2N(const CardMask& mine, const CardMask& board, const int boardcards)
+int getindex2N(const CardMask& mine, const CardMask& board, const int boardcards, int * suits)
 {
 	suitrep n[4];
 	int mytotal[2];
 	int ret;
 
+	if(CardMask_ANY_SET(mine, board))
+		REPORT("duplicate cards found in getindex2N");
+
 	//for ease of coding in some areas, its handy to call getindex2N when you really mean getindex2.
 	if(boardcards==0 && StdDeck_CardMask_IS_EMPTY(board)) return getindex2(mine);
 
+	//fill suitrep 'suit' field - only used by 231 and 2311
+	n[0].suit = StdDeck_Suit_SPADES;
+	n[1].suit = StdDeck_Suit_DIAMONDS;
+	n[2].suit = StdDeck_Suit_CLUBS;
+	n[3].suit = StdDeck_Suit_HEARTS;
+	//fill the rest of the structure
 	masktosuitrep(CardMask_SPADES(mine),   CardMask_SPADES(board),   n[0]);
 	masktosuitrep(CardMask_DIAMONDS(mine), CardMask_DIAMONDS(board), n[1]);
 	masktosuitrep(CardMask_CLUBS(mine),    CardMask_CLUBS(board),    n[2]);
@@ -301,6 +313,14 @@ int getindex2N(const CardMask& mine, const CardMask& board, const int boardcards
 	std::sort(n, n+4);
 	//n[3] is BIGGEST - MOST CARDS, or if same cards, MOST RANKI
 	//n[0] IS smallest - least cards, or if same cards, SMALLEST RANK.
+
+	if(suits!=NULL) // - only used by 231 and 2311
+	{
+		suits[0] = n[0].suit;
+		suits[1] = n[1].suit;
+		suits[2] = n[2].suit;
+		suits[3] = n[3].suit;
+	}
 
 	for(int i=3,j=1,passed=0; j>=0; i--) //increment from LARGEST to SMALLEST (for speed and consistency)
 	{
@@ -356,10 +376,89 @@ int getindex2N(const CardMask& mine, const CardMask& board, const int boardcards
 		break;
 		
 	default:
-                REPORT("You called getindex2N with wrong N");
+		REPORT("You called getindex2N with wrong N");
 	}
 
 	return ret;
+}
+
+//this code is not going to match the above in style or convention.
+//it was written much later, and will be much more awesome
+
+int getindex231(CardMask pflop, CardMask flop, CardMask turn)
+{
+	if(CardMask_ANY_SET(flop, turn))
+		REPORT("duplicate cards found in getindex231");
+
+	//need to get an ordering of the 4 suits that does not change with suit rotation (and the index)
+
+	CardMask board;
+	CardMask_OR(board, flop, turn);
+	int suits[4];
+	int index24 = getindex2N(pflop, board, 4, suits);
+
+	//we just need to find the location of the turn card among the 4 total cards
+	//the ordering doesn't matter, but it NEEDS to be such that a rotation of the suits won't change
+	//the index.
+
+	int num_passed = 0;
+	for(int i=3; i>=0; i--) //faster since most cards sorted to end
+		for(int r=0; r<13; r++)
+			if(CardMask_CARD_IS_SET(flop, StdDeck_MAKE_CARD(r, suits[i])))
+				num_passed++;
+			else if(CardMask_CARD_IS_SET(turn, StdDeck_MAKE_CARD(r, suits[i])))
+				goto foundit; //need to break out of double loop
+foundit:
+
+	//now num_passed is the 0-3 location of the turn card, in some arbitrary ordering defined by PokerEval
+
+	if(num_passed < 0 || num_passed > 3)
+		REPORT("getindex231 failed!");
+
+	//we just need to combine that with the 24 index, and we're good.
+
+	return combine(index24, num_passed, 4);
+}
+
+int64 getindex2311(CardMask pflop, CardMask flop, CardMask turn, CardMask river)
+{
+	//need to get an ordering of the 4 suits that does not change with suit rotation (and the index)
+
+	if(CardMask_ANY_SET(flop, turn) || CardMask_ANY_SET(flop, river) || CardMask_ANY_SET(river, turn))
+		REPORT("duplicate cards found in getindex231");
+	CardMask board;
+	CardMask_OR(board, flop, turn);
+	CardMask_OR(board, board, river);
+	int suits[4];
+	int index25 = getindex2N(pflop, board, 5, suits);
+
+	//i give you 5 (arbitrarily) ordered cards (from the number returned by getindex2N with N=5)
+	//i need to know, which 1 of the 5 is the turn, and which 1 of the remaining 4 is the river
+	//so i find the number of cards to the left of the turn-card, which will be 0,1,2,3,or 4, 
+	//and i find the number of cards --besides the turn-card-- to the left of the river,
+	//which will be 0,1,2,or 3.
+
+	int num_passed = 0, turn_location = -1, river_location = -1;
+
+	for(int i=0; i<4 && (turn_location<0 || river_location<0); i++)
+		for(int r=StdDeck_Rank_FIRST; r<=StdDeck_Rank_LAST && (turn_location<0 || river_location<0); r++)
+
+			if(CardMask_CARD_IS_SET(river, StdDeck_MAKE_CARD(r, suits[i])))
+				river_location = num_passed++; //count river for turn count (and not river count -- post inc)
+			else if(CardMask_CARD_IS_SET(turn, StdDeck_MAKE_CARD(r, suits[i])))
+				turn_location = num_passed; //do not count turn card for either count
+			else if(CardMask_CARD_IS_SET(flop, StdDeck_MAKE_CARD(r, suits[i])))
+				num_passed++;
+
+	if(num_passed < 1 || num_passed > 5 || 
+			turn_location < 0 || turn_location > 4 || 
+			river_location < 0 || river_location > 3)
+		REPORT("getindex2311 failed! num_passed="+tostring(num_passed)
+			+", turn_loc="+tostring(turn_location)+", river_loc="+tostring(river_location));
+
+	//we just need to combine that with the 25 index, and we're good.
+
+	return combine(index25, turn_location, 5, river_location, 4);
 }
 
 int getindex2(const CardMask& mine)
@@ -385,6 +484,7 @@ int getindex2(const CardMask& mine)
 #if COMPILE_TESTCODE
 
 #include <fstream>
+#include <string.h> //for memset
 #include "inlines/eval.h"
 using namespace std;
 
@@ -499,7 +599,7 @@ void checkcount(char * count, int maxi, int N)
 		else if (!datawasok && (count[i]>=4 && count[i]<=24))
 			log << "  Data is okay starting " << i << endl << endl;
 		datawasok = (count[i]>=4 && count[i]<=24);
-		if(0<=count[i] && count[i]<100) numseen[count[i]]++;
+		if(0<=count[i] && count[i]<100) numseen[(int)count[i]]++;
 	}
 
 	log << "  Multiplicity of values between 0 and 100 seen in this count array:" << endl;
@@ -630,5 +730,138 @@ void testindex2N()
 
 	log.close();
 }
+
+#include <vector>
+const int PREFLOP = 0;
+const int FLOP = 1;
+const int TURN = 2;
+const int RIVER = 3;
+inline void checkindex231(const int64 index, const vector<CardMask> &cards, 
+		HandVal &hv1, HandVal &hv2, HandVal &hv3, bool haveseen, int pass)
+{
+	HandVal myhv1, myhv2, myhv3;
+	CardMask temp;
+	CardMask_OR(temp, cards[PREFLOP], cards[FLOP]);
+
+	switch(pass)
+	{
+		case 0:
+			myhv1 = Hand_EVAL_N(cards[PREFLOP], 2);
+			myhv2 = Hand_EVAL_N(temp, 5);
+			CardMask_OR(temp, temp, cards[TURN]);
+			myhv3 = Hand_EVAL_N(temp, 6);
+			break;
+
+		case 1:
+			myhv1 = Hand_EVAL_N(cards[PREFLOP], 2);
+			myhv2 = Hand_EVAL_N(temp, 5);
+			break;
+
+		case 2:
+			CardMask_OR(temp, temp, cards[TURN]);
+			myhv1 = Hand_EVAL_N(temp, 6);
+			CardMask_OR(temp, temp, cards[RIVER]);
+			myhv2 = Hand_EVAL_N(temp, 7);
+			break;
+	}
+
+
+	if(!haveseen)
+	{
+		hv1 = myhv1;
+		hv2 = myhv2;
+		if(pass==0) hv3 = myhv3;
+	}
+	else if(hv1 != myhv1 || hv2 != myhv2 || (pass==0 && hv3 != myhv3))
+		REPORT("handval check failure at index:"+tostring(index)+" pass:"+tostring(pass)+"  "+tostring(cards));
+}
+
+void testindex231()
+{
+	for(int pass = 0; pass < 5; pass++)
+	{
+		int64 index_max;
+		if(pass == 0)
+			index_max = INDEX231_MAX;
+		else if(pass == 1 || pass == 2)
+			index_max = INDEX2311_MAX;
+		else if(pass == 3)
+			index_max = INDEX24_MAX;
+		else if(pass == 4)
+			index_max = INDEX25_MAX;
+
+		vector< HandVal > handval1(pass == 0 || pass == 1 || pass == 2 ? index_max : 0, 0);
+		vector< HandVal > handval2(pass == 0 || pass == 1 || pass == 2 ? index_max : 0, 0);
+		vector< HandVal > handval3(pass == 0 ? index_max : 0, 0); //only used for 231
+		vector< short > count(pass != 1 ? index_max : 0, 0);
+		vector< bool > seen(index_max, false);
+		vector< CardMask > cards(pass == 1 || pass == 2 ? 4 : pass == 0 ? 3 : 2);
+
+		ENUMERATE_2_CARDS(cards[PREFLOP],
+		{
+			if(pass == 0 || pass == 1 || pass == 2)
+			{
+				ENUMERATE_3_CARDS_D(cards[FLOP], cards[PREFLOP],
+				{
+					CardMask dead;
+					CardMask_OR(dead, cards[PREFLOP], cards[FLOP]);
+					ENUMERATE_1_CARDS_D(cards[TURN], dead,
+					{
+						if(pass == 0)
+						{
+							int64 index = getindex231(cards[PREFLOP], cards[FLOP], cards[TURN]);
+							if(index < 0 || index >= INDEX231_MAX)
+								REPORT("index is out of range: "+tostring(index));
+							count[index]++;
+							checkindex231(index, cards, handval1[index], handval2[index], handval3[index], seen[index], pass);
+							seen[index] = true;
+						}
+						else if(pass == 1 || pass == 2)
+						{
+							CardMask dead2;
+							CardMask_OR(dead2, dead, cards[TURN]);
+							ENUMERATE_1_CARDS_D(cards[RIVER], dead2,
+							{
+								int64 index = getindex2311(cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER]);
+								if(index < 0 || index >= INDEX2311_MAX)
+									REPORT("index is out of range: "+tostring(index));
+								if(pass==2) count[index]++;
+								checkindex231(index, cards, handval1[index], handval2[index], handval3[index], seen[index], pass);
+								seen[index] = true;
+							});
+						}
+					});
+				});
+			}
+			else if(pass == 3 || pass == 4)
+			{
+				CardMask board;
+				ENUMERATE_N_CARDS_D(board, pass+1, cards[PREFLOP], 
+				{
+					count[getindex2N(cards[PREFLOP], board, pass+1)]++;
+				});
+			}
+		});
+
+
+		if(pass == 0 || pass == 2 || pass == 3 || pass == 4)
+		{
+			//we will count the number of times each possible count was seen
+			vector< int > numseen(100, 0);
+
+			for(int64 i=0; i<index_max; i++)
+				if(count[0]<0 || count[0]>=100)
+					REPORT("count out of range! pass:" + tostring(pass)+" index: "+tostring(i));
+				else
+					numseen[count[i]]++;
+
+			cout << "  Multiplicity of values between 0 and 100 seen in pass " << pass << ':' << endl;
+			for(int i=0; i<100; i++)
+				if (numseen[i]!=0) 
+					cout << "   " << i << ": " << numseen[i] << endl;
+		}
+	}
+}
+
 
 #endif

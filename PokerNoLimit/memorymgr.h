@@ -75,15 +75,15 @@ private:
 
 #if STORE_DENOM
 #define CASENINDEXING(nacts) case nacts: do{\
-	stratn = data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].stratn; \
-	regret = data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].regret; \
-	stratd = &(data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].stratd); \
+	stratn = data##nacts[gr][combine(cardsi, actioni, actionmax[gr][nacts-2])].stratn; \
+	regret = data##nacts[gr][combine(cardsi, actioni, actionmax[gr][nacts-2])].regret; \
+	stratd = &(data##nacts[gr][combine(cardsi, actioni, actionmax[gr][nacts-2])].stratd); \
 	return; \
 }while(0)
 #else
 #define CASENINDEXING(nacts) case nacts: do{\
-	stratn = data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].stratn; \
-	regret = data##nacts[gr][COMBINE(cardsi, actioni, actionmax[gr][nacts-2])].regret; \
+	stratn = data##nacts[gr][combine(cardsi, actioni, actionmax[gr][nacts-2])].stratn; \
+	regret = data##nacts[gr][combine(cardsi, actioni, actionmax[gr][nacts-2])].regret; \
 	return; \
 }while(0)
 #endif

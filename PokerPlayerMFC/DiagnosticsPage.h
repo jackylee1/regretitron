@@ -44,14 +44,14 @@ public:
 	//sense to write the code once and put it in just one place. that neccesitated
 	//these wrapper functions so that BotAPI could send over the neccesary info
 	//and then cause this page to draw the hands.
-	void setcardstoshow(Strategy * currstrat, int gr, int handi, int boardi);
+	void setcardstoshow(Strategy * currstrat, int gr, const vector<int> &handi, int boardi);
 	afx_msg void RefreshCards();
 
 private:
 	//set by setcardstoshow, read by RefreshCards. 
 	Strategy * mycurrstrat;
 	int mygr;
-	int myhandi;
+	vector<int> myhandi;
 	int myboardi;
 
 	//used by RefreshCards.

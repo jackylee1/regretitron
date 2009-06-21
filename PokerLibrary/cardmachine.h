@@ -3,6 +3,7 @@
 
 #include "../MersenneTwister.h"
 #include "../utility.h" //for uint64
+#include "binstorage.h"
 #include <poker_defs.h> //has CardMask
 #include <string>
 #include <vector>
@@ -16,7 +17,9 @@ struct cardsettings_t
 {
 	int bin_max[4];
 	string filename[4];
-	uint32 filesize[4];
+	int64 filesize[4];
+	bool usehistory;
+	bool useflopalyzer;
 };
 
 class CardMachine
@@ -30,11 +33,11 @@ public:
 	inline int getcardsimax(int gr) const { return cardsi_max[gr]; }
 
 	void getnewgame(int cardsi[4][2], int &twoprob0wins);
-	int getindices(int gr, const vector<CardMask> &cards, int &handi, int &boardi); //returns cardsi
+	int getindices(int gr, const vector<CardMask> &cards, vector<int> &handi, int &boardi); //returns cardsi
 	inline int getcardsi(int gr, const vector<CardMask> &cards)
-		{ int dummy1, dummy2; return getindices(gr, cards, dummy1, dummy2); }
-	void findexamplehand(int gr, int handi, int boardi, vector<CardMask> &cards);
-	string preflophandstring(int index);
+		{ vector<int> dummy1; int dummy2; return getindices(gr, cards, dummy1, dummy2); }
+	void findexamplehand(int gr, const vector<int> &handi, int boardi, vector<CardMask> &cards);
+	int preflophandinfo(int index, string &handstring); //index is getindex2() index, return cardsi
 
 
 #if COMPILE_FLOPALYZER_TESTCODE
@@ -51,21 +54,14 @@ private:
 	static int turnalyzer(const CardMask flop, const CardMask turn);
 	static int rivalyzer(const CardMask flop, const CardMask turn, const CardMask river);
 
+	//private data
 	const cardsettings_t myparams;
-	int cardsi_max[4]; //constant too
+	vector<int> cardsi_max; //constant too
 	static const int FLOPALYZER_MAX[4]; //must be initialized in the cpp file, as it is an array (not integral data member)
-
-	//is CardMachine being used by Solver or by BotAPI?
-	bool solving;
-
-	//if we are solving, these are used
+	vector<PackedBinFile *> binfiles;
+	bool solving; //is CardMachine being used by Solver or by BotAPI?
 	MTRand randforsolver;
 	MTRand randforexamplehands;
-	uint64 * bindata[4]; //should replace with this type of shit: http://ubuntuforums.org/showthread.php?t=67867
-
-	//if we are playing, these are used
-	ifstream filepointers[4];
-	int readbintable(const int gr, const int index);
 };
 
 #endif

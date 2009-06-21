@@ -10,7 +10,7 @@ int64 Solver::iterations; //number of iterations remaining
 int64 Solver::total = 0; //number of iterations done total
 double Solver::inittime;
 CardMachine * Solver::cardmachine = NULL;
-BettingTree * Solver::tree = NULL;
+const BettingTree * Solver::tree = NULL;
 MemoryManager * Solver::memory = NULL;
 #ifdef DO_THREADS
 pthread_mutex_t * Solver::cardsilocks[4] = {NULL,NULL,NULL,NULL}; //one lock per player per gameround per cardsi
@@ -23,7 +23,7 @@ void Solver::initsolver()
 	cardmachine = new CardMachine(CARDSETTINGS, true, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
 	tree = new BettingTree(TREESETTINGS); //the settings are taken from solveparams.h
 	memory = new MemoryManager(*tree, *cardmachine);
-	GETDBLTIME(inittime);
+	inittime = getdoubletime();
 
 #ifdef DO_THREADS
 	for(int gr=0; gr<4; gr++)
@@ -51,8 +51,7 @@ double Solver::solve(int64 iter)
 	total += iterations = iter; 
 
 	Solver solvers[NUM_THREADS];
-	double starttime, finishtime;
-	GETDBLTIME(starttime);
+	double starttime = getdoubletime();
 #ifdef DO_THREADS
 	pthread_t threads[NUM_THREADS-1];
 	for(int i=0; i<NUM_THREADS-1; i++)
@@ -67,8 +66,7 @@ double Solver::solve(int64 iter)
 		if(pthread_join(threads[i],NULL))
 			REPORT("error joining thread");
 #endif
-	GETDBLTIME(finishtime);
-	return finishtime-starttime;
+	return getdoubletime() - starttime;
 }
 
 #ifdef __GNUC__ //needed to print __float128 on linux
@@ -78,6 +76,7 @@ inline ostream& operator << (ostream& os, const __float128& n) { return os << (_
 
 void Solver::save(const string &filename, bool writedata)
 {
+	cout << "saving XML settings file..." << endl;
 
 	// save the data first to get the filesize
 
@@ -112,9 +111,7 @@ void Solver::save(const string &filename, bool writedata)
 
 	//total time elapsed
 
-	double elapsed;
-	GETDBLTIME(elapsed);
-	elapsed -= inittime;
+	double elapsed = getdoubletime() - inittime;
 	ostringstream timestr;
 	timestr << fixed << setprecision(1);
 	if(elapsed > 60.0*60.0*24.0*2.5)
@@ -156,11 +153,15 @@ void Solver::save(const string &filename, bool writedata)
 	strat->LinkEndChild(data);
 	root->LinkEndChild(strat);
 
-	//bin parameters
+	//cards parameters
 
-	TiXmlElement * bins = new TiXmlElement("bins");
-	root->LinkEndChild(bins);
+	TiXmlElement * cardbins = new TiXmlElement("cardbins");
+	root->LinkEndChild(cardbins);
 
+	TiXmlElement * meta = new TiXmlElement("meta");
+	meta->SetAttribute("usehistory", cardmachine->getparams().usehistory);
+	meta->SetAttribute("useflopalyzer", cardmachine->getparams().useflopalyzer);
+	cardbins->LinkEndChild(meta);
 	for(int gr=0; gr<4; gr++)
 	{
 		ostringstream o;
@@ -170,7 +171,7 @@ void Solver::save(const string &filename, bool writedata)
 		round->SetAttribute("filesize", cardmachine->getparams().filesize[gr]);
 		TiXmlText * roundtext = new TiXmlText(cardmachine->getparams().filename[gr]);
 		round->LinkEndChild(roundtext);
-		bins->LinkEndChild(round);
+		cardbins->LinkEndChild(round);
 	}
 
 	// tree parameters
@@ -184,18 +185,13 @@ void Solver::save(const string &filename, bool writedata)
 	mytree->LinkEndChild(blinds);
 
 	TiXmlElement * bets = new TiXmlElement("bets");
-	bets->SetAttribute("B1", (int)tree->getparams().bets[0]);
-	bets->SetAttribute("B2", (int)tree->getparams().bets[1]);
-	bets->SetAttribute("B3", (int)tree->getparams().bets[2]);
-	bets->SetAttribute("B4", (int)tree->getparams().bets[3]);
-	bets->SetAttribute("B5", (int)tree->getparams().bets[4]);
-	bets->SetAttribute("B6", (int)tree->getparams().bets[5]);
 	mytree->LinkEndChild(bets);
-
 	for(int N=0; N<6; N++)
 	{
-		ostringstream raiseN;
+		ostringstream raiseN, BN;
 		raiseN << "raise" << N+1;
+		BN << 'B' << N+1;
+		bets->SetAttribute(BN.str(), (int)tree->getparams().bets[N]);
 		TiXmlElement * raise = new TiXmlElement(raiseN.str());
 		for(int M=0; M<6; M++)
 		{
@@ -218,8 +214,12 @@ void Solver::save(const string &filename, bool writedata)
 	BetNode mynode;
 	tree->getnode(PREFLOP, 0, 0, mynode);
 	const int &numa = mynode.numacts;
-	for(int cardsi=cardmachine->getcardsimax(PREFLOP)-1; cardsi>=0; cardsi--)
+	for(int index=INDEX2_MAX-1; index>=0; index--)
 	{
+		//get string and cardsi
+
+		string handstring;
+		int cardsi = cardmachine->preflophandinfo(index, handstring);
 
 		//get pointers to data
 
@@ -236,11 +236,11 @@ void Solver::save(const string &filename, bool writedata)
 		//print out a heading including example hand
 
 		if(tree->getparams().pushfold)
-			text << setw(5) << left << ":" << cardmachine->preflophandstring(cardsi);
+			text << setw(5) << left << ":" << handstring;
 		else
 		{
 			text << endl << "cardsi: " << cardsi << ":" << endl;
-			text << cardmachine->preflophandstring(cardsi) << ":" << endl;
+			text << handstring << ":" << endl;
 		}
 
 		//compute the denominator

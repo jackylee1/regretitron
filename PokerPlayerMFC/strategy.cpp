@@ -25,22 +25,22 @@ Strategy::Strategy(string xmlfilename) :
 
 		Element* root = doc.FirstChildElement("strategy");
 		if(!root->HasAttribute("version") || root->GetAttribute<int>("version") != SAVE_FORMAT_VERSION)
-		{
-			WARN("Unsupported XML file (older/newer version).");
-			exit(-1);
-		}
+			REPORT("Unsupported XML file (older/newer version).");
 
 		//set CardMachine
 
+		Element* cardbins = doc.FirstChildElement("cardbins");
 		cardsettings_t cardsettings;
+		cardsettings.usehistory = cardbins->FirstChildElement("meta")->GetAttribute<bool>("usehistory");
+		cardsettings.useflopalyzer = cardbins->FirstChildElement("meta")->GetAttribute<bool>("useflopalyzer");
 		for(int gr=0; gr<4; gr++)
 		{
 			ostringstream roundname;
 			roundname << "round" << gr;
-			Element* bin = doc.FirstChildElement("strategy")->FirstChildElement("bins")->FirstChildElement(roundname.str());
-			cardsettings.filename[gr] = bin->GetTextOrDefault("");
-			cardsettings.filesize[gr] = bin->GetAttribute<uint64>("filesize");
-			cardsettings.bin_max[gr] = bin->GetAttribute<int>("nbins");
+			Element* cardbins = doc.FirstChildElement("strategy")->FirstChildElement("cardbins")->FirstChildElement(roundname.str());
+			cardsettings.filename[gr] = cardbins->GetTextOrDefault("");
+			cardsettings.filesize[gr] = cardbins->GetAttribute<uint64>("filesize");
+			cardsettings.bin_max[gr] = cardbins->GetAttribute<int>("nbins");
 		}
 		cardmach = new CardMachine(cardsettings, false);
 
@@ -75,10 +75,7 @@ Strategy::Strategy(string xmlfilename) :
 
 		Element* strat = doc.FirstChildElement("strategy")->FirstChildElement("solver")->FirstChildElement("savefile");
 		if(strat->GetAttribute<uint64>("filesize") == 0)
-		{
-			WARN("the strategy file was not saved for this xml file.");
-			exit(-1);
-		}
+			REPORT("the strategy file was not saved for this xml file.");
 		strategyfile.open((strat->GetText()).c_str(), ifstream::binary);
 		if(!strategyfile.good() || !strategyfile.is_open())
 			REPORT("strategy file not found");
@@ -88,8 +85,7 @@ Strategy::Strategy(string xmlfilename) :
 	}
 	catch(Exception &ex)
 	{
-		WARN(ex.what());
-		exit(-1);
+		REPORT(ex.what());
 	}
 
 	//load strategy file offsets
@@ -130,7 +126,7 @@ void Strategy::getprobs(int gr, int actioni, int numa, const vector<CardMask> &c
 	
 	unsigned char charprobs[MAX_ACTIONS];
 	//seekg ( offset + combinedindex * sizeofeachdata )
-	strategyfile.seekg( dataoffset[gr][numa-2] + COMBINE(cardsi, (int64)actioni, actionmax[gr][numa-2]) * (int64)numa );
+	strategyfile.seekg( dataoffset[gr][numa-2] + combine(cardsi, actioni, actionmax[gr][numa-2]) * (int64)numa );
 	strategyfile.read((char*)charprobs, numa);
 	if(strategyfile.gcount()!=numa || strategyfile.eof())
 		REPORT("strategy file has failed us.");

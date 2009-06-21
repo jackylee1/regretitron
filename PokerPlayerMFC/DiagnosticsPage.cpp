@@ -114,7 +114,7 @@ END_MESSAGE_MAP()
 //this function is called first (on change of bot state) to set these indices
 //this is the way that teh BotAPI communicates with the diagnostics page,
 //so that the RefreshCards handler doesn't have to call into BotAPI or something
-void DiagnosticsPage::setcardstoshow(Strategy * currstrat, int gr, int handi, int boardi)
+void DiagnosticsPage::setcardstoshow(Strategy * currstrat, int gr, const vector<int> &handi, int boardi)
 {
 	mycurrstrat = currstrat;
 	mygr = gr;

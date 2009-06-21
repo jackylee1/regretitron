@@ -7,9 +7,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerNoLimit", "PokerNoLimi
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 	ProjectSection(ProjectDependencies) = postProject
-		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0} = {6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}
-		{A4DEF05E-E072-493E-B282-84731D60BCF0} = {A4DEF05E-E072-493E-B282-84731D60BCF0}
 		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD} = {FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}
+		{A4DEF05E-E072-493E-B282-84731D60BCF0} = {A4DEF05E-E072-493E-B282-84731D60BCF0}
+		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0} = {6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerEval", "pokereval\poker-eval.vcproj", "{A4DEF05E-E072-493E-B282-84731D60BCF0}"
@@ -33,8 +33,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HandBinningV1", "HandSSCalc
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 	ProjectSection(ProjectDependencies) = postProject
-		{97192A80-9FB7-4D5C-8250-DC7B548F756F} = {97192A80-9FB7-4D5C-8250-DC7B548F756F}
+		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0} = {6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}
 		{A4DEF05E-E072-493E-B282-84731D60BCF0} = {A4DEF05E-E072-493E-B282-84731D60BCF0}
+		{97192A80-9FB7-4D5C-8250-DC7B548F756F} = {97192A80-9FB7-4D5C-8250-DC7B548F756F}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerLibrary", "PokerLibrary\PokerLibrary.vcproj", "{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}"
@@ -70,8 +71,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerPlayer", "PokerPlayerM
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 	ProjectSection(ProjectDependencies) = postProject
-		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD} = {FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}
 		{6DBB0C4D-D870-4A74-8693-6BA46EC21AC0} = {6DBB0C4D-D870-4A74-8693-6BA46EC21AC0}
+		{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD} = {FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TinyXML++", "TinyXML++\TiCPP.vcproj", "{FC578DE7-FD17-9A43-ACBD-8F49CC750FDD}"
@@ -146,6 +147,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		AMDCaProjectFile = C:\Documents and Settings\Scott\My Documents\PokerBreedingGrounds\trunk\CodeAnalyst\PokerBreedingGrounds.caw
+		AMDCaProjectFile = Z:\pokerbreedinggrounds\CodeAnalyst\PokerBreedingGrounds.caw
 	EndGlobalSection
 EndGlobal

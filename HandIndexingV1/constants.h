@@ -1,3 +1,5 @@
+#include "../utility.h" //for int64
+
 //the following are MAX INDEX VALUES
 //Ni - describing a bucket of i ranks
 #define N1 ((13)/(1)) //13 choose 1
@@ -23,3 +25,8 @@ const int INDEX2_MAX = M21 + N2;
 const int INDEX25_MAX = INDEX7_MAX*((7*6)/(2*1)); //7 choose 2 additional combos to specify which are mine
 const int INDEX24_MAX = INDEX6_MAX*((6*5)/(2*1)); //6 choose 2 additional combos to specify which are mine
 const int INDEX23_MAX = INDEX5_MAX*((5*4)/(2*1)); //5 choose 2 additional combos to specify which are mine
+
+const int INDEX231_MAX = INDEX24_MAX*4; //4 for the 4 locations of the turn card among the 4 board cards
+const int64 INDEX2311_MAX = INDEX25_MAX*4LL*5LL;  //5 for the turn card location among the 5 board cards, 
+												  //4 for the river card location among the remaining 4
+

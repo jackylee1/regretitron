@@ -5,31 +5,50 @@
 #include "../PokerLibrary/treenolimit.h" //for treesettings_t
 #include "../PokerLibrary/cardmachine.h" //for cardsettings_t
 #include "../PokerLibrary/binstorage.h" //to determine bin filesize
-
-#define STRINGIFY(symb) #symb
-#define TOSTRING(symb) STRINGIFY(symb)
+#include "../utility.h" // for TOSTRING()
 
 //main settings
 const char SAVENAME[] = "testbotapi2";
 #define TESTXML 0
 #define STOPAFTER 1*MILLION*MILLION
-#define SAVEAFTER 0
+#define SAVEAFTER 10*MILLION
 
 //solver settings
 #define FPWORKING_T long double
-#define FPSTORE_T long double
+#define FPSTORE_T double
 #define STORE_DENOM 1
 #define NUM_THREADS 4
 const bool SEED_RAND = true;
 const int  SEED_WITH = 42;
 
 //bin settings
-#define FBIN 256
-#define TBIN 90
-#define RBIN 32
+#define PFBIN 7
+#define FBIN 7
+#define TBIN 7
+#define RBIN 7
 
 const cardsettings_t CARDSETTINGS =
 {
+#if 1 // this for my new binning method with history
+
+	{ PFBIN, FBIN, TBIN, RBIN },
+	{
+		string("bins/preflop" TOSTRING(PFBIN) "HistBins.dat"),
+		string("bins/flop" TOSTRING(PFBIN) "-" TOSTRING(FBIN) "HistBins.dat"),
+		string("bins/turn" TOSTRING(PFBIN) "-" TOSTRING(FBIN) "-" TOSTRING(TBIN) "HistBins.dat"),
+		string("bins/river" TOSTRING(PFBIN) "-" TOSTRING(FBIN) "-" TOSTRING(TBIN) "-" TOSTRING(RBIN) "HistBins.dat"),
+	},
+	{
+		PackedBinFile::numwordsneeded(PFBIN, INDEX2_MAX)*8,
+		PackedBinFile::numwordsneeded(FBIN, INDEX23_MAX)*8,
+		PackedBinFile::numwordsneeded(TBIN, INDEX231_MAX)*8,
+		PackedBinFile::numwordsneeded(RBIN, INDEX2311_MAX)*8
+	},
+	true, //use history
+	false //use flopalyzer
+
+#else // this one is my old binning method, with no history
+
 	{ INDEX2_MAX, FBIN, TBIN, RBIN },
 	{
 		string(""),
@@ -39,10 +58,14 @@ const cardsettings_t CARDSETTINGS =
 	},
 	{
 		0,
-		BinRoutines::filesize(FBIN, INDEX23_MAX),
-		BinRoutines::filesize(TBIN, INDEX24_MAX),
-		BinRoutines::filesize(RBIN, INDEX25_MAX)
-	}
+		PackedBinFile::numwordsneeded(FBIN, INDEX23_MAX)*8,
+		PackedBinFile::numwordsneeded(TBIN, INDEX24_MAX)*8,
+		PackedBinFile::numwordsneeded(RBIN, INDEX25_MAX)*8
+	},
+	false, //use history
+	true //use flopalyzer
+
+#endif 
 };
 
 
@@ -149,8 +172,6 @@ const char * const FPWORKING_TYPENAME = TOSTRING(FPWORKING_T);
 const char * const FPSTORE_TYPENAME = TOSTRING(FPSTORE_T);
 #undef FPWORKING_T
 #undef FPSTORE_T
-#undef STRINGIFY
-#undef TOSTRING
 #undef FBIN
 #undef TBIN
 #undef RBIN

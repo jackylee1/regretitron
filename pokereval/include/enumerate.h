@@ -273,9 +273,14 @@ do {                                                                    \
                                                                         
 #define DECK_ENUMERATE_3_CARDS_D(deck, cards_var, dead_cards, action)   \
 do {                                                                    \
-  int _i1, _i2, _i3;                                                    \
-  deck##_CardMask _card1, _card2, _card3,                               \
-    _n2, _n3;                                                           \
+  int _i1;                                                              \
+  int _i2;                                                              \
+  int _i3;                                                              \
+  deck##_CardMask _card1;                                               \
+  deck##_CardMask _card2;                                               \
+  deck##_CardMask _card3;                                               \
+  deck##_CardMask _n2;                                                  \
+  deck##_CardMask _n3;                                                  \
                                                                         \
   for (_i1 = deck##_N_CARDS-1; _i1 >= 0; _i1--) {                       \
     _card1 = deck##_MASK(_i1);                                          \
@@ -300,9 +305,17 @@ do {                                                                    \
                                                                         
 #define DECK_ENUMERATE_4_CARDS_D(deck, cards_var, dead_cards, action)   \
 do {                                                                    \
-  int _i1, _i2, _i3, _i4;                                               \
-  deck##_CardMask _card1, _card2, _card3, _card4,                       \
-    _n2, _n3, _n4;                                                      \
+  int _i1;                                                              \
+  int _i2;                                                              \
+  int _i3;                                                              \
+  int _i4;                                                              \
+  deck##_CardMask _card1;                                               \
+  deck##_CardMask _card2;                                               \
+  deck##_CardMask _card3;                                               \
+  deck##_CardMask _card4;                                               \
+  deck##_CardMask _n2;                                                  \
+  deck##_CardMask _n3;                                                  \
+  deck##_CardMask _n4;                                                  \
                                                                         \
   for (_i1 = deck##_N_CARDS-1; _i1 >= 0; _i1--) {                       \
     _card1 = deck##_MASK(_i1);                                          \
@@ -333,9 +346,20 @@ do {                                                                    \
                                                                         
 #define DECK_ENUMERATE_5_CARDS_D(deck, cards_var, dead_cards, action)   \
 do {                                                                    \
-  int _i1, _i2, _i3, _i4, _i5;                                          \
-  deck##_CardMask _card1, _card2, _card3, _card4, _card5,               \
-    _n2, _n3, _n4, _n5;                                                 \
+  int _i1;                                                              \
+  int _i2;                                                              \
+  int _i3;                                                              \
+  int _i4;                                                              \
+  int _i5;                                                              \
+  deck##_CardMask _card1;                                               \
+  deck##_CardMask _card2;                                               \
+  deck##_CardMask _card3;                                               \
+  deck##_CardMask _card4;                                               \
+  deck##_CardMask _card5;                                               \
+  deck##_CardMask _n2;                                                  \
+  deck##_CardMask _n3;                                                  \
+  deck##_CardMask _n4;                                                  \
+  deck##_CardMask _n5;                                                  \
                                                                         \
   for (_i1 = deck##_N_CARDS-1; _i1 >= 0; _i1--) {                       \
     _card1 = deck##_MASK(_i1);                                          \

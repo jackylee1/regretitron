@@ -10,7 +10,6 @@
 #endif						
 
 #include <stdio.h>
-#include <tchar.h>
 
 #include <iostream> //required for cout
 #include <fstream> //required for files
@@ -19,13 +18,6 @@
 #include <iomanip> //to pad things
 
 //PokerEval
-#include "poker_defs.h"
-#include "inlines/eval.h"
+#include <poker_defs.h>
+#include <inlines/eval.h>
 
-#define REPORT(chars) do{ \
-	std::cout << chars << std::endl << std::flush; \
-	_asm {int 3}; \
-	exit(1); \
-}while(0)
-
-#define PRINTMASK(c) GenericDeck_maskString(&StdDeck, &c)

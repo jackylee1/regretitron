@@ -43,7 +43,7 @@ private:
 	static double inittime; //to find total elapsed for logging purposes
 	
 	static CardMachine * cardmachine; //created as pointers so I do not statically initialize them (fiasco...)
-	static BettingTree * tree;
+	static const BettingTree * tree;
 	static MemoryManager * memory;
 #ifdef DO_THREADS
 	static pthread_mutex_t * cardsilocks[4]; //one lock per player per gameround per cardsi
