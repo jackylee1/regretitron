@@ -17,6 +17,6 @@ enum Player
 const int MAX_ACTIONS = 9;
 const int MAX_NODETYPES = MAX_ACTIONS-1; //because there are no single membered nodes
 
-const int SAVE_FORMAT_VERSION = 2; //will increment on changes
+const int SAVE_FORMAT_VERSION = 3; //will increment on changes
 
 #endif

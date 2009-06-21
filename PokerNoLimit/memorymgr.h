@@ -31,6 +31,7 @@ struct stratN_t
 {
 	stratN_t(const dataN_t<N> &data); //performs division
 	unsigned char weight[N];
+	unsigned char checksum;
 };
 
 

@@ -23,13 +23,13 @@ dataN_t<N>::dataN_t() //initialize all to zero
 //each char value represents as equal segment in the floating point range [0, max),
 //with max then mapped to 255.
 template <int N>
-stratN_t<N>::stratN_t(const dataN_t<N> &data)
+stratN_t<N>::stratN_t(const dataN_t<N> &data) : checksum(0)
 {
 	fpstore_type max_value = *max_element(data.stratn, data.stratn+N);
 
 	if(max_value==0) //algorithm never reached this node.
 		for(int a=0; a<N; a++)
-			weight[a]=1; //assigns equal probability weighting to each
+			checksum += weight[a]=1; //assigns equal probability weighting to each
 	else
 	{
 		for(int a=0; a<N; a++)
@@ -43,7 +43,7 @@ stratN_t<N>::stratN_t(const dataN_t<N> &data)
 			if(temp == 256) temp = 255;
 			if(temp < 0 || temp > 255)
 				REPORT("failure to divide");
-			weight[a] = (unsigned char)temp;
+			checksum += weight[a] = (unsigned char)temp;
 		}
 	}
 
@@ -198,6 +198,7 @@ MemoryManager::~MemoryManager()
 	{ \
 		stratN_t<numa> thisnode(data##numa[gr][k]); \
 		f.write((char*)thisnode.weight, numa); \
+		f.write((char*)&(thisnode.checksum), 1); \
 	} \
 	dataoffset = f.tellp(); \
 }while(0);

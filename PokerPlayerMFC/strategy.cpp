@@ -16,6 +16,7 @@ Strategy::Strategy(string xmlfilename) :
 	actionmax(4, vector<int>(MAX_NODETYPES, 0)) // 2D array of ints all zero
 {
 	using namespace ticpp;
+	int64 strategyfilesize;
 	try //catches errors from xml parsing
 	{
 		Document doc(xmlfilename);
@@ -75,13 +76,14 @@ Strategy::Strategy(string xmlfilename) :
 		//set strategy file
 
 		Element* strat = doc.FirstChildElement("strategy")->FirstChildElement("solver")->FirstChildElement("savefile");
-		if(strat->GetAttribute<uint64>("filesize") == 0)
+		strategyfilesize = strat->GetAttribute<int64>("filesize");
+		if(strategyfilesize == 0)
 			REPORT("the strategy file was not saved for this xml file.");
 		strategyfile.open((strat->GetText()).c_str(), ifstream::binary);
 		if(!strategyfile.good() || !strategyfile.is_open())
 			REPORT("strategy file not found");
 		strategyfile.seekg(0, ios::end);
-		if(!strategyfile.good() || (uint64)strategyfile.tellg()!=strat->GetAttribute<uint64>("filesize"))
+		if(!strategyfile.good() || (int64)strategyfile.tellg() != strategyfilesize)
 			REPORT("strategy file found but not correct size");
 	}
 	catch(Exception &ex)
@@ -92,21 +94,21 @@ Strategy::Strategy(string xmlfilename) :
 	//load strategy file offsets
 
 	strategyfile.seekg(0);
+	int64 nextoffset = 4*MAX_NODETYPES*8; //should be start of data
 	for(int gr=0; gr<4; gr++)
 	{
-		int64 lastoffset = 0;
 		for(int i=7; i>=0; i--) //loops must go in same order as done in memorymgr.
 		{
 			int64 thisoffset;
 			strategyfile.read((char*)&thisoffset, 8);
-			if(thisoffset < lastoffset)
-				REPORT("Strategy file is corrupt (offsets must grow)");
+			if(thisoffset != nextoffset)
+				REPORT("redundant offset storage has revealed errors in strategy file");
 			dataoffset[gr][i] = thisoffset;
-			lastoffset = thisoffset;
+			nextoffset = thisoffset + actionmax[gr][i]*cardmach->getcardsimax(gr)*(i+3);
 		}
 	}
-	if(dataoffset[0][7] != strategyfile.tellg() || dataoffset[0][7] != 4*MAX_NODETYPES*8 || !strategyfile.good())
-		REPORT("Strategy flie is corrupt (first data offset not as expected)");
+	if(dataoffset[0][7] != strategyfile.tellg() || strategyfilesize != nextoffset || !strategyfile.good())
+		REPORT("Strategy file failed final error checks.");
 }
 
 Strategy::~Strategy()
@@ -126,18 +128,24 @@ void Strategy::getprobs(int gr, int actioni, int numa, const vector<CardMask> &c
 	//read the char probabilities, matching the offset to the memorymgr code.
 	
 	unsigned char charprobs[MAX_ACTIONS];
+	unsigned char checksum;
 	//seekg ( offset + combinedindex * sizeofeachdata )
-	strategyfile.seekg( dataoffset[gr][numa-2] + combine(cardsi, actioni, actionmax[gr][numa-2]) * (int64)numa );
+	strategyfile.seekg( dataoffset[gr][numa-2] + combine(cardsi, actioni, actionmax[gr][numa-2]) * (numa+1) );
 	strategyfile.read((char*)charprobs, numa);
 	if(strategyfile.gcount()!=numa || strategyfile.eof())
+		REPORT("strategy file has failed us.");
+	strategyfile.read((char*)&checksum, 1);
+	if(strategyfile.gcount()!=1 || strategyfile.eof())
 		REPORT("strategy file has failed us.");
 
 	//convert the numa chars to numa doubles
 
 	probs.resize(numa);
-	int sum=0;
+	unsigned int sum=0;
 	for(int i=0; i<numa; i++)
 		sum += charprobs[i];
+	if((sum & 0x000000FF) != checksum)
+		REPORT("checksum failed in strategy file!");
 	for(int i=0; i<numa; i++)
 		probs[i] = (double)charprobs[i]/sum;
 }

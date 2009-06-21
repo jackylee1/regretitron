@@ -70,7 +70,10 @@ PackedBinFile::~PackedBinFile()
 	if(_bindata!=NULL)
 		delete _bindata;
 	if(_filehandle!=NULL)
+	{
+		_filehandle->close();
 		delete _filehandle;
+	}
 }
 
 int PackedBinFile::retrieve(int64 index) const

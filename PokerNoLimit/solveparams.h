@@ -8,7 +8,7 @@
 #include "../utility.h" // for TOSTRING()
 
 //main settings
-const char SAVENAME[] = "testbotapi3";
+const char SAVENAME[] = "testbotapi4";
 #define TESTXML 0
 #define STOPAFTER 1*MILLION*MILLION
 #define SAVEAFTER 1*MILLION
