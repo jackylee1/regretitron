@@ -19,7 +19,7 @@ public:
 	FloaterFile(const string filename, const int64 n_floaters); //loads floaters from file
 	FloaterFile(const int64 n_floaters) : mydata(n_floaters, -1) {}
 	inline floater operator[](uint64 index) const { return mydata[index]; }
-	inline void store(uint64 index, floater value);
+	inline void store(int64 index, floater value);
 	void savefile(string filename);
 private:
 	vector<floater> mydata;
@@ -57,9 +57,9 @@ FloaterFile::FloaterFile(string filename, const int64 n_floaters) : mydata(n_flo
 	f.close();
 }
 
-inline void FloaterFile::store(uint64 index, floater value)
+inline void FloaterFile::store(int64 index, floater value)
 {
-	if(index < 0 || index > mydata.size() || value < 0 || value > 1)
+	if(index < 0 || index > (int64)mydata.size() || value < 0 || value > 1)
 		REPORT("bad data trying to be put into a FloaterFile!");
 	mydata[index] = value;
 }
@@ -863,9 +863,11 @@ int main(int argc, char *argv[])
 	else if(argc == 4 && strcmp("oldbins", argv[1])==0 && strcmp("river", argv[2])==0)
 		saveriverBINS(atoi(argv[3]));
 
+#ifdef COMPILE_TESTCODE
 	//test
 	else if(argc==2 && strcmp("test", argv[1])==0)
 		testindex231();
+#endif
 
 	//diff
 	else if((argc==6 || argc==7) && strcmp("diff", argv[1]) == 0)
@@ -922,7 +924,9 @@ int main(int argc, char *argv[])
 		cout << "Create history bins:           " << argv[0] << " histbin n_bins" << endl;
 		cout << "Create one round of hist bins: " << argv[0] << " histbin (preflop | flop | turn | river) n_bins ... n_bins" << endl;
 		cout << "Create old-style bins:         " << argv[0] << " oldbins (flop | turn | river) n_bins" << endl;
+#ifdef COMPILE_TESTCODE
 		cout << "Test indexing function:        " << argv[0] << " test" << endl;
+#endif
 		cout << "Diff two bin files:            " << argv[0] << " diff file1 file2 binmax indextype [-f | errmax]" << endl;
 		exit(-1);
 	}

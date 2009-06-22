@@ -65,13 +65,12 @@ private:
 	void graygameover();
 	void graypostact(Player nexttoact);
 	//variables
-	BotAPI MyBot;
+	BotAPI * _mybot;
 	MTRand cardrandom;
 	int handsplayed;
 	const double _sblind;
 	const double _bblind;
-	const double _stacksize;
-	const bool _islimit;
+	double _stacksize;
 	Player human, bot;
 	CardMask humancards, botcards, flop, turn, river;
 	CardMask botcm0, botcm1, humancm0, humancm1;

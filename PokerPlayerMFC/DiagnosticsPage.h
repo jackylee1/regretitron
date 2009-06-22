@@ -1,4 +1,5 @@
 #pragma once
+#ifdef _MFC_VER
 #include "afxwin.h"
 #include "picturectrl.h"
 #include "strategy.h"
@@ -61,3 +62,4 @@ private:
 	CPictureCtrl Card[5][7]; //5 rows of 7 cards
 };
 
+#endif

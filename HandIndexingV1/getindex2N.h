@@ -3,9 +3,6 @@
 
 #include "../utility.h" //for int64
 
-//Controls whether the testcode is seen by the compiler
-#define COMPILE_TESTCODE 1
-
 //getindex2N
 // mine are the PokerEval CardMask containing my hole cards. Must be 2 cards.
 // board are the PokerEval CardMask containing the board cards. Must contain 3, 4, or 5 cards.
@@ -19,7 +16,7 @@ inline int getindex23(CardMask pflop, CardMask flop) { return getindex2N(pflop, 
 extern int getindex231(CardMask pflop, CardMask flop, CardMask turn);
 extern int64 getindex2311(CardMask pflop, CardMask flop, CardMask turn, CardMask river);
 
-#if COMPILE_TESTCODE
+#ifdef COMPILE_TESTCODE
 extern void testindex2N();
 extern void testindex231();
 #endif

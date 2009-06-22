@@ -14,13 +14,12 @@
 // CSimpleGameDlg dialog
 CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSimpleGameDlg::IDD, pParent),
-	  MyBot(false),
+	  _mybot(NULL),
 	  cardrandom(),
 	  handsplayed(0),
 	  _sblind(5),
 	  _bblind(10),
 	  _stacksize(MyBot.getstacksizemult() * _bblind),
-	  _islimit(MyBot.islimit()),
 	  human(P0), 
 	  bot(P1),
 	  totalhumanwon(0)
@@ -86,6 +85,8 @@ END_MESSAGE_MAP()
 void CSimpleGameDlg::PostNcDestroy() 
 {	
     CDialog::PostNcDestroy();
+	if(_mybot != NULL)
+		delete _mybot;
     delete this;
 }
 //but then more digging makes me realize that the problem was that
@@ -100,7 +101,7 @@ void CSimpleGameDlg::PostNcDestroy()
 //Okay.
 void CSimpleGameDlg::OnCancel()
 {
-	MyBot.setdiagnostics(false); //this will DestroyWindow the diagnostics page if it exists.
+	_mybot->setdiagnostics(false); //this will DestroyWindow the diagnostics page if it exists.
 	DestroyWindow();
 }
 
@@ -126,13 +127,21 @@ BOOL CSimpleGameDlg::OnInitDialog()
 
 	// Set the icon for this dialog.  The framework does this automatically
 	//  when the application's main window is not a dialog
+
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
-	// TODO: Add extra initialization here
+	//find a strategy file and create the bot api
+
+	CFileDialog filechooser(TRUE, "xml", NULL, OFN_NOCHANGEDIR);
+	if(filechooser.DoModal() == IDCANCEL) exit(0);
+	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()), false);
+
+	//initialize the window controls that need it
+
 	TotalWon.SetWindowText(TEXT("$0.00"));
 	graygameover();
-	if(_islimit)
+	if(_mybot->islimit())
 		BetAmount.EnableWindow(FALSE);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
@@ -277,7 +286,7 @@ void CSimpleGameDlg::docall(Player pl)
 {
 	//inform bot unless game is over
 	if(!_isallin && _gameround != RIVER)
-		MyBot.doaction(pl,CALL,invested[1-pl]);
+		_mybot->doaction(pl,CALL,invested[1-pl]);
 	//increase pot
 	pot += invested[1-pl];
 	updatepot();
@@ -309,17 +318,17 @@ void CSimpleGameDlg::docall(Player pl)
 	{
 	//for the first three rounds, we just inform the bot and then print the cards.
 	case PREFLOP: 
-		MyBot.setnextround(FLOP, flop, pot); 
+		_mybot->setnextround(FLOP, flop, pot); 
 		printflop();
 		break;
 
 	case FLOP: 
-		MyBot.setnextround(TURN, turn, pot); 
+		_mybot->setnextround(TURN, turn, pot); 
 		printturn();
 		break;
 
 	case TURN: 
-		MyBot.setnextround(RIVER, river, pot); 
+		_mybot->setnextround(RIVER, river, pot); 
 		printriver();
 		break;
 
@@ -348,7 +357,7 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 		REPORT("someone bet an illegal amount.");
 
 	//inform the bot
-	MyBot.doaction(pl,BET,amount);
+	_mybot->doaction(pl,BET,amount);
 	//set our invested amount
 	invested[pl] = amount;
 	updateinvested();
@@ -358,7 +367,7 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 void CSimpleGameDlg::doallin(Player pl)
 {
 	//inform the bot
-	MyBot.doaction(pl, ALLIN, 0);
+	_mybot->doaction(pl, ALLIN, 0);
 	_isallin=true;
 	//set our invested amount
 	invested[pl]=_stacksize-pot;
@@ -454,7 +463,7 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 		//gray out makebotgo
 		MakeBotGoButton.EnableWindow(FALSE);
 
-		if(_isallin || _islimit) //can't go all in twice
+		if(_isallin || _mybot->islimit()) //can't go all in twice
 			AllInButton.EnableWindow(FALSE);
 		else
 			AllInButton.EnableWindow(TRUE);
@@ -478,7 +487,7 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 		}
 
 		//if min bet + our pot share < _stacksize
-		if(_islimit)
+		if(_mybot->islimit())
 		{
 			if(invested[1-nexttoact]+0.01 >= 4*limitbetincrement()) //fp compare
 				BetRaiseButton.EnableWindow(FALSE);
@@ -514,9 +523,9 @@ void CSimpleGameDlg::OnBnClickedCheck2()
 	//This function is our only interaction
 	//(it decides when it's appropriate to pop up the window, and it closes it)
 	if(ShowDiagnostics.GetCheck())
-		MyBot.setdiagnostics(true, this);
+		_mybot->setdiagnostics(true, this);
 	else
-		MyBot.setdiagnostics(false);
+		_mybot->setdiagnostics(false);
 }
 
 // ---------------------------- Action Buttons -------------------------------
@@ -559,7 +568,7 @@ void CSimpleGameDlg::OnBnClickedButton3()
 	//the bet/raise button always has the meaning of betting/raising,
 	// (that is, meaning as defined by my poker api or, rather, BotAPI)
 
-	if(_islimit)
+	if(_mybot->islimit())
 	{
 		dobet(human, invested[bot] + limitbetincrement());
 	}
@@ -653,7 +662,7 @@ void CSimpleGameDlg::OnBnClickedButton5()
 		_winner = -1;
 
 	//inform bot of the new game
-	MyBot.setnewgame(bot, botcards, _sblind, _bblind, _stacksize);
+	_mybot->setnewgame(bot, botcards, _sblind, _bblind, _stacksize);
 
 	//display the cards pics
 	eraseboard();
@@ -673,7 +682,7 @@ void CSimpleGameDlg::OnBnClickedButton6()
 	double val;
 	Action act;
 	//get answer from bot
-	act = MyBot.getbotaction(val);
+	act = _mybot->getbotaction(val);
 
 	//the bot uses the same semantics, so this is easy
 	switch(act)

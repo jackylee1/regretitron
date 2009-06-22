@@ -5,15 +5,17 @@
 #include "../PokerLibrary/cardmachine.h"
 #include "../PokerLibrary/treenolimit.h"
 #include "../PokerLibrary/constants.h"
+#ifndef TIXML_USE_TICPP
 #define TIXML_USE_TICPP
+#endif
 #include "../TinyXML++/ticpp.h"
 
 //loads a new strategy, reads xml
 Strategy::Strategy(string xmlfilename) : 
 	tree(NULL),
+	actionmax(4, vector<int>(MAX_NODETYPES, 0)), // 2D array of ints all zero
 	cardmach(NULL),
-	dataoffset(4, vector<int64>(MAX_NODETYPES, 0)), // array of (4 x MAX_NODETYPES) 0's
-	actionmax(4, vector<int>(MAX_NODETYPES, 0)) // 2D array of ints all zero
+	dataoffset(4, vector<int64>(MAX_NODETYPES, 0)) // array of (4 x MAX_NODETYPES) 0's
 {
 	using namespace ticpp;
 	int64 strategyfilesize;
@@ -89,6 +91,7 @@ Strategy::Strategy(string xmlfilename) :
 	catch(Exception &ex)
 	{
 		REPORT(ex.what());
+		exit(-1);
 	}
 
 	//load strategy file offsets

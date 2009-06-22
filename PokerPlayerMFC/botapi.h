@@ -6,15 +6,17 @@
 #include "../PokerLibrary/constants.h"
 #include "../MersenneTwister.h"
 #include <vector>
+#include <string>
 #include <poker_defs.h>
 using std::vector;
+using std::string;
 
 enum Action
 {
 	FOLD, //a player has folded
-	CALL, //ends the betting, continuing at next round
+	CALL, //ends the betting, continuing at next round, could be calling all-in
 	BET,  //keeps the betting going. could be check
-	ALLIN
+	ALLIN //this is a bet of all-in
 };
 
 
@@ -23,7 +25,7 @@ class DiagnosticsPage; //forward declaration
 class BotAPI
 {
 public:
-	BotAPI(bool diagon);
+	BotAPI(string xmlfile, bool diagon = false);
 	~BotAPI();
 
 	//control game progress
@@ -33,8 +35,11 @@ public:
 	Action getbotaction(double &amount);
 
 	//diagnostics
+#ifdef _MFC_VER
 	void setdiagnostics(bool onoff, CWnd* parentwin = NULL); //controls DiagnosticsPage
-	int getstacksizemult() const { return mystrats[0]->gettree().getparams().stacksize / mystrats[0]->gettree().getparams().bblind; }
+#endif
+	double getstacksizemult() const 
+		{ return (double)mystrats[0]->gettree().getparams().stacksize / mystrats[0]->gettree().getparams().bblind; }
 	bool islimit() const { return mystrats[0]->gettree().getparams().limit; }
 
 private:
@@ -51,8 +56,10 @@ private:
 
 	//diagnostics window
 	DiagnosticsPage * MyWindow;
+#ifdef _MFC_VER
 	void populatewindow(CWnd * parentwin = NULL);
 	void destroywindow();
+#endif
 	bool isdiagnosticson;
 
 	//private data

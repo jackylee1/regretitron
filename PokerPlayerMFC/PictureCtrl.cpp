@@ -14,7 +14,8 @@
 //Note: I found this code at: 
 //      http://www.codeproject.com/KB/graphics/CPictureControl.aspx
 
-#include "StdAfx.h"
+#include "stdafx.h"
+#ifdef _MFC_VER
 #include "PictureCtrl.h"
 #include <GdiPlus.h>
 #include <sstream>
@@ -338,3 +339,5 @@ BOOL CPictureCtrl::OnEraseBkgnd(CDC *pDC)
 		return CStatic::OnEraseBkgnd(pDC);
 	}
 }
+
+#endif

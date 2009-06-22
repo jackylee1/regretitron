@@ -481,7 +481,7 @@ int getindex2(const CardMask& mine)
 
 //Here, begins the testing code. Code used to verify that the above does
 //indeed produce unique indices that only combine non-distinct hands.
-#if COMPILE_TESTCODE
+#ifdef COMPILE_TESTCODE
 
 #include <fstream>
 #include <string.h> //for memset
@@ -847,7 +847,7 @@ void testindex231()
 		if(pass == 0 || pass == 2 || pass == 3 || pass == 4)
 		{
 			//we will count the number of times each possible count was seen
-			vector< int > numseen(100, 0);
+			vector< int64 > numseen(100, 0);
 
 			for(int64 i=0; i<index_max; i++)
 				if(count[0]<0 || count[0]>=100)
@@ -862,6 +862,37 @@ void testindex231()
 		}
 	}
 }
+
+/*** Correct results, from when vector numseen above was a vector<int>. 
+  ** Adding 2^32 to that one yields the correct value: 
+  ** -2132987476 + 2^32 = 2161979820 = 108098991 * 20
+  **
+  ** Multiplying pass 4 by twenty yields the pass 2 counts, multiplying the 
+  ** pass 3 by four, yields the pass 0 counts. No errors were REPORTed, 
+  ** indexing function works.
+
+scott@pokerserver:~/pokerbreedinggrounds/bin$ ./binmaker test
+  Multiplicity of values between 0 and 100 seen in pass 0:
+   4: 330720
+   6: 78000
+   12: 13097760
+   24: 44272800
+  Multiplicity of values between 0 and 100 seen in pass 2:
+   4: 5050500
+   12: 356816460
+   24: -2132987476
+  Multiplicity of values between 0 and 100 seen in pass 3:
+   4: 82680
+   6: 19500
+   12: 3274440
+   24: 11068200
+  Multiplicity of values between 0 and 100 seen in pass 4:
+   4: 252525
+   12: 17840823
+   24: 108098991
+
+*******/
+
 
 
 #endif

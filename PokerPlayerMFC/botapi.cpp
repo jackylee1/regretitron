@@ -15,26 +15,28 @@ bool fpequal(double a, double b)
 	return isequal;
 }
 
-BotAPI::BotAPI(bool diagon)
-   : isdiagnosticson(diagon), answer(-1), MyWindow(NULL),
-     mystrats(), //initialize to be empty
+BotAPI::BotAPI(string xmlfile, bool diagon)
+   : MyWindow(NULL),
+     isdiagnosticson(diagon), 
+     actionchooser(), //seeds rand with time and clock
+     mystrats(1, new Strategy(xmlfile)), //initialize to one strat given by xmlfile
 	 currstrat(NULL),
 	 actualinv(2, -1), //size is 2, initial values are -1
 	 perceivedinv(2, -1), //size is 2, initial values are -1
 	 cards(), //size is 0, will be resized
+	 answer(-1), 
 	 bot_status(INVALID),
-	 actionchooser(), //seeds rand with time and clock
 	 historyindexer(this)
-{
-	CFileDialog filechooser(TRUE, "xml", NULL, OFN_NOCHANGEDIR);
-	if(filechooser.DoModal() == IDCANCEL) exit(0);
-	mystrats.push_back(new Strategy(string((LPCTSTR)filechooser.GetPathName())));
-}
+{ }
 
 BotAPI::~BotAPI()
 {
 	//kill the diagnostics window, if any
+#ifdef _MFC_VER
 	destroywindow();
+#endif
+	for(unsigned i=0; i<mystrats.size(); i++)
+		delete mystrats[i];
 }
 
 void BotAPI::setnewgame(Player playernum, CardMask myhand, 
@@ -50,8 +52,9 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	double besterror = numeric_limits<double>::infinity();
 	for(unsigned int i=0; i<mystrats.size(); i++)
 	{
-		double error = abs( mystrats[i]->gettree().getparams().stacksize 
-			/ mystrats[i]->gettree().getparams().bblind - stacksize/bblind);
+		double error = mystrats[i]->gettree().getparams().stacksize 
+			/ mystrats[i]->gettree().getparams().bblind - stacksize/bblind;
+		if(error < 0) error = -error;
 		if(error < besterror)
 		{
 			besterror = error;
@@ -61,7 +64,10 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 
 	//We go through the list of our private data and update each.
 
-	multiplier = stacksize / currstrat->gettree().getparams().stacksize;
+	if(islimit())
+		multiplier = bblind / currstrat->gettree().getparams().bblind;
+	else
+		multiplier = stacksize / currstrat->gettree().getparams().stacksize;
 	actualinv[P0] = bblind/multiplier;
 	actualinv[P1] = sblind/multiplier;
 	perceivedinv[P0] = currstrat->gettree().getparams().bblind;
@@ -89,7 +95,7 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot)
 {
 	//check input parameters
 
-	if (cards.size() != gr || currentgr != gr-1 || gr < FLOP || gr > RIVER) REPORT("you set the next round at the wrong time");
+	if ((int)cards.size() != gr || currentgr != gr-1 || gr < FLOP || gr > RIVER) REPORT("you set the next round at the wrong time");
 	if (bot_status != WAITING_ROUND) REPORT("you must advancetree before you setflop");
 	if (actualinv[0] != actualinv[1]) REPORT("you both best be betting the same.");
 	if (perceivedinv[0] != perceivedinv[1]) REPORT("perceived state is messed up");
@@ -142,6 +148,7 @@ Action BotAPI::getbotaction(double &amount)
 	if(myplayer != mynode.playertoact) REPORT("You asked for an answer when the bot thought action was on opp.");
 	if(answer<0 || answer>=MAX_ACTIONS) REPORT("Inconsistant BotAPI state.");
 
+#ifdef _MFC_VER
 	//replace strategy-chosen answer with answer from window if available
 
 	if(MyWindow!=NULL)
@@ -160,6 +167,7 @@ Action BotAPI::getbotaction(double &amount)
 		default: REPORT("Failure of buttons.");
 		}
 	}
+#endif
 
 	//translate to Action type and set amount
 
@@ -218,7 +226,7 @@ Action BotAPI::getbotaction(double &amount)
 	return myact;
 }
 
-
+#ifdef _MFC_VER
 //turns diagnostics window on or off
 //this is the only interaction users of BotAPI have with this window.
 void BotAPI::setdiagnostics(bool onoff, CWnd* parentwin)
@@ -230,6 +238,7 @@ void BotAPI::setdiagnostics(bool onoff, CWnd* parentwin)
 	else
 		destroywindow(); //will do nothing if window not there
 }
+#endif
 
 
 //a "call" by definition ends the betting round
@@ -269,7 +278,8 @@ void BotAPI::dobet(Player pl, double amount)
 			if(currstrat->gettree().isallin(mynode.result[a],mynode.potcontrib[a],currentgr))
 				continue;
 
-			double error = abs((double)(perceivedpot + mynode.potcontrib[a]) - (actualpot + amount));
+			double error = (double)(perceivedpot + mynode.potcontrib[a]) - (actualpot + amount);
+			if(error < 0) error = -error;
 			if(error < besterror)
 			{
 				bestaction = a;
@@ -348,8 +358,10 @@ void BotAPI::processmyturn()
 
 	//update diagnostics window
 
+#ifdef _MFC_VER
 	if(isdiagnosticson)
 		populatewindow();
+#endif
 }
 
 double BotAPI::mintotalwager()
@@ -368,6 +380,7 @@ double BotAPI::mintotalwager()
 	return actualinv[1-acting] + max((double)currstrat->gettree().getparams().bblind, prevwager);
 }
 
+#ifdef _MFC_VER
 #define CSTR(stdstr) CString((stdstr).c_str())
 
 //this function is a member of BotAPI so that it has access to all the
@@ -534,6 +547,7 @@ void BotAPI::destroywindow()
 		MyWindow = NULL;
 	}
 }
+#endif //_MFC_VER
 
 void BotAPI::BetHistoryIndexer::push(int gr, int pot, int beti) //or could have go return pot
 {

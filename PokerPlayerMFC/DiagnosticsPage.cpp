@@ -1,7 +1,5 @@
-// DiagnosticsPage.cpp : implementation file
-//
-
 #include "stdafx.h"
+#ifdef _MFC_VER
 #include "DiagnosticsPage.h"
 #include "../utility.h"
 #include "../PokerLibrary/constants.h"
@@ -202,3 +200,5 @@ void DiagnosticsPage::drawflop(int whichset, CardMask flop)
 	Card[whichset][3].LoadFromCardMask(singles[1]);
 	Card[whichset][4].LoadFromCardMask(singles[2]);
 }
+
+#endif
