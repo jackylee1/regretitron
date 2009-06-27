@@ -53,7 +53,7 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, bool seedra
 				cout << "loading " << myparams.filename[gr] << " into memory..." << endl;
 
 			//so ugly to do this in the loop...
-			int index_max;
+			int64 index_max;
 			if(gr==PREFLOP)
 				index_max = INDEX2_MAX;
 			else if(gr==FLOP)
@@ -63,10 +63,10 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, bool seedra
 			else
 				index_max = myparams.usehistory ? INDEX2311_MAX : INDEX25_MAX;
 
-			//if solving or under 50 megs, preload the file
+			//if solving or under 5 megs, preload the file
 			binfiles[gr] = new PackedBinFile(myparams.filename[gr], myparams.filesize[gr], 
 				myparams.bin_max[gr], index_max,
-				(solving || myparams.filesize[gr] < 50 * 1024 * 1024));
+				(solving || myparams.filesize[gr] < 5 * 1024 * 1024));
 		}
 	}
 }
@@ -294,61 +294,61 @@ void CardMachine::findexamplehand(int gr, const vector<int> &handi, int boardi, 
 
 	if(myparams.usehistory) //cprg system
 	{
-
-		//find the preflop hand first, just for a slight speed increase
-
 		CardMask usedcards;
+		//the story of findcount: if we randomly choose all hands at once, check the indices, 
+		// and then randomly choose them again, it is slow (looking for 1 in 10000 that way),
+		// if we do it incrementally, like here, only looking for 1 in 10 at each step, but
+		// for some preflop/flop/turn combos, NO river card satisfies it. This is what works.
+		int findcount;
+restart:
 		CardMask_RESET(usedcards);
 
-		while(1) //find preflop hand matching this index
+		do
 		{
 			MONTECARLO_N_CARDS_D(cards[PREFLOP], usedcards, 2, 1, );
-			if(binfiles[PREFLOP]->retrieve(getindex2(cards[PREFLOP])) == handi[PREFLOP])
-				break;
 		}
+		while(binfiles[PREFLOP]->retrieve(getindex2(cards[PREFLOP])) != handi[PREFLOP]);
 
 		if(gr==PREFLOP) return; //we are done
+		usedcards = cards[PREFLOP];
 
-		while(1) //deal an entire board and check it. it is fast due to smart if statements
+		findcount = 0;
+		do
 		{
-			switch(gr)
-			{
-				//deal out random cards
-				case RIVER:
-					MONTECARLO_N_CARDS_D(cards[RIVER], usedcards, 1, 1, );
-					usedcards = cards[RIVER]; //do not break from switch
-				case TURN:
-					MONTECARLO_N_CARDS_D(cards[TURN], usedcards, 1, 1, );
-					CardMask_OR(usedcards, usedcards, cards[TURN]);
-				case FLOP:
-					MONTECARLO_N_CARDS_D(cards[FLOP], usedcards, 3, 1, );
-					CardMask_OR(usedcards, usedcards, cards[FLOP]);
-			}
-			switch(gr)
-			{
-				//check the ones that are fast to check first
-				case RIVER: 
-					if( (!myparams.useflopalyzer || rivalyzer(cards[FLOP],cards[TURN],cards[RIVER]) == boardi)
-							&& binfiles[FLOP]->retrieve(getindex23(cards[PREFLOP], cards[FLOP])) == handi[FLOP]
-							&& binfiles[TURN]->retrieve(getindex231(cards[PREFLOP], cards[FLOP], cards[TURN])) == handi[TURN]
-							&& binfiles[RIVER]->retrieve(getindex2311(cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER])) == handi[RIVER])
-						return;
-					break; //break from switch
-
-				case TURN: 
-					if( (!myparams.useflopalyzer || turnalyzer(cards[FLOP],cards[TURN]) == boardi)
-							&& binfiles[FLOP]->retrieve(getindex23(cards[PREFLOP], cards[FLOP])) == handi[FLOP] 
-							&& binfiles[TURN]->retrieve(getindex231(cards[PREFLOP], cards[FLOP], cards[TURN])) == handi[TURN])
-						return;
-					break;
-
-				case FLOP: 
-					if( (!myparams.useflopalyzer || flopalyzer(cards[FLOP]) == boardi)
-							&& binfiles[FLOP]->retrieve(getindex23(cards[PREFLOP], cards[FLOP])) == handi[FLOP])
-						return;
-					break;
-			}
+			if(++findcount == 150)
+				goto restart;
+			MONTECARLO_N_CARDS_D(cards[FLOP], usedcards, 3, 1, );
 		}
+		while((myparams.useflopalyzer && flopalyzer(cards[FLOP]) != boardi)
+				|| binfiles[FLOP]->retrieve(getindex23(cards[PREFLOP], cards[FLOP])) != handi[FLOP]);
+
+		if(gr==FLOP) return;
+		CardMask_OR(usedcards, usedcards, cards[FLOP]);
+
+		findcount = 0;
+		do
+		{
+			if(++findcount == 150)
+				goto restart;
+			MONTECARLO_N_CARDS_D(cards[TURN], usedcards, 1, 1, );
+		}
+		while((myparams.useflopalyzer && turnalyzer(cards[FLOP],cards[TURN]) != boardi)
+				|| binfiles[TURN]->retrieve(getindex231(cards[PREFLOP], cards[FLOP], cards[TURN])) != handi[TURN]);
+
+		if(gr==TURN) return;
+		CardMask_OR(usedcards, usedcards, cards[TURN]);
+
+		findcount = 0;
+		do
+		{
+			if(++findcount == 150)
+				goto restart;
+			MONTECARLO_N_CARDS_D(cards[RIVER], usedcards, 1, 1, );
+		}
+		while((myparams.useflopalyzer && rivalyzer(cards[FLOP],cards[TURN],cards[RIVER]) != boardi)
+				|| binfiles[RIVER]->retrieve(getindex2311(cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER])) != handi[RIVER]);
+
+		if(gr==RIVER) return;
 	}
 	else // my old binning system
 	{

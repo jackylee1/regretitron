@@ -2,6 +2,7 @@
 #include "solver.h"
 #include <sstream>
 #include <iomanip>
+#include <math.h> //sqrt
 #include "../TinyXML++/tinyxml.h"
 using namespace std;
 
@@ -16,6 +17,8 @@ MemoryManager * Solver::memory = NULL;
 pthread_mutex_t * Solver::cardsilocks[4] = {NULL,NULL,NULL,NULL}; //one lock per player per gameround per cardsi
 pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
 #endif
+vector< vector<int> > Solver::staticactioncounters(4, vector<int>(MAX_NODETYPES, 0));
+vector< fpworking_type > Solver::accumulated_regret;
 
 
 void Solver::initsolver()
@@ -46,26 +49,36 @@ void Solver::destructsolver()
 #endif
 }
 
-double Solver::solve(int64 iter) 
+//function called by main()
+//returns seconds taken to do this many iter
+double Solver::solve(int64 iter)  
 { 
-	total += iterations = iter; 
-
-	Solver solvers[NUM_THREADS];
 	double starttime = getdoubletime();
-#ifdef DO_THREADS
-	pthread_t threads[NUM_THREADS-1];
-	for(int i=0; i<NUM_THREADS-1; i++)
-		if(pthread_create(&threads[i], NULL, callthreadloop, &solvers[i+1]))
-			REPORT("error creating thread");
-#endif
-	//use current thread too
-	solvers[0].threadloop();
-#ifdef DO_THREADS
-	//wait for them all to return
-	for(int i=0; i<NUM_THREADS-1; i++)
-		if(pthread_join(threads[i],NULL))
-			REPORT("error joining thread");
-#endif
+
+	//logic to stop every DO_BOUNDS_EVERY iterations, and print bound info
+	//otherwise, just do 'iter' iterations
+
+	int64 goal = total + iter;
+	int64 numleft = iter;
+	while(total < goal)
+	{
+		// last time we did bounds: (total/DO_BOUNDS_EVERY) * DO_BOUNDS_EVERY
+		// next time we do bounds: (total/DO_BOUNDS_EVERY + 1) * DO_BOUNDS_EVERY
+		int64 tillbound = (total/DO_BOUNDS_EVERY + 1) * DO_BOUNDS_EVERY - total;
+		if(numleft < tillbound)
+			doiter(numleft);
+		else
+		{
+			doiter(tillbound);
+			numleft -= tillbound;
+			cout << endl << " Calculating bounds on solution..." << endl;
+			cout << getstatus() << endl;
+		}
+	}
+
+	if(total!=goal) 
+		REPORT("can't count.");
+
 	return getdoubletime() - starttime;
 }
 
@@ -145,12 +158,20 @@ void Solver::save(const string &filename, bool writedata)
 	data->SetAttribute("fpworking_type", FPWORKING_TYPENAME);
 	data->SetAttribute("fpstore_type", FPSTORE_TYPENAME);
 
-	//link xml node
+	//get bounder report
+
+	TiXmlText * bounderreport = new TiXmlText("\n"+getstatus());
+	bounderreport ->SetCDATA(true);
+	TiXmlElement * boundernode = new TiXmlElement("bounderreport");
+	boundernode->LinkEndChild(bounderreport);
+
+	//link xml node..
 
 	TiXmlElement * strat = new TiXmlElement("solver");
 	strat->LinkEndChild(file);
 	strat->LinkEndChild(run);
 	strat->LinkEndChild(data);
+	strat->LinkEndChild(boundernode);
 	root->LinkEndChild(strat);
 
 	//cards parameters
@@ -179,6 +200,12 @@ void Solver::save(const string &filename, bool writedata)
 	TiXmlElement * mytree = new TiXmlElement("tree");
 	root->LinkEndChild(mytree);
 
+	TiXmlElement * metanode = new TiXmlElement("meta");
+	metanode->SetAttribute("stacksize", (int)tree->getparams().stacksize);
+	metanode->SetAttribute("pushfold", tree->getparams().pushfold);
+	metanode->SetAttribute("limit", tree->getparams().limit);
+	mytree->LinkEndChild(metanode);
+
 	TiXmlElement * blinds = new TiXmlElement("blinds");
 	blinds->SetAttribute("sblind", (int)tree->getparams().sblind);
 	blinds->SetAttribute("bblind", (int)tree->getparams().bblind);
@@ -201,12 +228,6 @@ void Solver::save(const string &filename, bool writedata)
 		}
 		mytree->LinkEndChild(raise);
 	}
-
-	TiXmlElement * metanode = new TiXmlElement("meta");
-	metanode->SetAttribute("stacksize", (int)tree->getparams().stacksize);
-	metanode->SetAttribute("pushfold", tree->getparams().pushfold);
-	metanode->SetAttribute("limit", tree->getparams().limit);
-	mytree->LinkEndChild(metanode);
 
 	// print the first node strategy to an ostringstream
 
@@ -237,7 +258,7 @@ void Solver::save(const string &filename, bool writedata)
 		//print out a heading including example hand
 
 		if(tree->getparams().pushfold)
-			text << setw(5) << left << ":" << handstring;
+			text << setw(5) << left << handstring + ":";
 		else
 		{
 			text << endl << "cardsi: " << cardsi << ":" << endl;
@@ -257,11 +278,24 @@ void Solver::save(const string &filename, bool writedata)
 			fpworking_type myprob = (fpworking_type)stratn[a] / denominator;
 
 			//aiming for http://www.daimi.au.dk/~bromille/pokerdata/SingleHandSmallBlind/SHSB.4000
-			if(tree->getparams().pushfold && myprob>0.98 && a==numa-1) 
-				text << "jam" << endl;
-			else if(tree->getparams().pushfold && myprob>0.98) 
-				text << "fold" << endl;
-			else if(!tree->getparams().pushfold || myprob>0.02)
+			if(tree->getparams().pushfold)
+			{
+				if(myprob > 0.98) //surety
+				{
+					if(a==numa-1)
+						text << "jam" << endl;
+					else
+						text << "fold" << endl;
+				}
+				else if(myprob > 0.02) //unsurety
+				{
+					if (a==0) 
+						text << endl << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100*myprob << "%" << endl;
+					else
+						text << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100*myprob << "%" << endl;
+				}
+			}
+			else
 				text << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100*myprob << "%" << endl;
 		}
 
@@ -288,6 +322,28 @@ void Solver::save(const string &filename, bool writedata)
 
 	doc.SaveFile(("output/"+filename+".xml").c_str());
 }
+
+void Solver::doiter(int64 iter) 
+{ 
+	total += iterations = iter; 
+
+	Solver solvers[NUM_THREADS];
+#ifdef DO_THREADS
+	pthread_t threads[NUM_THREADS-1];
+	for(int i=0; i<NUM_THREADS-1; i++)
+		if(pthread_create(&threads[i], NULL, callthreadloop, &solvers[i+1]))
+			REPORT("error creating thread");
+#endif
+	//use current thread too
+	solvers[0].threadloop();
+#ifdef DO_THREADS
+	//wait for them all to return
+	for(int i=0; i<NUM_THREADS-1; i++)
+		if(pthread_join(threads[i],NULL))
+			REPORT("error joining thread");
+#endif
+}
+
 
 //must be static because pthreads do not understand classes.
 //the void* parameter is a pointer to solver instance (i.e. the 'this' pointer).
@@ -353,18 +409,16 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 
 	//obtain pointers to data for this turn
 
+	if(numa-2 < 0) REPORT("gcc was right");
+#if STORE_DENOM
+	fpstore_type * stratn, * regret, * stratd;
+	memory->dataindexing(gr, numa, actioncounters[gr][numa-2]++, cardsi[gr][(int)mynode.playertoact], stratn, regret, stratd);
+#else
 	fpstore_type * stratn, * regret;
-#if STORE_DENOM
-	fpstore_type * stratd;
+	memory->dataindexing(gr, numa, actioncounters[gr][numa-2]++, cardsi[gr][(int)mynode.playertoact], stratn, regret);
 #endif
-	if(numa-2 < 0 || numa-2 >= MAX_NODETYPES) REPORT("gcc was right.");
-	memory->dataindexing(gr, numa, actioncounters[gr][numa-2]++, cardsi[gr][(int)mynode.playertoact], 
-		stratn, regret
-#if STORE_DENOM
-		, stratd
-#endif
-		);//try out some gcc builtins here for prefetching
-
+	
+	//TODO: try out some gcc builtins here for prefetching
 
 	// OK, NOW WE WILL APPLY EQUATION (8) FROM TECH REPORT, COMPUTE STRATEGY T+1
 
@@ -402,8 +456,6 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 			//same code as in dummywalker
 			switch(mynode.result[i])
 			{
-			case BetNode::NA:
-				REPORT("invalid tree");
 			case BetNode::FD:
 			case BetNode::AI:
 				continue;
@@ -420,9 +472,6 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 
 		switch(mynode.result[i])
 		{
-		case BetNode::NA: //error
-			REPORT("Invalid betting tree node action reached."); //will exit
-
 		case BetNode::AI: //called allin
 			utility[i] = tree->getparams().stacksize * (twoprob0wins-1);
 			break;
@@ -508,15 +557,13 @@ void Solver::dummywalker(int gr, int pot, int beti)
 	tree->getnode(gr, pot, beti, mynode);
 	const int &numa = mynode.numacts;
 
-	if(numa-2 < 0 || numa-2 >= MAX_NODETYPES) REPORT("gcc was right.");
+	if(numa-2 < 0) REPORT("gcc was right");
 	actioncounters[gr][numa-2]++;
 
 	for(int a=0; a<numa; a++)
 	{
 		switch(mynode.result[a])
 		{
-		case BetNode::NA:
-			REPORT("invalid tree");
 		case BetNode::FD:
 		case BetNode::AI:
 			continue;
@@ -531,4 +578,95 @@ void Solver::dummywalker(int gr, int pot, int beti)
 		}
 	}
 }
+
+string Solver::getstatus()
+{
+	ostringstream out;
+
+	//get info from bounder
+
+	staticactioncounters.assign(4, vector<int>(MAX_NODETYPES, 0)); //zero our 2D array
+	accumulated_regret.assign(2, 0); //one per player
+	bounder(0,0,0); //boom
+
+	//error checking & info node calc
+
+	vector<vector<int> > myactmax;
+	GetTreeSize(*tree, myactmax);
+	int64 infonodes = 0;
+	for(int i=0; i<4; i++)
+	{
+		for(int j=0; j<MAX_NODETYPES; j++)
+		{
+			if(myactmax[i][j] != staticactioncounters[i][j]) //error check
+				REPORT("bounder has failed");
+			infonodes += myactmax[i][j]*cardmachine->getcardsimax(i);
+		}
+	}
+
+	//build string and quit
+
+	out << " accumulated regret of player P0: " << accumulated_regret[P0] << " P1: " << accumulated_regret[P1] << endl;
+	out << " iterations done: " << total << endl;
+	out << " number of info nodes: " << infonodes << endl;
+	out << " iterations per info node: " << fixed << setprecision(1) << (double)total/infonodes << endl;
+	out << " epsilon: " << fixed << setprecision(1)
+		<< 2 * ((max(accumulated_regret[P0], accumulated_regret[P1]) / total) / tree->getparams().bblind) * 1000 
+		<< " milli-big-blinds" << endl;
+
+	return out.str();
+}
+
+void Solver::bounder(int gr, int pot, int beti)
+{
+	BetNode mynode;
+	tree->getnode(gr, pot, beti, mynode);
+	const int &numa = mynode.numacts; //for ease of typing
+
+	for(int cardsi = 0; cardsi < cardmachine->getcardsimax(gr); cardsi++)
+	{
+#if STORE_DENOM
+		fpstore_type * stratn, * regret, * stratd;
+		memory->dataindexing(gr, numa, staticactioncounters[gr][numa-2], cardsi, stratn, regret, stratd);
+#else
+		fpstore_type * stratn, * regret;
+		memory->dataindexing(gr, numa, staticactioncounters[gr][numa-2], cardsi, stratn, regret);
+#endif
+
+		fpstore_type regret_max = 0; // we want max regret or 0, whichever is biggest
+		for(int i=0; i<numa; i++)
+			if(regret[i] > regret_max)
+				regret_max = regret[i];
+
+		fpstore_type bound = 2 * tree->getparams().stacksize * sqrt( total * numa );
+		if(regret_max > bound)
+			REPORT("NOTE: regret "+tostring(regret_max)+" exceeds bounds "+tostring(bound)+'.');
+
+		accumulated_regret[(int)mynode.playertoact] += (fpworking_type)regret_max;
+	}
+
+	staticactioncounters[gr][numa-2]++;
+
+	for(int a=0; a<numa; a++)
+	{
+		switch(mynode.result[a])
+		{
+		case BetNode::NA:
+			REPORT("invalid tree");
+		case BetNode::FD:
+		case BetNode::AI:
+			continue;
+		case BetNode::GO:
+			if(gr!=RIVER)
+				bounder(gr+1, pot+mynode.potcontrib[a], 0);
+			continue;
+
+		default://child node
+			bounder(gr, pot, mynode.result[a]);
+			continue;
+		}
+	}
+}
+
+
 

@@ -18,7 +18,8 @@ PackedBinFile::PackedBinFile(string filename, int64 filesize, int bin_max, int64
 	if(filesize == -1)
 		filesize = numwordsneeded(bin_max, index_max)*8;
 	else if(filesize != numwordsneeded(bin_max, index_max)*8)
-		REPORT("wrong file size for packed bin file");
+		REPORT("wrong file size for "+filename+": you said "+tostring(filesize)
+				+", but should be "+tostring(numwordsneeded(bin_max, index_max)*8));
 
 	_filehandle = new ifstream(filename.c_str(), ifstream::binary);
 
@@ -26,7 +27,8 @@ PackedBinFile::PackedBinFile(string filename, int64 filesize, int bin_max, int64
 		REPORT("'" + filename + "' bin file not found");
 	_filehandle->seekg(0, ios::end);
 	if(!_filehandle->good() || (int64)_filehandle->tellg()!=filesize)
-		REPORT("'" + filename + "' bin file found but not correct size");
+		REPORT("'" + filename + "' bin file found but not correct size: should be "+tostring(filesize)
+				+", but found it is "+tostring(_filehandle->tellg()));
 
 	if(preload)
 	{

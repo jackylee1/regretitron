@@ -6,6 +6,7 @@
 #include "../PokerLibrary/cardmachine.h"
 #include <poker_defs.h>
 #include <vector>
+#include "../HandIndexingV1/getindex2N.h"
 using std::vector;
 
 
@@ -18,11 +19,13 @@ DiagnosticsPage::DiagnosticsPage(CWnd* pParent /*=NULL*/)
 	//i initialize these to -1 so that if RefreshCards is called prematurely,
 	//before setcardstoshow, it will see they are -1 and not use garbage data.
 	, mygr(-1)
+	, myfloaters(4, (FloaterFile*)NULL)
 {
 	//this is the code to actually make this page display when it is created via new.
 	//Boom: http://www.codeproject.com/KB/dialog/gettingmodeless.aspx
 	Create(DiagnosticsPage::IDD, GetDesktopWindow());
 	ShowWindow(SW_SHOWNORMAL);
+
 	//and see this thread on how to include a resource from
 	//a static library in order to have it be found in an
 	//application. See post 20 or last post.
@@ -31,6 +34,30 @@ DiagnosticsPage::DiagnosticsPage(CWnd* pParent /*=NULL*/)
 
 DiagnosticsPage::~DiagnosticsPage()
 {
+}
+
+BOOL DiagnosticsPage::OnInitDialog()
+{
+	CDialog::OnInitDialog();           // Call default ::OnInitDialog
+
+	myfloaters[PREFLOP] = new FloaterFile("preflopHSS", INDEX2_MAX, false);
+	myfloaters[FLOP] = new FloaterFile("flopHSS", INDEX23_MAX, false);
+	myfloaters[TURN] = new FloaterFile("turnHSS", INDEX24_MAX, false);
+	myfloaters[RIVER] = new FloaterFile("riverEV", INDEX25_MAX, false);
+
+	/*
+	LOGFONT lf;                        // Used to create the CFont.
+	memset(&lf, 0, sizeof(LOGFONT));   // Clear out structure.
+	lf.lfHeight = 25;                  // Request a 20-pixel-high font
+	strcpy(lf.lfFaceName, "Arial");    //    with face name "Arial".
+	HSSFont.CreateFontIndirect(&lf);    // Create the font.
+
+	for(int i=0; i<4; i++)
+		for(int j=0; j<4; j++)
+			CardInfo[i][j].SetFont(&HSSFont);
+			*/
+
+	return TRUE;
 }
 
 void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
@@ -101,6 +128,22 @@ void DiagnosticsPage::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_MAXBIN, BinMax);
 	DDX_Control(pDX, IDC_BETIHIST, BetHistory);
 	DDX_Control(pDX, IDC_BOARD, BoardScore);
+	DDX_Control(pDX, IDC_CARDINFO00, CardInfo[0][0]);
+	DDX_Control(pDX, IDC_CARDINFO01, CardInfo[0][1]);
+	DDX_Control(pDX, IDC_CARDINFO02, CardInfo[0][2]);
+	DDX_Control(pDX, IDC_CARDINFO03, CardInfo[0][3]);
+	DDX_Control(pDX, IDC_CARDINFO10, CardInfo[1][0]);
+	DDX_Control(pDX, IDC_CARDINFO11, CardInfo[1][1]);
+	DDX_Control(pDX, IDC_CARDINFO12, CardInfo[1][2]);
+	DDX_Control(pDX, IDC_CARDINFO13, CardInfo[1][3]);
+	DDX_Control(pDX, IDC_CARDINFO20, CardInfo[2][0]);
+	DDX_Control(pDX, IDC_CARDINFO21, CardInfo[2][1]);
+	DDX_Control(pDX, IDC_CARDINFO22, CardInfo[2][2]);
+	DDX_Control(pDX, IDC_CARDINFO23, CardInfo[2][3]);
+	DDX_Control(pDX, IDC_CARDINFO30, CardInfo[3][0]);
+	DDX_Control(pDX, IDC_CARDINFO31, CardInfo[3][1]);
+	DDX_Control(pDX, IDC_CARDINFO32, CardInfo[3][2]);
+	DDX_Control(pDX, IDC_CARDINFO33, CardInfo[3][3]);
 }
 
 
@@ -112,60 +155,112 @@ END_MESSAGE_MAP()
 //this function is called first (on change of bot state) to set these indices
 //this is the way that teh BotAPI communicates with the diagnostics page,
 //so that the RefreshCards handler doesn't have to call into BotAPI or something
-void DiagnosticsPage::setcardstoshow(Strategy * currstrat, int gr, const vector<int> &handi, int boardi)
+inline bool operator == (const CardMask &a, const CardMask &b) { return StdDeck_CardMask_EQUAL(a,b); }
+void DiagnosticsPage::setcardstoshow(Strategy * currstrat, int gr, const vector<CardMask> &cards)
 {
-	mycurrstrat = currstrat;
-	mygr = gr;
-	myhandi = handi;
-	myboardi = boardi;
+	if(mycurrstrat != currstrat || mygr != gr || mycards != cards)
+	{
+		mycurrstrat = currstrat;
+		mygr = gr;
+		mycards = cards;
+		RefreshCards(true);
+	}
 }
+
+void DiagnosticsPage::setcardinfo(int row, const vector<CardMask> &cards, int gr)
+{
+	if(mycurrstrat->getcardmach().getparams().usehistory || mygr == gr)
+	{
+		CString text;
+		text.Format((gr<=FLOP ? "HSS: %f" : "%f"), 
+			gr==RIVER ? 
+			myfloaters[gr]->get(getindex2N(cards, gr)) * myfloaters[gr]->get(getindex2N(cards, gr)) :
+			myfloaters[gr]->get(getindex2N(cards, gr)));
+		CardInfo[row][gr].SetWindowText(text);
+	}
+	else
+		CardInfo[row][gr].SetWindowText("");
+}
+
 
 //this is the event handler for the refresh button. it gets the information it needs
 //from the private data set by setcardstoshow(). that function must be called first.
 //it uses the two helper functions above to help print the preflop and cthe flop,
 //since those muste be decomposed, but does the turn and river itself for each case.
-void DiagnosticsPage::RefreshCards()
+void DiagnosticsPage::RefreshCards(bool newcards)
 {
-	//we have had no info sent to us yet.
-	if(mygr == -1) return;
+	if(mygr == -1) return; //we have had no info sent to us yet.
+
+	//get indices from strategy
+
+	vector<int> handi;
+	int boardi;
+	mycurrstrat->getcardmach().getindices(mygr, mycards, handi, boardi);
+
+	//set my cards to the first row
+
+	if(newcards)
+	{
+		switch(mygr)
+		{
+		case RIVER:
+			Card[0][6].LoadFromCardMask(mycards[RIVER]);
+			setcardinfo(0, mycards, RIVER);
+		case TURN:
+			Card[0][5].LoadFromCardMask(mycards[TURN]);
+			setcardinfo(0, mycards, TURN);
+		case FLOP:
+			drawflop(0, mycards[FLOP]);
+			setcardinfo(0, mycards, FLOP);
+		case PREFLOP:
+			drawpreflop(0, mycards[PREFLOP]);
+			setcardinfo(0, mycards, PREFLOP);
+		}
+	}
+
+	//set example cards to the next 3 rows
 
 	vector<CardMask> cards; //to be filled by call to CardMachine
-
-	for(int n=0; n<5; n++) //5 sets of hands
+	for(int n=1; n<4; n++) //3 sets of example hands
 	{
-		if(mygr==PREFLOP)
+		mycurrstrat->getcardmach().findexamplehand(mygr, handi, boardi, cards);
+		switch(mygr)
 		{
-			mycurrstrat->getcardmach().findexamplehand(mygr, myhandi, myboardi, cards);
-			drawpreflop(n, cards[PREFLOP]);
-			for(int i=2; i<7; i++)
-				Card[n][i].FreeData();
-		}
-		else if(mygr==FLOP)
-		{
-			mycurrstrat->getcardmach().findexamplehand(mygr, myhandi, myboardi, cards);
-			drawpreflop(n, cards[PREFLOP]);
-			drawflop(n, cards[FLOP]);
-			Card[n][5].FreeData();
-			Card[n][6].FreeData();
-		}
-		else if(mygr==TURN)
-		{
-			mycurrstrat->getcardmach().findexamplehand(mygr, myhandi, myboardi, cards);
-			drawpreflop(n, cards[PREFLOP]);
-			drawflop(n, cards[FLOP]);
-			Card[n][5].LoadFromCardMask(cards[TURN]);
-			Card[n][6].FreeData();
-		}
-		else if(mygr==RIVER)
-		{
-			mycurrstrat->getcardmach().findexamplehand(mygr, myhandi, myboardi, cards);
-			drawpreflop(n, cards[PREFLOP]);
-			drawflop(n, cards[FLOP]);
-			Card[n][5].LoadFromCardMask(cards[TURN]);
+		case RIVER:
 			Card[n][6].LoadFromCardMask(cards[RIVER]);
+			setcardinfo(n, cards, RIVER);
+		case TURN:
+			Card[n][5].LoadFromCardMask(cards[TURN]);
+			setcardinfo(n, cards, TURN);
+		case FLOP:
+			drawflop(n, cards[FLOP]);
+			setcardinfo(n, cards, FLOP);
+		case PREFLOP:
+			drawpreflop(n, cards[PREFLOP]);
+			setcardinfo(n, cards, PREFLOP);
 		}
-		else
-			REPORT("Invalid gameround in refresh hands");
+	}
+
+	//free data from the rest
+
+	for(int n=0; n<4; n++)
+	{
+		switch(mygr)
+		{
+		case PREFLOP:
+			Card[n][2].FreeData();
+			Card[n][3].FreeData();
+			Card[n][4].FreeData();
+			CardInfo[n][1].SetWindowText("");
+		case FLOP:
+			Card[n][5].FreeData();
+			CardInfo[n][2].SetWindowText("");
+		case TURN:
+			Card[n][6].FreeData();
+			CardInfo[n][3].SetWindowText("");
+		case RIVER:
+			break;
+		}
 	}
 }
 

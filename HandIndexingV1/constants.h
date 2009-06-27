@@ -1,3 +1,6 @@
+#ifndef __handindex_constants_h__
+#define __handindex_constants_h__
+
 #include "../utility.h" //for int64
 
 //the following are MAX INDEX VALUES
@@ -30,3 +33,5 @@ const int INDEX231_MAX = INDEX24_MAX*4; //4 for the 4 locations of the turn card
 const int64 INDEX2311_MAX = INDEX25_MAX*4LL*5LL;  //5 for the turn card location among the 5 board cards, 
 												  //4 for the river card location among the remaining 4
 
+
+#endif

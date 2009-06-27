@@ -478,6 +478,20 @@ int getindex2(const CardMask& mine)
 	return getindex2(n);
 }
 
+int getindex2N(const vector<CardMask> &cards, int maxround)
+{
+	CardMask board;
+	CardMask_RESET(board);
+	if((maxround = std::min((int)cards.size()-1, maxround)) == PREFLOP)
+		return getindex2(cards[PREFLOP]);
+	else
+	{
+		for(int i=FLOP; i<=maxround; i++)
+			CardMask_OR(board, board, cards[i]);
+		return getindex2N(cards[PREFLOP], board, maxround+2);
+	}
+}
+
 
 //Here, begins the testing code. Code used to verify that the above does
 //indeed produce unique indices that only combine non-distinct hands.

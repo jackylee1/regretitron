@@ -2,6 +2,9 @@
 #define __get_index2N__
 
 #include "../utility.h" //for int64
+#include "../PokerLibrary/constants.h"
+#include <vector>
+using std::vector;
 
 //getindex2N
 // mine are the PokerEval CardMask containing my hole cards. Must be 2 cards.
@@ -9,6 +12,7 @@
 // boardcards is just the total number of cards in the board. Must be 3, 4, or 5.
 //This function will return an integer in the range 0..INDEX2N_MAX
 //Two hands with the same integer should have the same strength/EV/etc against an opponent.
+extern int getindex2N(const vector<CardMask> &cards, int maxround = RIVER);
 extern int getindex2N(const CardMask& mine, const CardMask& board, const int boardcards, int * suits = NULL);
 extern int getindex2(const CardMask& mine);
 

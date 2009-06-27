@@ -8,9 +8,6 @@
 
 // --------------------- MFC Class, window stuff ---------------------------
 
-//converts from std::string to Cstring
-#define CSTR(stdstr) CString((stdstr).c_str())
-
 // CSimpleGameDlg dialog
 CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSimpleGameDlg::IDD, pParent),
@@ -19,7 +16,6 @@ CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	  handsplayed(0),
 	  _sblind(5),
 	  _bblind(10),
-	  _stacksize(MyBot.getstacksizemult() * _bblind),
 	  human(P0), 
 	  bot(P1),
 	  totalhumanwon(0)
@@ -60,6 +56,9 @@ void CSimpleGameDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_CHECK3, AutoNewGame);
 	DDX_Control(pDX, IDC_CHECK4, AutoBotPlay);
 	DDX_Control(pDX, IDC_POTVAL, PotValue);
+	DDX_Control(pDX, IDC_OPENFILE, OpenBotButton);
+	DDX_Control(pDX, IDC_HUMANDEAL, HumanDealerChip);
+	DDX_Control(pDX, IDC_BOTDEAL, BotDealerChip);
 }
 
 BEGIN_MESSAGE_MAP(CSimpleGameDlg, CDialog)
@@ -74,6 +73,7 @@ BEGIN_MESSAGE_MAP(CSimpleGameDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON3, &CSimpleGameDlg::OnBnClickedButton3)
 	ON_BN_CLICKED(IDC_BUTTON4, &CSimpleGameDlg::OnBnClickedButton4)
 	ON_BN_CLICKED(IDC_CHECK2, &CSimpleGameDlg::OnBnClickedCheck2)
+	ON_BN_CLICKED(IDC_OPENFILE, &CSimpleGameDlg::OnBnClickedOpenfile)
 END_MESSAGE_MAP()
 
 // CSimpleGameDlg message handlers
@@ -133,9 +133,11 @@ BOOL CSimpleGameDlg::OnInitDialog()
 
 	//find a strategy file and create the bot api
 
-	CFileDialog filechooser(TRUE, "xml", NULL, OFN_NOCHANGEDIR);
+	CFileDialog filechooser(TRUE, "xml", NULL);
 	if(filechooser.DoModal() == IDCANCEL) exit(0);
-	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()), false);
+	SetCurrentDirectory("../");
+	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()));
+	_stacksize = _mybot->getstacksizemult() * _bblind;
 
 	//initialize the window controls that need it
 
@@ -143,6 +145,11 @@ BOOL CSimpleGameDlg::OnInitDialog()
 	graygameover();
 	if(_mybot->islimit())
 		BetAmount.EnableWindow(FALSE);
+
+	//set the picture on the File Open Button
+
+	OpenBotButton.LoadBitmaps(IDB_OPEN1, IDB_OPEN1, IDB_OPEN1, IDB_OPEN2);
+	OpenBotButton.SizeToContent();
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -238,14 +245,30 @@ void CSimpleGameDlg::updatepot()
 	val.Format(TEXT("Common Pot: $%.2f"), 2*pot);
 	PotValue.SetWindowText(val);
 }
-void CSimpleGameDlg::updateinvested()
+void CSimpleGameDlg::updateinvested(Player justacted)
 {
-	//reprint the pot to the screen
 	CString val;
-	val.Format(TEXT("$%.2f"), invested[human]);
-	InvestedHum.SetWindowText(val);
-	val.Format(TEXT("$%.2f"), invested[bot]);
-	InvestedBot.SetWindowText(val);
+
+	if(invested[human] > 0)
+	{
+		val.Format(TEXT("$%.2f"), invested[human]);
+		InvestedHum.SetWindowText(val);
+	}
+	else if(justacted == human)
+		InvestedHum.SetWindowText("CHECK");
+	else
+		InvestedHum.SetWindowText("");
+
+	if(invested[bot] > 0)
+	{
+		val.Format(TEXT("$%.2f"), invested[bot]);
+		InvestedBot.SetWindowText(val);
+	}
+	else if(justacted == bot)
+		InvestedBot.SetWindowText("CHECK");
+	else
+		InvestedBot.SetWindowText("");
+
 	val.Format(TEXT("You: $%.2f"), _stacksize-invested[human]-pot);
 	HumanStack.SetWindowText(val);
 	val.Format(TEXT("Bot: $%.2f"), _stacksize-invested[bot]-pot);
@@ -360,7 +383,7 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 	_mybot->doaction(pl,BET,amount);
 	//set our invested amount
 	invested[pl] = amount;
-	updateinvested();
+	updateinvested(pl);
 	//other players turn now
 	graypostact(Player(1-pl));
 }
@@ -430,6 +453,7 @@ void CSimpleGameDlg::dogameover(bool fold)
 void CSimpleGameDlg::graygameover()
 {
 	//gray out all but newgame
+	OpenBotButton.EnableWindow(TRUE);
 	NewGameButton.EnableWindow(TRUE);
 	FoldCheckButton.SetWindowText(TEXT("Fold/Check"));
 	FoldCheckButton.EnableWindow(FALSE);
@@ -447,6 +471,8 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 		return;
 	}
 
+
+	OpenBotButton.EnableWindow(FALSE);
 	NewGameButton.EnableWindow(FALSE);
 
 	if(nexttoact == bot)
@@ -605,8 +631,21 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	text.Format("SimpleGame - %d hands played", handsplayed);
 	SetWindowText(text); //titlebar
 	handsplayed++;
-	//change positions
+	//change positions & set dealer chip
 	std::swap(human,bot);
+	if(human == P1)
+	{
+		HumanDealerChip.LoadFromFile("cards/dealerchip.png");
+		BotDealerChip.FreeData();
+		BotDealerChip.RedrawWindow();
+	}
+	else
+	{
+		BotDealerChip.LoadFromFile("cards/dealerchip.png");
+		HumanDealerChip.FreeData();
+		HumanDealerChip.RedrawWindow();
+	}
+
 	//set _gameround
 	_gameround = PREFLOP;
 	//no one is all-in
@@ -692,4 +731,23 @@ void CSimpleGameDlg::OnBnClickedButton6()
 	case BET: dobet(bot, val); break;
 	case ALLIN: doallin(bot); break;
 	}
+}
+
+void CSimpleGameDlg::OnBnClickedOpenfile()
+{
+	CFileDialog filechooser(TRUE, "xml", NULL);
+	if(filechooser.DoModal() == IDCANCEL) return;
+	SetCurrentDirectory("../");
+	delete _mybot; //will kill diag
+	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()));
+	if(ShowDiagnostics.GetCheck())
+		_mybot->setdiagnostics(true, this);
+	_stacksize = _mybot->getstacksizemult() * _bblind;
+	totalhumanwon = 0;
+	handsplayed = 0;
+	if(_mybot->islimit())
+		BetAmount.EnableWindow(FALSE);
+	else
+		BetAmount.EnableWindow(TRUE);
+
 }

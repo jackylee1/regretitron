@@ -8,6 +8,8 @@ using std::vector;
 #include "resource.h"
 #include "afxcmn.h"
 #include <poker_defs.h>
+#include "../PokerLibrary/floaterfile.h"
+#include "afxext.h"
 
 
 // DiagnosticsPage dialog
@@ -19,6 +21,7 @@ class DiagnosticsPage : public CDialog
 public:
 	DiagnosticsPage(CWnd* pParent = NULL);   // standard constructor
 	virtual ~DiagnosticsPage();
+	BOOL OnInitDialog();
 
 // Dialog Data
 	enum { IDD = IDD_PROPPAGE_LARGE };
@@ -45,21 +48,26 @@ public:
 	//sense to write the code once and put it in just one place. that neccesitated
 	//these wrapper functions so that BotAPI could send over the neccesary info
 	//and then cause this page to draw the hands.
-	void setcardstoshow(Strategy * currstrat, int gr, const vector<int> &handi, int boardi);
-	afx_msg void RefreshCards();
+	void setcardstoshow(Strategy * currstrat, int gr, const vector<CardMask> &cards);
 
 private:
+	afx_msg void RefreshCards() { RefreshCards(false); }
+	void RefreshCards(bool newcards);
+	void setcardinfo(int row, const vector<CardMask> &cards, int gr);
+
 	//set by setcardstoshow, read by RefreshCards. 
 	Strategy * mycurrstrat;
 	int mygr;
-	vector<int> myhandi;
-	int myboardi;
+	vector<CardMask> mycards;
 
 	//used by RefreshCards.
+	vector<FloaterFile*> myfloaters;
 	static void decomposecm(CardMask in, vector<CardMask> &out);
 	void drawpreflop(int whichset, CardMask hand);
 	void drawflop(int whichset, CardMask flop);
-	CPictureCtrl Card[5][7]; //5 rows of 7 cards
+	CPictureCtrl Card[5][7]; //5 rows of 7 cards (only 4 rows used now)
+	CStatic CardInfo[4][4]; //4 rows of 4 rounds of card info
+	CFont HSSFont;
 };
 
 #endif

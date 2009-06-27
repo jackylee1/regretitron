@@ -64,27 +64,27 @@ BEGIN
     LTEXT           "Static",IDC_CARD04,147,31,29,38
     LTEXT           "Static",IDC_CARD05,186,31,29,38
     LTEXT           "Static",IDC_CARD06,226,31,29,38
-    LTEXT           "Static",IDC_CARD1,12,75,29,38
-    LTEXT           "Static",IDC_CARD2,44,75,29,38
-    LTEXT           "Static",IDC_CARD3,83,75,29,38
-    LTEXT           "Static",IDC_CARD4,115,75,29,38
-    LTEXT           "Static",IDC_CARD5,147,75,29,38
-    LTEXT           "Static",IDC_CARD6,186,75,29,38
-    LTEXT           "Static",IDC_CARD7,226,75,29,38
-    LTEXT           "Static",IDC_CARD9,12,119,29,38
-    LTEXT           "Static",IDC_CARD8,44,119,29,38
-    LTEXT           "Static",IDC_CARD10,83,119,29,38
-    LTEXT           "Static",IDC_CARD12,115,119,29,38
-    LTEXT           "Static",IDC_CARD11,147,119,29,38
-    LTEXT           "Static",IDC_CARD13,186,119,29,38
-    LTEXT           "Static",IDC_CARD14,226,119,29,38
-    LTEXT           "Static",IDC_CARD16,12,163,29,38
-    LTEXT           "Static",IDC_CARD15,44,163,29,38
-    LTEXT           "Static",IDC_CARD17,83,163,29,38
-    LTEXT           "Static",IDC_CARD19,115,163,29,38
-    LTEXT           "Static",IDC_CARD18,147,163,29,38
-    LTEXT           "Static",IDC_CARD20,186,163,29,38
-    LTEXT           "Static",IDC_CARD21,226,163,29,38
+    LTEXT           "Static",IDC_CARD1,12,85,29,38
+    LTEXT           "Static",IDC_CARD2,44,85,29,38
+    LTEXT           "Static",IDC_CARD3,83,85,29,38
+    LTEXT           "Static",IDC_CARD4,115,85,29,38
+    LTEXT           "Static",IDC_CARD5,147,85,29,38
+    LTEXT           "Static",IDC_CARD6,186,85,29,38
+    LTEXT           "Static",IDC_CARD7,226,85,29,38
+    LTEXT           "Static",IDC_CARD9,12,139,29,38
+    LTEXT           "Static",IDC_CARD8,44,139,29,38
+    LTEXT           "Static",IDC_CARD10,83,139,29,38
+    LTEXT           "Static",IDC_CARD12,115,139,29,38
+    LTEXT           "Static",IDC_CARD11,147,139,29,38
+    LTEXT           "Static",IDC_CARD13,186,139,29,38
+    LTEXT           "Static",IDC_CARD14,226,139,29,38
+    LTEXT           "Static",IDC_CARD16,12,193,29,38
+    LTEXT           "Static",IDC_CARD15,44,193,29,38
+    LTEXT           "Static",IDC_CARD17,83,193,29,38
+    LTEXT           "Static",IDC_CARD19,115,193,29,38
+    LTEXT           "Static",IDC_CARD18,147,193,29,38
+    LTEXT           "Static",IDC_CARD20,186,193,29,38
+    LTEXT           "Static",IDC_CARD21,226,193,29,38
     LTEXT           "Static",IDC_CARD23,12,207,29,38
     LTEXT           "Static",IDC_CARD22,44,207,29,38
     LTEXT           "Static",IDC_CARD24,83,207,29,38
@@ -122,11 +122,27 @@ BEGIN
     CONTROL         "",IDC_PROGRESS8,"msctls_progress32",0x1,318,223,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
     CONTROL         "",IDC_PROGRESS9,"msctls_progress32",0x1,318,236,79,8,WS_EX_TRANSPARENT | WS_EX_STATICEDGE
     GROUPBOX        "Actions, including randomly chosen one:",IDC_STATIC,265,121,138,127
-    RTEXT           "Bin number:",IDC_MAXBIN,267,7,66,8
+    CONTROL         "Bin number:",IDC_MAXBIN,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,207,7,126,8,WS_EX_RIGHT
     RTEXT           "bin",IDC_BINNUM,343,7,48,8
     RTEXT           "Board score:",IDC_STATIC,293,18,40,8
     RTEXT           "board",IDC_BOARD,352,18,39,8
     RTEXT           "Static",IDC_BETIHIST,276,75,115,42
+    LTEXT           "HSS",IDC_CARDINFO00,12,73,60,8
+    LTEXT           "HSS",IDC_CARDINFO01,83,73,91,8
+    LTEXT           "HSS",IDC_CARDINFO02,186,73,30,8
+    LTEXT           "HSS",IDC_CARDINFO03,226,73,30,8
+    LTEXT           "HSS",IDC_CARDINFO10,12,128,60,8
+    LTEXT           "HSS",IDC_CARDINFO11,83,128,60,8
+    LTEXT           "HSS",IDC_CARDINFO12,186,128,30,8
+    LTEXT           "HSS",IDC_CARDINFO13,226,128,30,8
+    LTEXT           "HSS",IDC_CARDINFO20,12,181,60,8
+    LTEXT           "HSS",IDC_CARDINFO30,12,235,60,10
+    LTEXT           "HSS",IDC_CARDINFO21,83,181,60,8
+    LTEXT           "HSS",IDC_CARDINFO22,186,181,30,8
+    LTEXT           "HSS",IDC_CARDINFO23,226,181,30,8
+    LTEXT           "HSS",IDC_CARDINFO31,83,235,95,10
+    LTEXT           "HSS",IDC_CARDINFO32,186,235,32,10
+    LTEXT           "HSS",IDC_CARDINFO33,226,235,34,10
 END
 
 

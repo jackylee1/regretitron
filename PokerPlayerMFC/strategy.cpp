@@ -12,6 +12,7 @@
 
 //loads a new strategy, reads xml
 Strategy::Strategy(string xmlfilename) : 
+	_xmlfilename(xmlfilename),
 	tree(NULL),
 	actionmax(4, vector<int>(MAX_NODETYPES, 0)), // 2D array of ints all zero
 	cardmach(NULL),

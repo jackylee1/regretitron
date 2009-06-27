@@ -7,36 +7,41 @@
 #include "../PokerLibrary/binstorage.h" //to determine bin filesize
 #include "../utility.h" // for TOSTRING()
 
+const int64 MILLION = 1000000;
+const int64 THOUSAND = 1000;
+
 //main settings
-const char SAVENAME[] = "testbotapi4";
-#define TESTXML 0
-#define STOPAFTER 1*MILLION*MILLION
-#define SAVEAFTER 1*MILLION
+const string SAVENAME = "pushfold-40ss-to-6bb";
+const int64 TESTING_AMT = 1*MILLION; //do this many iterations as a test for speed
+const int64 STARTING_AMT = 25*MILLION; //do this many iterations, then...
+const double MULTIPLIER = 1.5; //multiply by this amount, do that many, repeat ....
+const int64 SAVEAFTER = 1*MILLION; // save xml & strategy file after this amount
+const int64 DO_BOUNDS_EVERY = MILLION*MILLION; //in addition to whenever the thing is saved
+const int64 STOPAFTER = MILLION*MILLION;  //stop after (at least) this amount of iterations
 
 //solver settings
-#define FPWORKING_T long double
-#define FPSTORE_T double
-#define STORE_DENOM 1
-#define NUM_THREADS 2
+#define FPWORKING_T __float128
+#define FPSTORE_T __float128
+#define STORE_DENOM 0
+#define NUM_THREADS 1
 const bool SEED_RAND = true;
 const int  SEED_WITH = 42;
 
 //bin settings
-#define PFBIN 7
-#define FBIN 128
-#define TBIN 90
-#define RBIN 32
-
 const cardsettings_t CARDSETTINGS =
 {
 #if 0 // this for my new binning method with history
+#define PFBIN 8
+#define FBIN 8
+#define TBIN 8
+#define RBIN 8
 
 	{ PFBIN, FBIN, TBIN, RBIN },
 	{
-		string("bins/preflop" TOSTRING(PFBIN) "HistBins.dat"),
-		string("bins/flop" TOSTRING(PFBIN) "-" TOSTRING(FBIN) "HistBins.dat"),
-		string("bins/turn" TOSTRING(PFBIN) "-" TOSTRING(FBIN) "-" TOSTRING(TBIN) "HistBins.dat"),
-		string("bins/river" TOSTRING(PFBIN) "-" TOSTRING(FBIN) "-" TOSTRING(TBIN) "-" TOSTRING(RBIN) "HistBins.dat"),
+		string("bins/preflop" TOSTRING(PFBIN)),
+		string("bins/flop" TOSTRING(PFBIN) "-" TOSTRING(FBIN)),
+		string("bins/turn" TOSTRING(PFBIN) "-" TOSTRING(FBIN) "-" TOSTRING(TBIN)),
+		string("bins/river" TOSTRING(PFBIN) "-" TOSTRING(FBIN) "-" TOSTRING(TBIN) "-" TOSTRING(RBIN)),
 	},
 	{
 		PackedBinFile::numwordsneeded(PFBIN, INDEX2_MAX)*8,
@@ -48,6 +53,9 @@ const cardsettings_t CARDSETTINGS =
 	false //use flopalyzer
 
 #else // this one is my old binning method, with no history
+#define FBIN 256
+#define TBIN 90
+#define RBIN 90
 
 	{ INDEX2_MAX, FBIN, TBIN, RBIN },
 	{
@@ -63,18 +71,18 @@ const cardsettings_t CARDSETTINGS =
 		PackedBinFile::numwordsneeded(RBIN, INDEX25_MAX)*8
 	},
 	false, //use history
-	true //use flopalyzer
+	false //use flopalyzer
 
 #endif 
 };
 
 
 //tree settings
-#define SB 1
-#define BB 2
-#define SS 13 //units of BB
-#define PUSHFOLD 0
-#define LIMIT 1
+#define SB 3
+#define BB 6
+#define SS 40
+#define PUSHFOLD 1
+#define LIMIT 0
 const treesettings_t TREESETTINGS = 
 {
 #if !LIMIT
@@ -88,7 +96,7 @@ const treesettings_t TREESETTINGS =
 	 {99,99,99,99,99,99},  //R41 - R46
 	 {99,99,99,99,99,99},  //R51 - R56
 	 {99,99,99,99,99,99}}, //R61 - R66
-	SS*BB, true, false //stacksize, pushfold, limit
+	SS, true, false //stacksize, pushfold, limit
 
 #elif SS<=8 //all possible options are represented
 
@@ -100,7 +108,7 @@ const treesettings_t TREESETTINGS =
 	 {16,24,32,40,48,56}, //R4n
 	 {20,30,40,50,60,70}, //R5n
 	 {24,36,48,60,72,84}}, //R6n
-	SS*BB, false, false
+	SS, false, false
 
 #elif SS==13
 	
@@ -113,7 +121,7 @@ const treesettings_t TREESETTINGS =
 	 {24,36,48,99,99,99},
 	 {32,48,99,99,99,99},
 	 {40,99,99,99,99,99}},
-	SS*BB, false, false
+	SS, false, false
 #else //smaller tree (same as used for prototype?)
 	SB, BB,
 	{2, 6, 12,20,99,99}, //B
@@ -123,7 +131,7 @@ const treesettings_t TREESETTINGS =
 	{99,99,99,99,99,99}, //R4
 	{99,99,99,99,99,99}, //R5
 	{99,99,99,99,99,99}, //R6
-	SS*BB, false, false
+	SS, false, false
 #endif
 
 #elif SS>=25 && SS<35
@@ -136,7 +144,7 @@ const treesettings_t TREESETTINGS =
 	{34,48,60,99,99,99}, //R4
 	{48,60,99,99,99,99}, //R5
 	{60,99,99,99,99,99}, //R6
-	SS*BB, false, false
+	SS, false, false
 
 #elif SS>=35
 
@@ -148,7 +156,7 @@ const treesettings_t TREESETTINGS =
 	50,66,99,99,99,99,
 	66,99,99,99,99,99,
 	99,99,99,99,99,99,
-	SS*BB, false, false
+	SS, false, false
 
 #endif
 #else //limit!
@@ -161,7 +169,7 @@ const treesettings_t TREESETTINGS =
 	 {0,0,0,0,0,0},
 	 {0,0,0,0,0,0},
 	 {0,0,0,0,0,0}},
-	200, false, true
+	SS, false, true
 
 #endif
 };
@@ -188,6 +196,7 @@ const char * const FPWORKING_TYPENAME = TOSTRING(FPWORKING_T);
 const char * const FPSTORE_TYPENAME = TOSTRING(FPSTORE_T);
 #undef FPWORKING_T
 #undef FPSTORE_T
+#undef PFBIN
 #undef FBIN
 #undef TBIN
 #undef RBIN

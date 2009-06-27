@@ -16,6 +16,7 @@ template <typename T>
 extern std::string tostring(const T &myobj);
 extern std::string tostring(CardMask cards);
 extern std::string tostring(const std::vector<CardMask> &cards);
+extern std::string gameroundstring(int gr);
 
 //how to get strings of things!
 
@@ -63,7 +64,7 @@ typedef uint64_t uint64;
 // how to convert a std::string to a CString
 
 #if defined _MFC_VER
-#define CSTR(stdstr) CString((stdstr).c_str())
+inline CString toCString(const std::string &stdstr) { return CString(stdstr.c_str()); }
 #endif
 
 // functions that combine multiple indices into one index

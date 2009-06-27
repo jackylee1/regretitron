@@ -5,12 +5,9 @@
 
 #include "../PokerPlayerMFC/botapi.h"
 #include "../PokerPlayerMFC/picturectrl.h"
+#include "../PokerLibrary/constants.h"
 #include "afxwin.h"
-
-#define PREFLOP 0
-#define FLOP 1
-#define TURN 2
-#define RIVER 3
+#include "afxext.h"
 
 // CSimpleGameDlg dialog
 class CSimpleGameDlg : public CDialog
@@ -54,7 +51,7 @@ private:
 	void printriver();
 	void eraseboard();
 	void updatepot();
-    void updateinvested();
+    void updateinvested(Player justacted = (Player)-1);
 	double mintotalwager(Player acting);
 	double limitbetincrement();
 	void dofold(Player pl);
@@ -90,6 +87,7 @@ private:
 	afx_msg void OnBnClickedButton6();
 	afx_msg void OnBnClickedButton4();
 	afx_msg void OnBnClickedCheck2();
+	afx_msg void OnBnClickedOpenfile();
 	// card images
 	CPictureCtrl hCard0;
 	CPictureCtrl hCard1;
@@ -113,8 +111,11 @@ private:
 	CButton MakeBotGoButton;
 	CStatic BotStack;
 	CStatic HumanStack;
+	CBitmapButton OpenBotButton;
 	CButton NewGameButton;
 	CButton AutoNewGame;
 	CButton AutoBotPlay;
 	CStatic PotValue;
+	CPictureCtrl HumanDealerChip;
+	CPictureCtrl BotDealerChip;
 };

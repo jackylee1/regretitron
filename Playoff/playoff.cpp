@@ -162,7 +162,7 @@ double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0win
 	{
 		case P0FOLD: return -pot; //return utility to player/bot 0
 		case P1FOLD: return pot;
-		case CALLALLIN: if(_bots[P0].islimit()) REPORT("limit allin!"); return (twoprob0wins-1) * _stacksize;
+		case CALLALLIN: if(_bots[P0]->islimit()) REPORT("limit allin!"); return (twoprob0wins-1) * _stacksize;
 		case GO: break;
 	}
 
@@ -174,7 +174,7 @@ double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0win
 		{
 			case P0FOLD: return -pot;
 			case P1FOLD: return pot;
-			case CALLALLIN: if(_bots[P0].islimit()) REPORT("limit allin!"); return (twoprob0wins-1) * _stacksize;
+			case CALLALLIN: if(_bots[P0]->islimit()) REPORT("limit allin!"); return (twoprob0wins-1) * _stacksize;
 			case GO: break;
 		}
 	}
@@ -228,7 +228,7 @@ Result Playoff::playoutaround(Player nexttogo, double &pot)
 struct sortingvector
 {
 	sortingvector(int vector_size) : vect(vector_size) {}
-	bool operator() (int i, int j) { return vect[i] < vect[j]; }
+	bool operator() (int i, int j) { return vect[i] > vect[j]; }
 	vector<double> vect;
 };
 
@@ -335,19 +335,19 @@ int main(int argc, char **argv)
 
 		//print column headings
 
-		cout << setw(10) << ' ';
+		cout << setw(8) << ' ';
 		for(int i=0; i<numfiles; i++)
-			cout << setw(10) << left << bot(i);
+			cout << setw(8) << left << bot(i);
 		cout << "Average" << endl;
 
 		//print rest of table body
 		
 		for(int i=0; i<numfiles; i++)
 		{
-			cout << setw(10) << right << bot(i)+":  ";
+			cout << setw(8) << right << bot(i)+":  ";
 			for(int j=0; j<numfiles; j++)
 			{
-				cout << fixed << setprecision(1) << left << setw(10) << results[sorted[i]][sorted[j]];
+				cout << fixed << setprecision(1) << left << setw(8) << results[sorted[i]][sorted[j]];
 			}
 			cout << fixed << setprecision(1) << avgresult.vect[sorted[i]] << endl;
 		}

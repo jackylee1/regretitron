@@ -6,6 +6,7 @@
 #include "../PokerLibrary/cardmachine.h"
 #include "DiagnosticsPage.h" //to access radios for answer
 #include "../utility.h"
+#include <iomanip>
 
 bool fpequal(double a, double b)
 {
@@ -15,9 +16,9 @@ bool fpequal(double a, double b)
 	return isequal;
 }
 
-BotAPI::BotAPI(string xmlfile, bool diagon)
+BotAPI::BotAPI(string xmlfile)
    : MyWindow(NULL),
-     isdiagnosticson(diagon), 
+     isdiagnosticson(false),
      actionchooser(), //seeds rand with time and clock
      mystrats(1, new Strategy(xmlfile)), //initialize to one strat given by xmlfile
 	 currstrat(NULL),
@@ -44,8 +45,6 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 {
 	if(playernum != P0 && playernum != P1)
 		REPORT("invalid myplayer number in BotAPI::setnewgame()");
-	if(!fpequal(stacksize/bblind, (int)(stacksize/bblind+0.5)))
-		REPORT("stacksize/bblind is not an integer?");
 
 	//find the strategy with the nearest stacksize
 	
@@ -310,7 +309,7 @@ void BotAPI::dobet(Player pl, double amount)
 //this is a "bet" of amount all-in
 void BotAPI::doallin(Player pl)
 {
-	int allinaction, total=0;
+	int allinaction=-1, total=0;
 	for(int a=0; a<mynode.numacts; a++)
 	{
 		if(currstrat->gettree().isallin(mynode.result[a],mynode.potcontrib[a],currentgr))
@@ -319,7 +318,7 @@ void BotAPI::doallin(Player pl)
 			total++;
 		}
 	}
-	if (total != 1) REPORT("not exactly 1 all-in action found!");
+	if(total != 1) REPORT("not exactly 1 all-in action found!");
 
 	actualinv[pl] = currstrat->gettree().getparams().stacksize-actualpot;
 	perceivedinv[pl] = currstrat->gettree().getparams().stacksize-perceivedpot;
@@ -381,7 +380,6 @@ double BotAPI::mintotalwager()
 }
 
 #ifdef _MFC_VER
-#define CSTR(stdstr) CString((stdstr).c_str())
 
 //this function is a member of BotAPI so that it has access to all the
 //current state of the bot. MyWindow is also a member of BotAPI, and has public
@@ -395,9 +393,13 @@ void BotAPI::populatewindow(CWnd* parentwin)
 	if(MyWindow == NULL && parentwin != NULL)
 		MyWindow = new DiagnosticsPage(parentwin);
 
-	//set actions
-
 	if(bot_status == INVALID) return; //can't do nothin with that!
+
+	//set bot name
+
+	MyWindow->SetWindowText(toCString(currstrat->getfilename()));
+
+	//set actions
 
 	if(mynode.playertoact == myplayer)
 	{
@@ -406,7 +408,7 @@ void BotAPI::populatewindow(CWnd* parentwin)
 			mynode.numacts, cards, probabilities);
 		for(int a=0; a<mynode.numacts; a++)
 		{
-			MyWindow->ActButton[a].SetWindowText(CSTR(currstrat->gettree().actionstring(currentgr,a,mynode,multiplier)));
+			MyWindow->ActButton[a].SetWindowText(toCString(currstrat->gettree().actionstring(currentgr,a,mynode,multiplier)));
 			MyWindow->ActButton[a].EnableWindow(TRUE);
 			MyWindow->ActionBars[a].ShowWindow(SW_SHOW);
 			int position = (int)(probabilities[a]*101.0);
@@ -487,22 +489,22 @@ void BotAPI::populatewindow(CWnd* parentwin)
 
 	if(currstrat->getcardmach().getparams().usehistory)
 	{
-		text.Format("%d", handi[PREFLOP]);
+		text.Format("%d", handi[PREFLOP]+1);
 		for(int i=FLOP; i<=currentgr; i++)
-			text.AppendFormat(" - %d", handi[i]);
+			text.AppendFormat(" - %d", handi[i]+1);
 	}
 	else
 		if(currentgr==PREFLOP)
 			text = TEXT("(index)");
 		else
-			text.Format("%d", handi[currentgr]);
+			text.Format("%d", handi[currentgr]+1);
 	MyWindow->BinNumber.SetWindowText(text);
 
 	//set bin max
 
 	if(currstrat->getcardmach().getparams().usehistory)
 	{
-		text.Format(TEXT("Bin num(max %d-%d-%d-%d):"), 
+		text.Format(TEXT("Bin num(max %d/%d/%d/%d):"), 
 				currstrat->getcardmach().getparams().bin_max[PREFLOP],
 				currstrat->getcardmach().getparams().bin_max[FLOP],
 				currstrat->getcardmach().getparams().bin_max[TURN],
@@ -520,17 +522,17 @@ void BotAPI::populatewindow(CWnd* parentwin)
 
 	if(currstrat->getcardmach().getparams().useflopalyzer)
 		if(currentgr==PREFLOP)
-			text = TEXT("NA");
+			text = TEXT("-");
 		else
 			text.Format("%d", boardi);
 	else
-		text = TEXT("--");
+		text = TEXT("(N/A)");
 	MyWindow->BoardScore.SetWindowText(text);
 
 	//send cards and our strategy to MyWindow, so that it can draw the cards as it needs
 
-	MyWindow->setcardstoshow(currstrat, currentgr, handi, boardi);
-	MyWindow->RefreshCards(); //same function as is called when button is clicked
+	//will refresh if changed.
+	MyWindow->setcardstoshow(currstrat, currentgr, cards);
 
 	//if preflop, may have stale images of board cards still up
 

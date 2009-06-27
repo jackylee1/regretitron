@@ -4,7 +4,7 @@
 //
 
 #pragma once
-#ifdef _MFC_VER
+#ifdef _WIN32
 
 // Modify the following defines if you have to target a platform prior to the ones specified below.
 // Refer to MSDN for the latest info on corresponding values for different platforms.
@@ -34,7 +34,7 @@
 #include <afx.h>
 #include <afxwin.h>         // MFC core and standard components
 #include <afxext.h>         // MFC extensions
-#endif //_MFC_VER
+#endif //_WIN32
 
 #include <fstream>
 #include <algorithm> //has min_element

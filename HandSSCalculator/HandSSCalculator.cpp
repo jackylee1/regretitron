@@ -4,83 +4,10 @@
 #include "../PokerLibrary/binstorage.h" //my standard routines to pack and un-pack data.
 #include <string>
 #include "../utility.h"
+#include "../PokerLibrary/floaterfile.h"
 using namespace std;
 
-// ** global settings **
 const string BINSFOLDER = ""; //current directory
-#define FLOATER double
-typedef FLOATER floater;
-const string DATASTR = TOSTRING(FLOATER);
-#undef FLOATER
-
-class FloaterFile //represents a file of floater type between 0 and 1 inclusive
-{
-public:
-	FloaterFile(const string filename, const int64 n_floaters); //loads floaters from file
-	FloaterFile(const int64 n_floaters) : mydata(n_floaters, -1) {}
-	inline floater operator[](uint64 index) const { return mydata[index]; }
-	inline void store(int64 index, floater value);
-	void savefile(string filename);
-private:
-	vector<floater> mydata;
-	static const string EXT;
-	static const string FOLDER;
-};
-
-const string FloaterFile::EXT = "."+DATASTR;
-
-//define the location of the handstrength data on different machines
-#ifdef __GNUC__ //my linux machine
-const string FloaterFile::FOLDER = "/home/scott/pokerbreedinggrounds/bin/handstrengthdata/";
-#elif defined _WIN32 //my windows machine
-const string FloaterFile::FOLDER = "Z:/pokerbreedinggrounds/bin/handstrengthdata/";
-#else
-#error where is floater?
-#endif
-
-FloaterFile::FloaterFile(string filename, const int64 n_floaters) : mydata(n_floaters, -1)
-{
-	filename = FOLDER + filename + EXT;
-	ifstream f(filename.c_str(),ifstream::binary);
-	if(!f.is_open() || !f.good())
-		REPORT(filename + " doesn't exist or could not be opened");
-	for(int64 i=0; i<n_floaters; i++)
-	{
-		floater temp;
-		f.read((char *)&temp, sizeof(floater));
-		if(temp<0 || temp>1)
-			REPORT(filename + " contained bad data!!");
-		mydata[i] = temp;
-	}
-	if(!f.good() || f.eof() || EOF!=f.peek() || !f.eof())
-		REPORT(filename + " failed us at the last minute, don't know what happened.");
-	f.close();
-}
-
-inline void FloaterFile::store(int64 index, floater value)
-{
-	if(index < 0 || index > (int64)mydata.size() || value < 0 || value > 1)
-		REPORT("bad data trying to be put into a FloaterFile!");
-	mydata[index] = value;
-}
-
-void FloaterFile::savefile(string filename)
-{
-	filename = FOLDER + filename + EXT;
-	ofstream f(filename.c_str(), ios::binary);
-	if(!f.good() || !f.is_open())
-		REPORT("failed to open "+filename+" for writing!");
-	for(uint64 i=0; i<mydata.size(); i++)
-	{
-		floater temp = mydata[i];
-		if(temp < 0 || temp > 1)
-			REPORT("you wanted to savefile on "+filename+" but the array contains bad data!");
-		f.write((char*)&temp, sizeof(floater));
-	}
-	if(!f.good())
-		REPORT(filename + " failed us at the last minute while saving, don't know what happened.");
-	f.close();
-}
 
 
 //------------- R i v e r   E V -------------------
@@ -123,7 +50,7 @@ inline floater computeriverEV2(CardMask mine, CardMask board)
 //used only once, and called only once, by the function saveriverEV below.
 void saveriverEV()
 {
-	cout << "generating river EV data using " << DATASTR << "s ..." << endl;
+	cout << "generating river EV data using " << FloaterFile::gettypename() << "s ..." << endl;
 
 	FloaterFile riverEVarr(INDEX25_MAX);
 	CardMask m, b;
@@ -189,7 +116,7 @@ inline floater computeturnHSS2(CardMask mine, CardMask flopturn, const FloaterFi
 //used only once, and called only once, by the function saveturnHSS below.
 void saveturnHSS()
 {
-	cout << "generating turn HSS data using " << DATASTR << "s ..." << endl;
+	cout << "generating turn HSS data using " << FloaterFile::gettypename() << "s ..." << endl;
 
 	FloaterFile arr(INDEX24_MAX);
 	const FloaterFile riverEV("riverEV", INDEX25_MAX);
@@ -255,7 +182,7 @@ inline floater computeflopHSS2(CardMask mine, CardMask flop, const FloaterFile &
 //used only once, and called only once, by the function saveflopHSS below.
 void saveflopHSS()
 {
-	cout << "generating flop HSS data using " << DATASTR << "s ..." << endl;
+	cout << "generating flop HSS data using " << FloaterFile::gettypename() << "s ..." << endl;
 
 	FloaterFile arr(INDEX23_MAX);
 	const FloaterFile turnHSS("turnHSS", INDEX24_MAX);
@@ -319,7 +246,7 @@ inline floater computepreflopHSS2(CardMask mine, const FloaterFile &flopHSS)
 //used only once, and called only once, by the function savepreflopHSS below.
 void savepreflopHSS()
 {
-	cout << "generating preflop HSS data using " << DATASTR << "s ..." << endl;
+	cout << "generating preflop HSS data using " << FloaterFile::gettypename() << "s ..." << endl;
 	FloaterFile arr(INDEX2_MAX);
 	const FloaterFile flopHSS("flopHSS", INDEX23_MAX);
 
@@ -832,7 +759,7 @@ int main(int argc, char *argv[])
 
 	if((argc>=2) && (strcmp("histbin", argv[1]) == 0 || strcmp("oldbins", argv[1]) == 0))
 	{
-		cout << "Current data type: Using " << DATASTR << endl;
+		cout << "Current data type: Using " << FloaterFile::gettypename() << endl;
 		cout << endl;
 	}
 

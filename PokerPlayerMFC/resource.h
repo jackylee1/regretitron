@@ -2,6 +2,7 @@
 // Microsoft Visual C++ generated include file.
 // Used by PokerPlayerMFC.rc
 //
+#define IDB_BITMAP1                     104
 #define IDD_PROPPAGE_LARGE              107
 #define IDC_REFRESH                     1001
 #define IDC_TEXT0                       1002
@@ -94,14 +95,31 @@
 #define IDC_PROGRESS7                   1072
 #define IDC_PROGRESS8                   1073
 #define IDC_PROGRESS9                   1074
+#define IDC_CARDINFO00                  1075
+#define IDC_CARDINFO01                  1076
+#define IDC_CARDINFO02                  1077
+#define IDC_CARDINFO03                  1078
+#define IDC_CARDINFO10                  1079
+#define IDC_CARDINFO11                  1080
+#define IDC_CARDINFO12                  1081
+#define IDC_CARDINFO13                  1082
+#define IDC_CARDINFO20                  1083
+#define IDC_CARDINFO30                  1084
+#define IDC_CARDINFO21                  1085
+#define IDC_CARDINFO22                  1086
+#define IDC_CARDINFO23                  1087
+#define IDC_CARDINFO31                  1088
+#define IDC_CARDINFO32                  1089
+#define IDC_CARDINFO33                  1090
+#define IDC_BOTNAME                     1091
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        102
+#define _APS_NEXT_RESOURCE_VALUE        105
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1068
+#define _APS_NEXT_CONTROL_VALUE         1092
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "utility.h"
+#include "PokerLibrary/constants.h"
 using namespace std;
 
 // how to get seconds with milliseconds
@@ -80,6 +81,20 @@ string tostring(const vector<CardMask> &cards)
 	for(unsigned int i=1; i<cards.size(); i++)
 		ret += " : " + tostring(cards[i]);
 	return ret;
+}
+
+//how to get a string from a gameround number
+
+string gameroundstring(int gr)
+{
+	switch(gr)
+	{
+	case RIVER: return "River";
+	case TURN: return "Turn";
+	case FLOP: return "Flop";
+	case PREFLOP: return "Preflop";
+	}
+	return "BAD GR";
 }
 
 // perform the magic numbers test, validates data integrity on multiple systems

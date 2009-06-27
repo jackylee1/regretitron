@@ -21,6 +21,9 @@ public:
 	Strategy(string xmlfilename);
 	~Strategy();
 
+	//access to filename of this bot
+	inline string getfilename() const { return _xmlfilename; }
+
 	//access to BettingTree functions
 	inline const BettingTree& gettree() const { return *tree; }
 
@@ -36,6 +39,9 @@ private:
 	//we do not support copying.
 	Strategy(const Strategy& rhs);
 	Strategy& operator=(const Strategy& rhs);
+
+	//for diagnostics, and so i know who's playing
+	string _xmlfilename;
 
 	//the betting tree
 	BettingTree * tree;

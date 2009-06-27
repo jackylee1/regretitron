@@ -27,12 +27,16 @@ private:
 	Solver(const Solver& rhs);
 	Solver& operator=(const Solver& rhs);
 
+	static void doiter(int64 iter); //actually starts threads, does iterations
 	static void* callthreadloop(void * mysolver); //static linkage function to allow use of C-style pthreads
 
 	//only these 3 functions can access per thread data, as they are non-static
 	void threadloop(); //master loop function, called first by each thread
 	fpworking_type walker(int gr, int pot, int beti, fpworking_type prob0, fpworking_type prob1); //the algorithm
 	void dummywalker(int gr, int pot, int beti); //faster version of the above when no data needs updating
+
+	static string getstatus();
+	static void bounder(int gr, int pot, int beti);
 
 	//this is the per thread data
 	int cardsi[4][2]; // 4 gamerounds, 2 players.
@@ -49,6 +53,10 @@ private:
 	static pthread_mutex_t * cardsilocks[4]; //one lock per player per gameround per cardsi
 	static pthread_mutex_t threaddatalock;
 #endif
+	//any info I want to get out of (recursive function) bounder, has to be put here
+	//other alternative is global, or adding more parameters to bounder (both suck)
+	static vector< vector<int> > staticactioncounters; //need static version for bounder
+	static vector< fpworking_type > accumulated_regret;
 };
 
 #endif

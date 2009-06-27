@@ -4,6 +4,8 @@
 //
 #define IDD_SIMPLEGAME_DIALOG           102
 #define IDR_MAINFRAME                   128
+#define IDB_OPEN1                       130
+#define IDB_OPEN2                       131
 #define IDC_BUTTON1                     1000
 #define IDC_BUTTON2                     1001
 #define IDC_BUTTON3                     1002
@@ -32,14 +34,17 @@
 #define IDC_CHECK4                      1026
 #define IDC_POTVAL                      1027
 #define IDC_NHANDS                      1028
+#define IDC_OPENFILE                    1029
+#define IDC_BOTDEAL                     1030
+#define IDC_HUMANDEAL                   1031
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        129
+#define _APS_NEXT_RESOURCE_VALUE        133
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1029
+#define _APS_NEXT_CONTROL_VALUE         1032
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

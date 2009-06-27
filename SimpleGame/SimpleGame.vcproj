@@ -62,7 +62,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="_DEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="$(IntDir)"
+				AdditionalIncludeDirectories="Z:\pokerbreedinggrounds\PokerPlayerMFC;&quot;$(IntDir)&quot;"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -148,7 +148,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="NDEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="$(IntDir)"
+				AdditionalIncludeDirectories="Z:\pokerbreedinggrounds\PokerPlayerMFC;&quot;$(IntDir)&quot;"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -260,15 +260,27 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 			<File
+				RelativePath=".\res\bitmap1.bmp"
+				>
+			</File>
+			<File
+				RelativePath=".\res\open1.bmp"
+				>
+			</File>
+			<File
+				RelativePath=".\res\open2.bmp"
+				>
+			</File>
+			<File
+				RelativePath=".\res\open3.bmp"
+				>
+			</File>
+			<File
 				RelativePath=".\res\SimpleGame.ico"
 				>
 			</File>
 			<File
 				RelativePath=".\SimpleGame.rc"
-				>
-			</File>
-			<File
-				RelativePath=".\res\SimpleGame.rc2"
 				>
 			</File>
 		</Filter>
