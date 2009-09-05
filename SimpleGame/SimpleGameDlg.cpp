@@ -135,7 +135,6 @@ BOOL CSimpleGameDlg::OnInitDialog()
 
 	CFileDialog filechooser(TRUE, "xml", NULL);
 	if(filechooser.DoModal() == IDCANCEL) exit(0);
-	SetCurrentDirectory("../");
 	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()));
 	_stacksize = _mybot->getstacksizemult() * _bblind;
 
@@ -706,10 +705,8 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	//display the cards pics
 	eraseboard();
 	printhumancards();
-	if(ShowBotCards.GetCheck())
-		printbotcards();
-	else
-		printbotcardbacks();
+	ShowBotCards.SetCheck(BST_UNCHECKED); //uncheck show bot cards, incase accidently left checked by user
+	printbotcardbacks();
 
 	//finally set grayness
 	graypostact(P1); //we'll just call the blinds an action as far as the name of that function goes
@@ -737,7 +734,6 @@ void CSimpleGameDlg::OnBnClickedOpenfile()
 {
 	CFileDialog filechooser(TRUE, "xml", NULL);
 	if(filechooser.DoModal() == IDCANCEL) return;
-	SetCurrentDirectory("../");
 	delete _mybot; //will kill diag
 	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()));
 	if(ShowDiagnostics.GetCheck())

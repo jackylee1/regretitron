@@ -152,16 +152,17 @@ string PackedBinFile::save(string filename) const
 		REPORT("can't save unless you're preloaded!");
 
 	vector<int64> multiplicity_count(256, 0);
+	vector<int64> first_index(256, -1);
 	for(int64 i=0; i<_index_max; i++)
-		multiplicity_count[(*_haveseen)[i]]++;
+		if(multiplicity_count[(*_haveseen)[i]]++ == 0)
+			first_index[(*_haveseen)[i]] = i;
 
-	if(multiplicity_count[0] != 0)
-		REPORT("this bin file has "+tostring(multiplicity_count[0])+" unstored indices when trying to save "+filename);
 	string ret = "Saving "+tostring(filename)+". Counts of multiplicities of times each index was stored:\n";
-	for(int i=1; i<256; i++)
+	for(int i=0; i<256; i++)
 		if(multiplicity_count[i] != 0)
 			ret += "   "+tostring(i)+": "+tostring(multiplicity_count[i])+" times ("
-					+tostring((double)100.0*multiplicity_count[i]/_index_max)+"%)\n";
+					+(multiplicity_count[i] == _index_max ? "ALL)" : tostring((double)100.0*multiplicity_count[i]/_index_max)+"%)")
+					+(i!=1 ? " (first index: "+tostring(first_index[i])+")\n" : "\n");
 	ret += '\n';
 
 	ofstream myfile(filename.c_str(), ios::binary);
@@ -173,7 +174,7 @@ string PackedBinFile::save(string filename) const
 	}
 
 	if(!myfile.good() || (int64)myfile.tellp() != numwordsneeded(_bin_max, _index_max)*8)
-		REPORT("error saving file.");
+		REPORT("error saving file... and return string was:\n\n"+ret);
 
 	myfile.close();
 

@@ -3,6 +3,8 @@
 #include <sstream>
 #include <iomanip>
 #include <math.h> //sqrt
+#include <algorithm> //sort
+#include <numeric> //accumulate
 #include "../TinyXML++/tinyxml.h"
 using namespace std;
 
@@ -14,8 +16,13 @@ CardMachine * Solver::cardmachine = NULL;
 const BettingTree * Solver::tree = NULL;
 MemoryManager * Solver::memory = NULL;
 #ifdef DO_THREADS
-pthread_mutex_t * Solver::cardsilocks[4] = {NULL,NULL,NULL,NULL}; //one lock per player per gameround per cardsi
 pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
+#if USE_HISTORY
+list<Solver::iteration_data_t> Solver::dataqueue(N_LOOKAHEAD);
+bool Solver::datainuse[PFLOP_CARDSI_MAX*2];
+pthread_cond_t Solver::signaler;
+#else
+#endif
 #endif
 vector< vector<int> > Solver::staticactioncounters(4, vector<int>(MAX_NODETYPES, 0));
 vector< fpworking_type > Solver::accumulated_regret;
@@ -29,12 +36,20 @@ void Solver::initsolver()
 	inittime = getdoubletime();
 
 #ifdef DO_THREADS
-	for(int gr=0; gr<4; gr++)
+#if USE_HISTORY 
+	pthread_cond_init(&signaler, NULL);
+	for(int i=0; i<PFLOP_CARDSI_MAX*2; i++)
+		datainuse[i] = false;
+	for(list<iteration_data_t>::iterator data = dataqueue.begin(); data!=dataqueue.end(); data++)
+		cardmachine->getnewgame(data->cardsi, data->twoprob0wins); //get new data
+#else 
+	for(int gr=0; gr<4; gr++) //need locks for all rounds
 	{
 		cardsilocks[gr] = new pthread_mutex_t[2*cardmachine->getcardsimax(gr)];
 		for(int i=0; i<2*cardmachine->getcardsimax(gr); i++)
 			pthread_mutex_init(&cardsilocks[gr][i], NULL);
 	}
+#endif
 #endif
 }
 
@@ -44,8 +59,11 @@ void Solver::destructsolver()
 	delete tree;
 	delete memory;
 #ifdef DO_THREADS
+#if !USE_HISTORY
 	for(int gr=0; gr<4; gr++)
-		delete[] cardsilocks[gr];
+		if(cardsilocks[gr]!=NULL)
+			delete[] cardsilocks[gr];
+#endif
 #endif
 }
 
@@ -86,6 +104,54 @@ double Solver::solve(int64 iter)
 inline ostream& operator << (ostream& os, const __float128& n) { return os << (__float80)n; }
 #endif
 
+fpworking_type Solver::getpfloppushprob(int pushfold_index)
+{
+	if(!tree->getparams().pushfold)
+		REPORT("getpfloppushprob only designed for pushfold");
+
+	//pushfold_index is combine(index2_index, INDEX2_MAX, sblind_bblind)
+	// where sblind_bblind is 0 for sblind and 1 for bblind
+	BetNode mynode;
+	const int beti = (pushfold_index / INDEX2_MAX == 0) ? 0 : 98;
+	tree->getnode(PREFLOP, 0, beti, mynode);
+	const int &numa = mynode.numacts;
+	if(numa != 2)
+		REPORT("getpfloppushprobs found a node with not 2 actions.");
+	const int cardsi = pushfold_index % INDEX2_MAX;
+
+	//get pointers to data
+
+	fpstore_type * stratn, * regret;
+#if STORE_DENOM
+	fpstore_type * stratd;
+#endif
+	const int actioni = (pushfold_index / INDEX2_MAX == 0) ? 0 : 1;
+	memory->dataindexing(PREFLOP, numa, actioni, cardsi, stratn, regret
+#if STORE_DENOM
+			, stratd
+#endif
+			);
+
+	//compute the denominator
+
+	fpworking_type denominator = 0.0;
+	for(int i=0; i<numa; i++)
+		denominator += stratn[i];
+
+	//return probability of pushing
+
+	if(!tree->isallin(mynode.result[1], mynode.potcontrib[1], PREFLOP)
+		   	&& mynode.result[1] != BetNode::AI)
+		REPORT("getpfloppushprob found not quite an all-in node");
+	return stratn[1] / denominator;
+}
+
+struct sortingvector
+{
+	sortingvector(int vector_size) : vect(vector_size) {}
+	bool operator() (int i, int j) { return vect[i] > vect[j]; }
+	vector<fpworking_type> vect;
+};
 
 void Solver::save(const string &filename, bool writedata)
 {
@@ -229,86 +295,210 @@ void Solver::save(const string &filename, bool writedata)
 		mytree->LinkEndChild(raise);
 	}
 
-	// print the first node strategy to an ostringstream
+	// print the pushfold case analysis to an ostringstream string
 
 	ostringstream text;
 	text << endl << endl;
-	BetNode mynode;
-	tree->getnode(PREFLOP, 0, 0, mynode);
-	const int &numa = mynode.numacts;
-	for(int index=INDEX2_MAX-1; index>=0; index--)
+
+	if(tree->getparams().pushfold)
 	{
-		//get string and cardsi
+		text << "Performing pushfold analysis:" << endl;
 
-		string handstring;
-		int cardsi = cardmachine->preflophandinfo(index, handstring);
+		//hard coded CORRECT data
 
-		//get pointers to data
+		//verifydata_xx_yy_SB/BB
+		//these are the CORRECT probabilities of PUSHING in pushfold scenario
+		// with xx to yy stacksize to bblind ratio,
+		// from either the SB or the BB,
+		// in INDEX2 order:
+		// 22, 32, 33, ... , K2 .. KQ KK, A2 .. AA, 32s, 42s, 43s, 52s .. 54s, A2s .. AKs
+		const fpworking_type verifydata_40_6_SB[INDEX2_MAX] = 
+		{
+			//small blind values: 
+			1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+			0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+			1.0, 0.0, 0.0, 0.0, 0.0, 0.5688307975983433, 1.0, 1.0, 0.0, 0.0,
+			0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+			0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0,
+			1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0,
+			1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+		};
 
-		fpstore_type * stratn, * regret;
-#if STORE_DENOM
-		fpstore_type * stratd;
-#endif
-		memory->dataindexing(PREFLOP, numa, 0, cardsi, stratn, regret
-#if STORE_DENOM
-				, stratd
-#endif
-				);
+		/*
+			//big blind values
+			1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0625, 1.0,
+			0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+			1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0,
+			0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0,
+			1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+			1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+		*/
 
-		//print out a heading including example hand
+		// keys for sorting
+		vector<int> key(INDEX2_MAX, -1);
+		for(int i=0; i<INDEX2_MAX; i++)
+			key[i]=i;
 
-		if(tree->getparams().pushfold)
-			text << setw(5) << left << handstring + ":";
+		// scores, compared above vs actual
+		sortingvector score(INDEX2_MAX);
+		const fpworking_type * validdata = NULL;
+		if(abs((double)tree->getparams().stacksize / tree->getparams().bblind - 40.0/6.0) < 1e-5)
+			validdata = verifydata_40_6_SB;
 		else
+			REPORT("No correct pushfold data found for stacksize "
+					+tostring(tree->getparams().stacksize)+" and bblind "
+					+tostring(tree->getparams().bblind)+".");
+
+		for(int i=0; i<INDEX2_MAX; ++i)
+			score.vect[i] = abs(getpfloppushprob(i) - validdata[i]);
+
+		// find a convergence score
+		text << "Total sum of error (over " << INDEX2_MAX << " calculated numbers): "
+			 << accumulate(score.vect.begin(), score.vect.end(), 0.0) << endl;
+
+		// sort the keys by the scores (same method as in Playoff)
+		sort(key.begin(), key.end(), score);
+
+		const int n_bullshit = 30;
+		text << "Top " << n_bullshit << " most erroneous cases:" << endl << endl;
+		for(int i=0; i<n_bullshit; i++)
 		{
-			text << endl << "cardsi: " << cardsi << ":" << endl;
-			text << handstring << ":" << endl;
+			string handstring;
+			if(cardmachine->preflophandinfo(key[i]%INDEX2_MAX, handstring) != key[i]%INDEX2_MAX)
+				REPORT("consistency check on cardsi and index2_indexes failed");
+			text << "  " << handstring << ' ' << (key[i]>=INDEX2_MAX ? "BB" : "SB") << ':' << endl;
+			text << "  correct: ";
+			if(validdata[key[i]] == 0.0)
+				text << "fold.";
+			else if(validdata[key[i]] == 1.0)
+				text << "jam.";
+			else 
+				text << 1.0-validdata[key[i]] << " fold, " << validdata[key[i]] << " jam.";
+			text << endl << "  calculated: " << 1.0-getpfloppushprob(key[i]) << " fold, " 
+				<< getpfloppushprob(key[i]) << " jam." << endl;
+			text << "  error: " << score.vect[key[i]] << endl << endl;
 		}
+	}
 
-		//compute the denominator
-		
-		fpworking_type denominator = 0;
-		for(int i=0; i<numa; i++)
-			denominator += stratn[i];
+	// print the first node strategy to an ostringstream
 
-		//print out each action
-
-		for (int a=0; a<numa; a++)
+	for(int actioni=0; actioni<=1; actioni++)
+	{
+		BetNode mynode;
+		if(actioni==0)
 		{
-			fpworking_type myprob = (fpworking_type)stratn[a] / denominator;
-
-			//aiming for http://www.daimi.au.dk/~bromille/pokerdata/SingleHandSmallBlind/SHSB.4000
+			tree->getnode(PREFLOP, 0, 0, mynode);
+			text << endl << "Small Blind actions:" << endl << endl;
+		}
+		else if(actioni==1)
+		{
 			if(tree->getparams().pushfold)
 			{
-				if(myprob > 0.98) //surety
-				{
-					if(a==numa-1)
-						text << "jam" << endl;
-					else
-						text << "fold" << endl;
-				}
-				else if(myprob > 0.02) //unsurety
-				{
-					if (a==0) 
-						text << endl << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100*myprob << "%" << endl;
-					else
-						text << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100*myprob << "%" << endl;
-				}
+				tree->getnode(PREFLOP, 0, 98, mynode); //big blind after sb pushes
+				text << endl << "Big Blind actions:" << endl << endl;
 			}
 			else
-				text << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100*myprob << "%" << endl;
+				break;
 		}
 
-		//print out denominator info if exists
+		const int &numa = mynode.numacts;
+
+		for(int index=INDEX2_MAX-1; index>=0; index--)
+		{
+			//get string and cardsi
+
+			string handstring;
+			int cardsi = cardmachine->preflophandinfo(index, handstring);
+
+			//get pointers to data
+
+			fpstore_type * stratn, * regret;
+#if STORE_DENOM
+			fpstore_type * stratd;
+#endif
+			memory->dataindexing(PREFLOP, numa, actioni, cardsi, stratn, regret
+#if STORE_DENOM
+					, stratd
+#endif
+					);
+
+			//print out a heading including example hand
+
+			if(tree->getparams().pushfold)
+				text << setw(5) << left << handstring + ":";
+			else
+			{
+				text << endl << "cardsi: " << cardsi << ":" << endl;
+				text << handstring << ":" << endl;
+			}
+
+			//compute the denominator
+
+			fpworking_type denominator = 0;
+			for(int i=0; i<numa; i++)
+				denominator += stratn[i];
+
+			//print out each action
+
+			for (int a=0; a<numa; a++)
+			{
+				fpworking_type myprob = (fpworking_type)stratn[a] / denominator;
+
+				//aiming for http://www.daimi.au.dk/~bromille/pokerdata/SingleHandSmallBlind/SHSB.4000
+				if(tree->getparams().pushfold)
+				{
+					if(myprob > 0.98) //surety
+					{
+						if(a==numa-1)
+							text << "jam" << endl;
+						else
+							text << "fold" << endl;
+					}
+					else if(myprob > 0.02) //unsurety
+					{
+						if (a==0) 
+							text << endl << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100.0*myprob << "%" << endl;
+						else
+							text << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100.0*myprob << "%" << endl;
+					}
+				}
+				else
+					text << setw(14) << tree->actionstring(PREFLOP,a,mynode,1.0)+": " << 100.0*myprob << "%" << endl;
+			}
+
+			//print out denominator info if exists
 
 #if STORE_DENOM
-		text << "Sum of strats:  " << denominator / *stratd << endl;
-		text << "stratd:         " << *stratd << endl;
-		text << "sum(stratn[a]): " << denominator << endl;
-		text << "difference:     " << *stratd - denominator << endl;
+			text << "Sum of strats:  " << denominator / *stratd << endl;
+			text << "stratd:         " << *stratd << endl;
+			text << "sum(stratn[a]): " << denominator << endl;
+			text << "difference:     " << *stratd - denominator << endl;
 #endif
+		}
+		text << endl;
 	}
-	text << endl << endl;
+	text << endl;
 
 	// add that string as the first node strategy
 
@@ -320,12 +510,13 @@ void Solver::save(const string &filename, bool writedata)
 
 	// save the xml file.
 
-	doc.SaveFile(("output/"+filename+".xml").c_str());
+	doc.SaveFile((filename+".xml").c_str());
 }
 
 void Solver::doiter(int64 iter) 
 { 
-	total += iterations = iter; 
+	total += iter; 
+	iterations = iter - N_LOOKAHEAD;
 
 	Solver solvers[NUM_THREADS];
 #ifdef DO_THREADS
@@ -342,6 +533,10 @@ void Solver::doiter(int64 iter)
 		if(pthread_join(threads[i],NULL))
 			REPORT("error joining thread");
 #endif
+
+	//do the last few unthreaded for consistency (to clear the queue)
+	iterations = N_LOOKAHEAD;
+	solvers[0].threadloop();
 }
 
 
@@ -353,46 +548,92 @@ void* Solver::callthreadloop(void* mysolver)
 	return NULL;
 }
 
+inline bool check(int a1, int a2, int b1, int b2)
+{
+	return a1 != b1 && a1 != b2 && a2 != b1 && a2 != b2;
+}
+
 void Solver::threadloop()
 {
+#ifdef DO_THREADS
+	pthread_mutex_lock(&threaddatalock);
+#endif
+
+	fpu_fix_start(NULL);
+
 	while(1)
 	{
+#ifdef DO_THREADS
+		list<iteration_data_t>::iterator my_data_it; //iterator pointing to my data I want to use
+		while(1) //loop till we find something
+		{
+			if(iterations==0) //check if we're all done.
+			{
+				pthread_cond_broadcast(&signaler); // wake up any sleeping threads
+				pthread_mutex_unlock(&threaddatalock);
+				return;
+			}
+
+			for(my_data_it = dataqueue.begin(); my_data_it!=dataqueue.end(); my_data_it++)
+			{
+				if(!datainuse[2*my_data_it->cardsi[PREFLOP][P0]] && !datainuse[2*my_data_it->cardsi[PREFLOP][P1]+1])
+				{
+					for(list<iteration_data_t>::iterator to_be_skipped=dataqueue.begin(); to_be_skipped != my_data_it; to_be_skipped++)
+					{
+						if(my_data_it->cardsi[PREFLOP][P0] == to_be_skipped->cardsi[PREFLOP][P0] ||
+								my_data_it->cardsi[PREFLOP][P1] == to_be_skipped->cardsi[PREFLOP][P1])
+						{
+							goto cannot_skip;
+						}
+					}
+					goto found_good_data;
+				}
+cannot_skip:
+				continue; // just has to be here as a statement for the cannot_skip label
+			}
+			pthread_cond_wait(&signaler, &threaddatalock);
+		}
+found_good_data:
+
+		if(THREADLOOPTRACE && false)
+		{
+			int j=0;
+			for(list<iteration_data_t>::iterator i=dataqueue.begin(); i != my_data_it; i++)
+				j++;
+			if(j>0)
+				cerr << this << ": ..skipped " << j << "data.." << endl;
+		}
+		memcpy(cardsi, my_data_it->cardsi, sizeof(cardsi)); //copy that data into our non-static variables
+		twoprob0wins = my_data_it->twoprob0wins;
+		datainuse[2*cardsi[PREFLOP][P0]] = true;
+		datainuse[2*cardsi[PREFLOP][P1]+1] = true;
+		cardmachine->getnewgame(my_data_it->cardsi, my_data_it->twoprob0wins); //get new data
+		dataqueue.splice(dataqueue.end(), dataqueue, my_data_it); //move that node to the end of the list
+		iterations--;
+		if(THREADLOOPTRACE)
+			cerr << /*this <<*/ ": Solving " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
+		pthread_mutex_unlock(&threaddatalock);
+#else
+		if(iterations-- == 0)
+			break;
+		cardmachine->getnewgame(cardsi, twoprob0wins);
+		if(THREADLOOPTRACE)
+			cerr << /*this <<*/ ": Solving " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
+#endif
 		for(int i=0; i<4; i++) 
 			for(int j=0; j<MAX_NODETYPES; j++)
 				actioncounters[i][j] = 0;
-#ifdef DO_THREADS
-		pthread_mutex_lock(&threaddatalock);
-#endif
-		if(iterations==0)
-		{
-#ifdef DO_THREADS
-			pthread_mutex_unlock(&threaddatalock);
-#endif
-			break; //nothing left to be done
-		}
-		iterations--;
-		cardmachine->getnewgame(cardsi, twoprob0wins);
-#ifdef DO_THREADS
-		pthread_mutex_lock(&cardsilocks[PREFLOP][cardsi[PREFLOP][P0]*2 + P0]);
-		pthread_mutex_lock(&cardsilocks[PREFLOP][cardsi[PREFLOP][P1]*2 + P1]);
-		pthread_mutex_lock(&cardsilocks[FLOP][cardsi[FLOP][P0]*2 + P0]);
-		pthread_mutex_lock(&cardsilocks[FLOP][cardsi[FLOP][P1]*2 + P1]);
-		pthread_mutex_lock(&cardsilocks[TURN][cardsi[TURN][P0]*2 + P0]);
-		pthread_mutex_lock(&cardsilocks[TURN][cardsi[TURN][P1]*2 + P1]);
-		pthread_mutex_lock(&cardsilocks[RIVER][cardsi[RIVER][P0]*2 + P0]);
-		pthread_mutex_lock(&cardsilocks[RIVER][cardsi[RIVER][P1]*2 + P1]);
-		pthread_mutex_unlock(&threaddatalock);
-#endif
 		walker(PREFLOP,0,0,1,1);
 #ifdef DO_THREADS
-		pthread_mutex_unlock(&cardsilocks[PREFLOP][cardsi[PREFLOP][P0]*2 + P0]);
-		pthread_mutex_unlock(&cardsilocks[PREFLOP][cardsi[PREFLOP][P1]*2 + P1]);
-		pthread_mutex_unlock(&cardsilocks[FLOP][cardsi[FLOP][P0]*2 + P0]);
-		pthread_mutex_unlock(&cardsilocks[FLOP][cardsi[FLOP][P1]*2 + P1]);
-		pthread_mutex_unlock(&cardsilocks[TURN][cardsi[TURN][P0]*2 + P0]);
-		pthread_mutex_unlock(&cardsilocks[TURN][cardsi[TURN][P1]*2 + P1]);
-		pthread_mutex_unlock(&cardsilocks[RIVER][cardsi[RIVER][P0]*2 + P0]);
-		pthread_mutex_unlock(&cardsilocks[RIVER][cardsi[RIVER][P1]*2 + P1]);
+		pthread_mutex_lock(&threaddatalock);
+		if(THREADLOOPTRACE && false)
+			cerr << this << ": Done with " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
+		//set datainuse of whatever we were doing to false
+		if(!datainuse[2*cardsi[PREFLOP][P0]] || !datainuse[2*cardsi[PREFLOP][P1]+1])
+			REPORT("we didn't have the lock... sadness...");
+		datainuse[2*cardsi[PREFLOP][P0]] = false;
+		datainuse[2*cardsi[PREFLOP][P1]+1] = false;
+		pthread_cond_signal(&signaler); //new data is availble to be touched, so signal
 #endif
 	}
 }
@@ -424,21 +665,24 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 
 	//find total regret
 
-	fpworking_type totalregret=0;
+	fpworking_type totalregret=0.0;
 
+	//FPERROR: SUM LIST OF NUMBERS 
 	for(int i=0; i<numa; i++)
-		if (regret[i]>0) totalregret += regret[i];
+		if (regret[i]>0.0) totalregret += regret[i];
 
 	//set strategy proportional to positive regret, or 1/numa if no positive regret
 
 	fpworking_type stratt[MAX_ACTIONS];
 
-	if (totalregret > 0)
+	//FPERROR: COMPARE TO ZERO
+	//FPERROR: STRAIGHT FORWARD DIVISION
+	if (totalregret > 0.0)
 		for(int i=0; i<numa; i++)
-			(regret[i]>0) ? stratt[i] = regret[i] / totalregret : stratt[i] = 0;
+			(regret[i]>0.0) ? stratt[i] = regret[i] / totalregret : stratt[i] = 0.0;
 	else
 		for(int i=0; i<numa; i++)
-			stratt[i] = (fpworking_type)1/numa;
+			stratt[i] = (fpworking_type)1/(fpworking_type)numa;
 
 
 	//NOW, WE WANT TO FIND THE UTILITY OF EACH ACTION. 
@@ -451,7 +695,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 	{
 		//utility will be unused, children's regret will be unaffected
 		//performance hack
-		if(stratt[i]==0 && ((mynode.playertoact==0 && prob1==0) || (mynode.playertoact==1 && prob0==0)) )
+		if(stratt[i]==0.0 && ((mynode.playertoact==0.0 && prob1==0.0) || (mynode.playertoact==1 && prob0==0.0)) )
 		{
 			//same code as in dummywalker
 			switch(mynode.result[i])
@@ -473,12 +717,12 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 		switch(mynode.result[i])
 		{
 		case BetNode::AI: //called allin
-			utility[i] = tree->getparams().stacksize * (twoprob0wins-1);
+			utility[i] = tree->getparams().stacksize * (twoprob0wins-1); //utility is integer value
 			break;
 
 		case BetNode::GO: //next game round
 			if(gr==RIVER)// showdown
-				utility[i] = (pot+mynode.potcontrib[i]) * (twoprob0wins-1);
+				utility[i] = (pot+mynode.potcontrib[i]) * (twoprob0wins-1); //utility is integer value
 			else 
 			{
 				if(mynode.playertoact==0)
@@ -489,7 +733,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 			break;
 
 		case BetNode::FD: //fold
-			utility[i] = (pot+mynode.potcontrib[i]) * (2*mynode.playertoact - 1); //acting player is loser
+			utility[i] = (pot+mynode.potcontrib[i]) * (2*mynode.playertoact - 1); //acting player is loser, utility is integer
 			break;
 
 		default: //child node within this game round
@@ -510,7 +754,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 	if (mynode.playertoact==0) //P0 playing, use prob1, proability of player 1 getting here.
 	{
 		//shortcut, along with the related one below, speeds up by 10% or so.
-		if(prob0!=0)
+		if(prob0!=0.0)
 		{
 			for(int a=0; a<numa; a++)
 				stratn[a] += prob0 * stratt[a];
@@ -520,7 +764,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 		}
 
 		//shortcut
-		if(prob1==0) return avgutility;
+		if(prob1==0.0) return avgutility;
 
 		for(int a=0; a<numa; a++)
 			regret[a] += prob1 * (utility[a] - avgutility);
@@ -528,7 +772,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 	else // P1 playing, so his regret values are negative of P0's regret values.
 	{
 		//shortcut
-		if(prob1!=0)
+		if(prob1!=0.0)
 		{
 			for(int a=0; a<numa; a++)
 				stratn[a] += prob1 * stratt[a];
@@ -538,7 +782,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 		}
 
 		//shortcut
-		if(prob0==0) return avgutility;
+		if(prob0==0.0) return avgutility;
 
 		for(int a=0; a<numa; a++)
 			regret[a] += - prob0 * (utility[a] - avgutility);
@@ -611,7 +855,7 @@ string Solver::getstatus()
 	out << " number of info nodes: " << infonodes << endl;
 	out << " iterations per info node: " << fixed << setprecision(1) << (double)total/infonodes << endl;
 	out << " epsilon: " << fixed << setprecision(1)
-		<< 2 * ((max(accumulated_regret[P0], accumulated_regret[P1]) / total) / tree->getparams().bblind) * 1000 
+		<< 2 * (((double)max(accumulated_regret[P0], accumulated_regret[P1]) / total) / tree->getparams().bblind) * 1000 
 		<< " milli-big-blinds" << endl;
 
 	return out.str();

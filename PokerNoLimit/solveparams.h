@@ -6,35 +6,43 @@
 #include "../PokerLibrary/cardmachine.h" //for cardsettings_t
 #include "../PokerLibrary/binstorage.h" //to determine bin filesize
 #include "../utility.h" // for TOSTRING()
+#include <qd/qd_real.h>
 
-const int64 MILLION = 1000000;
 const int64 THOUSAND = 1000;
+const int64 MILLION = 1000000;
+const int64 BILLION = THOUSAND*MILLION;
 
 //main settings
-const string SAVENAME = "pushfold-40ss-to-6bb";
-const int64 TESTING_AMT = 1*MILLION; //do this many iterations as a test for speed
-const int64 STARTING_AMT = 25*MILLION; //do this many iterations, then...
-const double MULTIPLIER = 1.5; //multiply by this amount, do that many, repeat ....
-const int64 SAVEAFTER = 1*MILLION; // save xml & strategy file after this amount
+const string SAVENAME = "E-8-s17429085";
+const int64 TESTING_AMT = 100; //do this many iterations as a test for speed
+const int64 STARTING_AMT = 100*MILLION; //do this many iterations, then...
+const double MULTIPLIER = 1.25; //multiply by this amount, do that many, repeat ....
+const int64 SAVEAFTER = 0; // save xml after this amount
+const bool SAVESTRAT = true; //save strategy file when saving xml
 const int64 DO_BOUNDS_EVERY = MILLION*MILLION; //in addition to whenever the thing is saved
-const int64 STOPAFTER = MILLION*MILLION;  //stop after (at least) this amount of iterations
+const int64 STOPAFTER = 1*MILLION;  //stop after (at least) this amount of iterations
 
 //solver settings
-#define FPWORKING_T __float128
-#define FPSTORE_T __float128
-#define STORE_DENOM 0
+#define FPSTORE_T double
+#define FPWORKING_T long double
+#define STORE_DENOM 1
 #define NUM_THREADS 1
+#define USE_HISTORY 1 //affects threading method
+const int N_LOOKAHEAD = 4; //affects threading performance
 const bool SEED_RAND = true;
-const int  SEED_WITH = 42;
+const int  SEED_WITH = 17429085;
+const bool THREADLOOPTRACE = false; //prints out debugging
 
 //bin settings
+#if USE_HISTORY // this for my new binning method with history
+#define TEMP 8
+#define PFBIN TEMP
+#define FBIN TEMP
+#define TBIN TEMP
+#define RBIN TEMP
+const int PFLOP_CARDSI_MAX = PFBIN; // used by threading method. 
 const cardsettings_t CARDSETTINGS =
 {
-#if 0 // this for my new binning method with history
-#define PFBIN 8
-#define FBIN 8
-#define TBIN 8
-#define RBIN 8
 
 	{ PFBIN, FBIN, TBIN, RBIN },
 	{
@@ -51,11 +59,15 @@ const cardsettings_t CARDSETTINGS =
 	},
 	true, //use history
 	false //use flopalyzer
+};
 
+#undef TEMP
 #else // this one is my old binning method, with no history
 #define FBIN 256
 #define TBIN 90
 #define RBIN 90
+const cardsettings_t CARDSETTINGS =
+{
 
 	{ INDEX2_MAX, FBIN, TBIN, RBIN },
 	{
@@ -72,17 +84,16 @@ const cardsettings_t CARDSETTINGS =
 	},
 	false, //use history
 	false //use flopalyzer
-
-#endif 
 };
+#endif 
 
 
 //tree settings
-#define SB 3
-#define BB 6
-#define SS 40
-#define PUSHFOLD 1
-#define LIMIT 0
+#define SB 1
+#define BB 2
+#define SS 200
+#define PUSHFOLD 0
+#define LIMIT 1
 const treesettings_t TREESETTINGS = 
 {
 #if !LIMIT

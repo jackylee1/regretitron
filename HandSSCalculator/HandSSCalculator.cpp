@@ -5,9 +5,12 @@
 #include <string>
 #include "../utility.h"
 #include "../PokerLibrary/floaterfile.h"
+#include <cmath>
 using namespace std;
 
 const string BINSFOLDER = ""; //current directory
+const floater EPSILON = 1e-12;
+const bool RIVERBUNCHHISTBINS = false;
 
 
 //------------- R i v e r   E V -------------------
@@ -270,23 +273,40 @@ void savepreflopHSS()
 
 //-------------- B i n s   C a l c u l a t i o n ---------------
 
-struct handvalue
+inline bool fpcompare(floater x, floater y)
 {
-	handvalue() : index(-1), weight(0), bin(-1), hss(-1) {}
-	handvalue(int64 myindex, floater myhss) : index(myindex), weight(1), bin(-1), hss(myhss) {}
+	//must only distinguish rounding error
+	//things separate by only this amount will be guaranteed to bin together. 
+	//this is important when a single hand has two indices and then two hss 
+	//values due to rounding error.
+	// bug = one hand, gets two indices (imperfect index function), those
+	// two indices get separate HSS values (fp rounding error), allowing 
+	// those two indices to not be recognized as teh same HSS, and then
+	// they HAPPEN to fall on the edge of a bin, and go into different bins.
+	//that is the bug
+	return std::abs(x - y) <= EPSILON * std::abs(x);
+}
+
+struct RawHand
+{
+	RawHand() : index(-1), hss(-1) { }
+	RawHand(int64 myindex, floater myhss) : index(myindex), hss(myhss) { }
 	int64 index;
-	short weight;
-	short bin;
 	floater hss;
 };
 
-inline bool operator < (const handvalue & a, const handvalue & b) 
+inline bool operator < (const RawHand & a, const RawHand & b) 
 { 
-	if(a.weight == 0) //this puts zero-weight items at END
-		return false;
-	else if (b.weight == 0)
-		return true;
+	if(a.index < 0 || b.index < 0)
+	{
+		REPORT("invalid index found in sort!");
+		exit(-1);
+	}
 	else if(a.hss != b.hss)
+		//can't use fpcompare, because then get weird issue with a == b and b == c
+		// but a < c, and it messes up sort sometimes. exact compare is fine, as
+		// long as the HSS's that *should* be the same are very close, and they 
+		// definitely will be.
 		return a.hss < b.hss; 
 	//turns out different indices can have the same hss value.
 	//in that odd case, order by indices, so that compressbins works.
@@ -296,50 +316,60 @@ inline bool operator < (const handvalue & a, const handvalue & b)
 		return a.index < b.index;
 }
 
-
-//takes a reference to vector of handvalue structs.
-//it updates, in place, the array so that hands with the same index are grouped
-//together with a higher weight. the input array should all have weight==1.
-//we assume, that since the hands have been sorted by HSS, and since hands with
-//the same index represent identical hands, that all hands with the same index
-//will be adjacent to each other in the array already.
-//used only once, and called only once, by calculatebins() below.
-int64 compressbins(vector<handvalue> &myhands)
+struct IndexNode
 {
-	uint64 i, j=0;
-	int64 total_hands = 0;
+	IndexNode(int64 myindex) : index(myindex), next(NULL) { }
+	int64 index;
+	IndexNode* next;
+};
 
+struct CompressedHand
+{
+	CompressedHand() : index(-1), nextindex(NULL), weight(0), bin(-1) { }
+	int64 index;
+	IndexNode * nextindex;
+	int weight;
+	int bin;
+};
+
+//totalhands is the length of the hand_list array
+int64 compressbins(const vector<RawHand> &hand_list, vector<CompressedHand> &hand_list_compressed, int64 totalhands, bool bunchsimilarhands)
+{
 	//prime the loop
 
-	int currentweight=myhands[0].weight; //should be 1
-	int64 currentindex=myhands[0].index;
-	
-	for(i=1; i<myhands.size() && myhands[i].weight; i++) //once we get to zero weights we're done
+	int64 currentindex = hand_list_compressed[0].index = hand_list[0].index;
+	hand_list_compressed[0].weight = 1;
+	IndexNode ** p_current_next_pointer = &(hand_list_compressed[0].nextindex); //whoa
+
+	int64 i=1, j=0;
+	for(; i<totalhands; i++)
 	{
-		if(myhands[i].index == currentindex)
-			currentweight++;
-		else //we've found a new index, save it to j++, and update the current weight/index
+		if(hand_list[i].index == currentindex) //hss equal, same index
 		{
-			myhands[j] = myhands[i-1]; //we are updating the array in place. at end will kill the rest
-			total_hands += myhands[j++].weight = currentweight;
-			currentweight = 1;
-			currentindex = myhands[i].index;
+			if(hand_list[i].hss != hand_list[i-1].hss) //hss differ, same index
+				REPORT("same index => different hss!");
+			hand_list_compressed[j].weight++;
+		}
+		else if(bunchsimilarhands && fpcompare(hand_list[i].hss, hand_list[i-1].hss)) //hss equal, and indices differ
+		{
+			hand_list_compressed[j].weight++;
+			(*p_current_next_pointer) = new IndexNode(hand_list[i].index);
+			p_current_next_pointer = &((*p_current_next_pointer)->next);
+			currentindex = hand_list[i].index;
+		}
+		else //index differs, and either we're not bunching similar hands, or the hss also differs
+		{
+			j++;
+			hand_list_compressed[j].index = currentindex = hand_list[i].index;
+			hand_list_compressed[j].weight = 1;
+			p_current_next_pointer = &(hand_list_compressed[j].nextindex);
 		}
 	}
+
 	//we've ended the loop with:
 	//  i pointing to the first invalid one
-	//  i-1 pointing to the last valid one
-	//  j pointing to the next open spot
-	//...and we have saved all of them but the group (one or more hands) that ends at i-1.
-	//we counted the one currently at i-1 when it was at i, but we have not saved it.
-	myhands[j] = myhands[i-1];
-	total_hands += myhands[j++].weight = currentweight;
-
-	//now kill the rest of them
-	for(; j<myhands.size(); j++)
-		myhands[j].weight = 0;
-
-	return total_hands;
+	//  j pointing to the last open spot
+	return j+1; //return length of hand_list_compressed array
 }
 
 
@@ -352,27 +382,33 @@ int64 compressbins(vector<handvalue> &myhands)
 //assign each unique hand a sigle bin number, and not use the higher bin numbers.
 //if i ever use very high n_bins, i will need to space them out to use all bin numbers
 //used only once, and called only once, by calculatebins() below.
-void determinebins(vector<handvalue> &myhands, const int n_bins, const int64 total_hands)
+void determinebins(vector<CompressedHand> &myhands, const int n_bins, const int64 total_hands, const int64 compressed_size)
 {
 	const bool print = false;
+	bool chunky = false;
+	float expected = (float)total_hands/n_bins; //expected bins per hand
+	float tolerance = 1.05f;
+	ostringstream status;
 	int currentbin=0;
 	int currentbinsize=0;
 	int64 n_hands_left = total_hands;
 
-	if(print)
-		cout << " binning " << total_hands << " into " << n_bins << " bins. expect " <<
-			(float)total_hands/n_bins << " hands per bin." << endl;
+	status << " binning " << total_hands << " hands (" << compressed_size
+	   << " compressed) into " << n_bins << " bins. expect " << expected << " hands per bin "
+	   << "(tolerance = " << tolerance << ")..." << endl;
 
-	for(uint64 i=0; i<myhands.size() && myhands[i].weight; i++) //done once hit zero-weight
+	for(int64 i=0; i<compressed_size; i++)
 	{
 		//increment bins if needed
 
 		if(currentbinsize + myhands[i].weight/2 > n_hands_left/(n_bins-currentbin) && currentbinsize > 0)
 		{
-			//done with this bin; goto next bin
-			if(print)
-				cout << "  bin " << currentbin << " has " << currentbinsize << " hands (" <<
-					100.0*currentbinsize*n_bins/total_hands << "% of expected)" << endl;
+			//done with this bin; go to next bin
+			status << "  bin " << currentbin << " has " << currentbinsize << " hands (" <<
+				100.0*currentbinsize/expected << "% of expected)" << endl;
+
+			if(currentbinsize > expected * tolerance || currentbinsize < expected / tolerance)
+				chunky = true;
 
 			n_hands_left -= currentbinsize;
 			currentbin++;
@@ -387,28 +423,95 @@ void determinebins(vector<handvalue> &myhands, const int n_bins, const int64 tot
 		currentbinsize +=myhands[i].weight;
 	}
 
+	status << "  bin " << currentbin << " has " << currentbinsize << " hands (" <<
+		100.0*currentbinsize/expected << "% of expected)";
+
 	if(currentbinsize != n_hands_left) //this would just be a bug
 		REPORT("Did not bin the right amount of hands!");
 	if(currentbin != n_bins-1) //as mentioned in comments, this is possible
-		REPORT(tostring(n_bins)+" is too many bins; we used "+tostring(currentbin+1)+". Could not find enough hands to fill them.");
+		REPORT("\n"+tostring(n_bins)+" is too many bins; we used "+tostring(currentbin+1)+". Could not find enough hands to fill them. "
+				+"We were binning "+tostring(total_hands)+" hands. ("+tostring(compressed_size)+" compressed).",WARN);
+	if(chunky)
+		REPORT("\nThis binning process has produced chunky bins, report follows:\n"+status.str(),WARN);
+	if(print)
+		cout << endl << status.str() << flush;
 }
 
-inline void binandstore(vector<handvalue> &hand_list, PackedBinFile &binfile, int n_bins)
+inline void store(PackedBinFile &binfile, int64 myindex, int newbinvalue)
+{
+	const int mult = binfile.isstored(myindex);
+	if(mult == 0)
+		binfile.store(myindex, newbinvalue);
+	else //weighted running average
+		binfile.store(myindex, (int)(((float)(newbinvalue + mult*binfile.retrieve(myindex)) / (mult + 1)) + 0.5));
+}
+
+inline void binandstore(vector<RawHand> &hand_list, PackedBinFile &binfile, int n_bins, int64 total_hands, bool bunchsimilarhands = true)
 {
 	//hand_list will be larger than it needs to be and any unused slots will have
 	//weight zero. we need sort to sort these to the END.
-	sort(hand_list.begin(), hand_list.end()); //large-hss now towards END OF ARRAY
-	int64 total_hands = compressbins(hand_list);
-	determinebins(hand_list, n_bins, total_hands);
 
-	for(uint64 i=0; i<hand_list.size() && hand_list[i].weight; i++)
+	sort(hand_list.begin(), hand_list.begin()+total_hands); //large-hss now towards END OF ARRAY
+
+	//compress the hands, getting the new size
+
+	static vector<CompressedHand> hand_list_compressed(0); //massive hack so we don't reallocate all the time
+	if((int64)hand_list_compressed.size() < total_hands/8) hand_list_compressed.resize(total_hands/7);
+	int64 compressed_size = compressbins(hand_list, hand_list_compressed, total_hands, bunchsimilarhands);
+	if(compressed_size > (int64)hand_list_compressed.size())
+		REPORT("overflowed hand_list_compressed - "+tostring(total_hands)+" "+tostring(compressed_size));
+
+	//do the binning
+
+	determinebins(hand_list_compressed, n_bins, total_hands, compressed_size);
+
+	//logging
+
+	if(false) //logging
 	{
-		const int64 &myindex = hand_list[i].index;
-		const int mult = binfile.isstored(myindex);
-		if(mult == 0)
-			binfile.store(myindex, hand_list[i].bin);
-		else //weighted running average
-			binfile.store(myindex, (int)(((float)(hand_list[i].bin + mult*binfile.retrieve(myindex)) / (mult + 1)) + 0.5));
+		ofstream log("binlog.txt");
+		log << "Raw Hand List:" << endl;
+		log << setw(10) << right << "i" << ":  " << setw(13) << right << "index2xx" << "   " << "hss" << endl;
+		log << setw(10) << right << 0 << ":  " << setw(13) << right << hand_list[0].index 
+			<< "   " << setprecision(20) << hand_list[0].hss << endl;
+		for(int64 i=1; i<total_hands; i++)
+		{
+			if(!fpcompare(hand_list[i].hss, hand_list[i-1].hss))
+				log << "\nFPCOMPARE BREAK\n\n";
+			else if(hand_list[i].hss != hand_list[i-1].hss)
+				log << "\nSTRICT COMPARE BREAK\n\n";
+
+			log << setw(10) << right << i << ":  " << setw(13) << right << hand_list[i].index 
+				<< "   " << setprecision(20) << hand_list[i].hss << '\n';
+		}
+
+		log << endl << endl << "Compressed Hand List:" << endl;
+		log << setw(5) << right << "i" << ":  " << setw(13) << right << "1st-index" 
+			<< "   " << setw(13) << right << "weight"
+		 	<< "   " << "bin#\n";
+		for(int64 i=0; i<compressed_size; i++)
+		{
+			log << setw(5) << right << i << ":  " << setw(13) << right << hand_list_compressed[i].index
+				<< "   " << setw(13) << right << hand_list_compressed[i].weight
+				<< "   " << hand_list_compressed[i].bin << '\n';
+		}
+		log.close();
+	}
+
+	//store the bins to the packed bin file, and delete the IndexNode's
+	
+	for(int64 i=0; i<compressed_size; i++)
+	{
+		store(binfile, hand_list_compressed[i].index, hand_list_compressed[i].bin);
+		IndexNode * nextindex = hand_list_compressed[i].nextindex;
+		hand_list_compressed[i].nextindex = NULL;
+		while(nextindex != NULL)
+		{
+			store(binfile, nextindex->index, hand_list_compressed[i].bin);
+			IndexNode * temp = nextindex->next;
+			delete nextindex;
+			nextindex = temp;
+		}
 	}
 }
 
@@ -419,10 +522,10 @@ inline void binandstore(vector<handvalue> &hand_list, PackedBinFile &binfile, in
 //by the getindex2N() function and should be INDEX2N_MAX long.
 //it assumes bintable is initialized to a negative number for error checking.
 //
-//it creates an array of "handvalue" structs, and initializes it to the 
+//it creates an array of "RawHand" structs, and initializes it to the 
 //(52-numboardcards choose 2) possible hands. it sets the hand+board index,
-//the weight to 1, and the HSS value - all values in the "handvalue" struct.
-//it then sorts the array of "handvalue"'s by HSS using overloaded < operator 
+//the weight to 1, and the HSS value - all values in the "RawHand" struct.
+//it then sorts the array of "RawHand"'s by HSS using overloaded < operator 
 //above. it then calls compressbins, which combines hands with the same index 
 //(because they only differ by suit rotation - note this varies by the the number 
 //of suits on a particular board), and then calls determinebins, which tries 
@@ -436,7 +539,7 @@ void calculatebins(const int numboardcards, const int n_bins, const FloaterFile 
 	const unsigned int n_hands = (52-numboardcards)*(51-numboardcards)/2;
 	CardMask b,m;
 
-	vector<handvalue> myhands(n_hands);
+	vector<RawHand> myhands(n_hands);
 
 	ENUMERATE_N_CARDS(b, numboardcards, //works for numboardcards = 0 !
 	{
@@ -445,14 +548,14 @@ void calculatebins(const int numboardcards, const int n_bins, const FloaterFile 
 		ENUMERATE_2_CARDS_D(m, b, 
 		{
 			int64 index = getindex2N(m,b,numboardcards); //works for numboardcards = 0 now.
-			myhands[i++] = handvalue(index, hsstable[index]); //pushes it back with weight=1, bin=-1
+			myhands[i++] = RawHand(index, hsstable[index]); //pushes it back with weight=1, bin=-1
 		});
 
 		if(i != n_hands) REPORT("failure to enumerate correctly");
 
 		//now i have an array of hands, with hss. need to sort, compress and bin
 
-		binandstore(myhands, binfile, n_bins);
+		binandstore(myhands, binfile, n_bins, n_hands);
 	});
 }
 
@@ -517,10 +620,11 @@ void doflophistorybins(int n_pflop, int n_flop)
 	PackedBinFile binfile(n_flop, INDEX23_MAX);
 
 	const float expected = 25989600.0f/n_pflop; //52C2 * 50C3 = 25989600
-	vector<handvalue> hand_list((int64)(1.11f*expected)); 
+	vector<RawHand> hand_list((int64)(1.11f*expected)); 
 
 	//iterate through the bins and associated hands and do bins
 	int64 x=0;
+	//floater previous=0;
 	for(int mypflopbin=0; mypflopbin<n_pflop; mypflopbin++)
 	{
 		uint64 i=0;
@@ -536,7 +640,21 @@ void doflophistorybins(int n_pflop, int n_flop)
 			ENUMERATE_3_CARDS_D(cards_flop, cards_pflop, 
 			{
 				int64 index = getindex23(cards_pflop, cards_flop);
-				hand_list[i++] = handvalue(index, flophss[index]);
+				/*
+				if(index==1209947)
+				{
+					cout << endl << "saw index23 " << index << ", "
+					<< "(" << tostring(cards_pflop) << " : " << tostring(cards_flop) << ")"
+					<< "  index2: " << getindex2(cards_pflop)
+					<< "  index23: " << getindex23(cards_pflop, cards_flop)
+					<< "  pflopbin: " << pflopbins.retrieve(getindex2(cards_pflop))
+					<< "  hss: " << flophss[index];
+					if(!fpcompare(flophss[index], previous))
+						cout << ", NOT EQUAL";
+					previous = flophss[index];
+				}
+				*/
+				hand_list[i++] = RawHand(index, flophss[index]);
 			});
 		});
 
@@ -546,10 +664,7 @@ void doflophistorybins(int n_pflop, int n_flop)
 		if(i-1>=hand_list.size())
 			REPORT("...and that overflowed hand_list. make fewer bins for less granularity or make hand_list bigger.");
 
-		for(; i<hand_list.size(); i++)
-			hand_list[i].weight = 0;
-
-		binandstore(hand_list, binfile, n_flop);
+		binandstore(hand_list, binfile, n_flop, i);
 	}
 
 	cout << endl;
@@ -567,7 +682,7 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 	PackedBinFile binfile(n_turn, INDEX231_MAX);
 
 	const float expected = 1221511200.0f/n_pflop/n_flop;
-	vector<handvalue> hand_list((int64)(1.11f*expected));
+	vector<RawHand> hand_list((int64)(1.11f*expected));
 
 	//build hand lists and bin
 	int64 x=0;
@@ -598,7 +713,7 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 						CardMask_OR(board, cards_flop, card_turn);
 						int64 index = getindex231(cards_pflop, cards_flop, card_turn);
 						/*
-						if(index==46834397)
+						if(index==49062272)
 						{
 							cout << endl << "saw index231 " << index << ", "
 								<< "(" << tostring(cards_pflop) << " : " << tostring(cards_flop) << " : " << tostring(card_turn) << ")"
@@ -609,7 +724,7 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 								<< "  flopbin: " << flopbins.retrieve(getindex23(cards_pflop, cards_flop));
 						}
 						*/
-						hand_list[i++] = handvalue(index, turnhss[getindex2N(cards_pflop, board, 4)]);
+						hand_list[i++] = RawHand(index, turnhss[getindex2N(cards_pflop, board, 4)]);
 					});
 				});
 			});
@@ -621,10 +736,7 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 			if(i-1>=hand_list.size())
 				REPORT("...and that overflowed hand_list. make fewer bins for less granularity or make hand_list bigger.");
 
-			for(; i<hand_list.size(); i++)
-				hand_list[i].weight = 0;
-
-			binandstore(hand_list, binfile, n_turn);
+			binandstore(hand_list, binfile, n_turn, i);
 		}
 	}
 	
@@ -644,7 +756,7 @@ void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
 	PackedBinFile binfile(n_river, INDEX2311_MAX);
 
 	const float expected = 56189515200.0f/n_pflop/n_flop/n_turn;
-	vector<handvalue> hand_list((int64)(1.11f*expected));
+	vector<RawHand> hand_list((int64)(1.11f*expected));
 
 	//build hand lists and bin
 	int64 x=0;
@@ -684,7 +796,7 @@ void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
 								CardMask_OR(board, cards_flop, card_turn);
 								CardMask_OR(board, board, card_river);
 								int64 index = getindex2311(cards_pflop, cards_flop, card_turn, card_river);
-								hand_list[i++] = handvalue(index, riverev[getindex2N(cards_pflop, board, 5)]);
+								hand_list[i++] = RawHand(index, riverev[getindex2N(cards_pflop, board, 5)]);
 							});
 						});
 					});
@@ -697,10 +809,7 @@ void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
 				if(i-1>=hand_list.size())
 					REPORT("...and that overflowed hand_list. make fewer bins for less granularity or make hand_list bigger.");
 
-				for(; i<hand_list.size(); i++)
-					hand_list[i].weight = 0;
-
-				binandstore(hand_list, binfile, n_river);
+				binandstore(hand_list, binfile, n_river, i, RIVERBUNCHHISTBINS); //true = DO bunch similar hands!
 			}
 		}
 	}
@@ -757,9 +866,13 @@ int main(int argc, char *argv[])
 {
 	checkdataformat();
 
-	if((argc>=2) && (strcmp("histbin", argv[1]) == 0 || strcmp("oldbins", argv[1]) == 0))
+	if((argc>=2) && (strcmp("histbin", argv[1]) == 0 || strcmp("oldbins", argv[1]) == 0 || strcmp("ramtest", argv[1])==0))
 	{
 		cout << "Current data type: Using " << FloaterFile::gettypename() << endl;
+		cout << "fpcompare uses " << EPSILON << "." << endl;
+		cout << "river bunches hands by HSS using fpcompare? " 
+			<< (RIVERBUNCHHISTBINS ? "Yes." : "No.") << endl;
+		cout << "(everything bunches hands by HSS using fpcompare, with possible exception of river.)" << endl;
 		cout << endl;
 	}
 
@@ -843,9 +956,50 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	//ram test
+	else if(argc == 3 && strcmp("ramtest", argv[1])==0)
+	{
+		int n_pflop, n_flop, n_turn, n_river;
+		n_pflop = n_flop = n_turn = n_river = atoi(argv[2]);
+		int64 temp, total=0;
+
+		total += temp = 8*PackedBinFile::numwordsneeded(n_pflop, INDEX2_MAX);
+		cout << "Preflop bins take " << space(temp) << endl;
+
+		total += temp = 8*PackedBinFile::numwordsneeded(n_flop, INDEX23_MAX);
+		cout << "Flop bins take " << space(temp) << endl;
+
+		total += temp = 8*PackedBinFile::numwordsneeded(n_turn, INDEX231_MAX);
+		cout << "Turn bins take " << space(temp) << endl;
+
+		total += temp = 8*PackedBinFile::numwordsneeded(n_river, INDEX2311_MAX);
+		cout << "River bins take " << space(temp) << endl;
+
+		total += temp = INDEX2311_MAX * sizeof(unsigned char);
+		cout << "Counter for river bin file takes " << space(temp) << endl;
+
+		total += temp = sizeof(floater)*INDEX25_MAX; //riverEV
+		cout << "RiverEV takes " << space(temp) << endl;
+
+		int64 rawhandlength = 1.11f*56189515200.0f/n_pflop/n_flop/n_turn;
+		total += temp = sizeof(RawHand)*rawhandlength;
+		cout << "RawHand(" << space(sizeof(RawHand)) << ") list takes " << space(temp) << endl;
+
+		total += temp = sizeof(CompressedHand)*(rawhandlength/1.11f/7);
+		cout << "CompressedHands(" << space(sizeof(CompressedHand)) << ") takes " << space(temp) << endl;
+
+		total += temp = sizeof(IndexNode)*(INDEX2311_MAX/n_pflop/n_flop/n_turn-500);
+		cout << "IndexNodes(" << space(sizeof(IndexNode)) << ") takes around " << space(temp) << endl;
+
+		cout << endl;
+		cout << "Total: " << space(total) << endl;
+	}
+	
+
 	//usage
 	else
 	{
+		cout << "RAM usage of n-n-n-n river histbins: " << argv[0] << " ramtest n_bins" << endl;
 		cout << "Create history bins:           " << argv[0] << " histbin n_pflop n_flop n_turn n_river" << endl;
 		cout << "Create history bins:           " << argv[0] << " histbin n_pflop n_flop-turn-river" << endl;
 		cout << "Create history bins:           " << argv[0] << " histbin n_bins" << endl;

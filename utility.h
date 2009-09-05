@@ -6,6 +6,17 @@
 #include <vector>
 #include <poker_defs.h>
 
+// how to get a 64 bit integer type
+
+#ifdef _MSC_VER
+typedef __int64 int64;
+typedef unsigned __int64 uint64;
+#elif __GNUC__ 
+#include <stdint.h>
+typedef int64_t int64;
+typedef uint64_t uint64;
+#endif
+
 //functions defined in the cpp file
 
 extern double getdoubletime(); //returns time since some (any) refence in seconds
@@ -17,6 +28,10 @@ extern std::string tostring(const T &myobj);
 extern std::string tostring(CardMask cards);
 extern std::string tostring(const std::vector<CardMask> &cards);
 extern std::string gameroundstring(int gr);
+extern void setdirectory(std::string directory);
+extern std::string getdirectory();
+extern std::string space(int64 bytes);
+extern bool file_exists(std::string filename);
 
 //how to get strings of things!
 
@@ -48,17 +63,6 @@ inline void PAUSE() { system("PAUSE"); }
 #elif __GNUC__
 #include <iostream>
 inline void PAUSE() { std::cout << "Press [enter] to continue . . ."; getchar(); }
-#endif
-
-// how to get a 64 bit integer type
-
-#ifdef _MSC_VER
-typedef __int64 int64;
-typedef unsigned __int64 uint64;
-#elif __GNUC__ 
-#include <stdint.h>
-typedef int64_t int64;
-typedef uint64_t uint64;
 #endif
 
 // how to convert a std::string to a CString

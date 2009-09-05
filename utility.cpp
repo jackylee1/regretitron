@@ -1,6 +1,10 @@
 #include "stdafx.h"
 #include "utility.h"
 #include "PokerLibrary/constants.h"
+#include <sstream>
+#include <iomanip>
+#include "MersenneTwister.h"
+#include <fstream>
 using namespace std;
 
 // how to get seconds with milliseconds
@@ -43,12 +47,26 @@ inline void notify(string text) { cout << text << endl; }
 
 #ifdef __GNUC__
 #include <stdlib.h> //needed for exit
+#include <execinfo.h> //needed for backtraces
 #endif
+
+inline string getbacktracestring()
+{
+	const int maxtraces = 200;
+	void * backtraces[maxtraces];
+	const size_t numtraces = backtrace(backtraces, maxtraces);
+	char ** strings = backtrace_symbols(backtraces, numtraces);
+	string ret = "Backtrace Follows:\n";
+	for(unsigned i=0; i<numtraces; i++)
+		ret += string(strings[i]) + "\n";
+	return ret;
+}
+
 void REPORT(string infomsg, report_t killswitch)
 {
 	switch(killswitch)
 	{
-	case KILL: infomsg.insert(0, "Error: "); break;
+	case KILL: infomsg = "Error: " + infomsg + "\n" + getbacktracestring(); break;
 	case WARN: infomsg.insert(0, "Warning: "); break;
 	case INFO: infomsg.insert(0, "It turns out: "); break;
 	}
@@ -58,9 +76,7 @@ void REPORT(string infomsg, report_t killswitch)
 	if(killswitch == KILL)
 	{
 		dobreakpoint();
-#ifndef __GNUC__
 		exit(-1);
-#endif
 	}
 }
 
@@ -97,10 +113,61 @@ string gameroundstring(int gr)
 	return "BAD GR";
 }
 
-// perform the magic numbers test, validates data integrity on multiple systems
+// how to get and set the current working directory.
 
-#include "MersenneTwister.h"
-#include <fstream>
+#ifndef _WIN32
+#include <unistd.h> //has chdir
+#endif
+void setdirectory(string directory)
+{
+#ifdef _WIN32
+	if(SetCurrentDirectory(directory.c_str()) == FALSE)
+#else
+	if(chdir(directory.c_str()) != 0)
+#endif
+		REPORT("Error changing directory");
+}
+
+string getdirectory()
+{
+	const int BUFSIZE = 512;
+	char buf[BUFSIZE];
+#ifdef _WIN32
+	if(GetCurrentDirectory(BUFSIZE, buf) == 0)
+#else
+	if(getcwd(buf, BUFSIZE) == NULL)
+#endif
+		REPORT("Error getting current directory");
+	return string(buf);
+}
+
+//how to print out pretty formatted bytes
+
+string space(int64 bytes)
+{
+	ostringstream o;
+	if(bytes < 1024)
+		o << bytes << " bytes";
+	else if(bytes < 1024*1024)
+		o << fixed << setprecision(1) << (double)bytes / 1024 << "KB";
+	else if(bytes < 1024*1024*1024)
+		o << fixed << setprecision(1) << (double)bytes / (1024*1024) << "MB";
+	else if(bytes < 1024LL*1024LL*1024LL*1024LL)
+		o << fixed << setprecision(1) << (double)bytes / (1024*1024*1024) << "GB";
+	else
+		o << "DAYM that's a lotta memory!";
+	return o.str();
+}
+
+//how to check if a file exists
+
+bool file_exists(string filename)
+{
+	ifstream test(filename.c_str());
+	return test.good() && test.is_open();
+}
+
+// perform the magic numbers test, validates data integrity on multiple systems
 
 template <typename T> //only used below
 inline void testdata(ifstream &file, T correct1, T correct2)

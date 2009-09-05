@@ -1,11 +1,11 @@
 CPP := g++# for C++ code
 CC := gcc# for C code
 # compiler flags:
-CFLAGS := -Wall -DTIXML_USE_STL
+CFLAGS := -Wall -DTIXML_USE_STL -march=native
 # linker flags:
 # define library paths in addition to /usr/lib with -L
 # define any libraries to link into executable with -l
-LFLAGS := -lpthread
+LFLAGS := -lpthread -lqd -rdynamic -march=native -lrt -lm
 
 ifeq ($(PEDANTIC),y)
    CPP += -ansi -pedantic -Wextra -Wno-long-long
@@ -28,13 +28,13 @@ ifeq ($(DEBUG),y)
    CFGDIR := debug
 else 
 ifeq ($(PROFILE),y)
-   CFLAGS += -O3 -pg
+   CFLAGS += -O3 -pg -ggdb
    LFLAGS += -pg
    MYOUT1 := $(OUT1P)
    MYOUT2 := $(OUT2P)
    CFGDIR := profile
 else
-   CFLAGS += -O3
+   CFLAGS += -O3 -ggdb
    MYOUT1 := $(OUT1)
    MYOUT2 := $(OUT2)
    CFGDIR := release

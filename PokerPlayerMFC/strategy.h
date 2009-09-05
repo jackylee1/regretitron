@@ -18,7 +18,7 @@ class Strategy
 {
 public:
 	//constructor reads xml
-	Strategy(string xmlfilename);
+	Strategy(string xmlfilename, bool preload);
 	~Strategy();
 
 	//access to filename of this bot

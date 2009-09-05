@@ -25,7 +25,7 @@ class DiagnosticsPage; //forward declaration
 class BotAPI
 {
 public:
-	BotAPI(string xmlfile);
+	BotAPI(string xmlfile, bool preload = false);
 	~BotAPI();
 
 	//control game progress

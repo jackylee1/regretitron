@@ -13,7 +13,13 @@
 #include <numeric> //accumulate
 #include <algorithm> //sort
 #include <iomanip>
+#include <list>
 using namespace std;
+
+const double LOAD_LIMIT = 35; //load average number
+const int LOAD_TO_USE = 2; //1, 2, or 3, for 1 min, 5 min, or 15 min.
+const int SLEEP_ON_THREADSTART = 1; // in minutes
+const int SLEEP_ON_NOWORK = 1; // in minutes
 
 enum Result
 {
@@ -56,7 +62,7 @@ private:
 	double _stacksize;
 	double totalwinningsbot0; //this refers to the bot ORIGINALLY placed in slot 0. (swaps always done in pairs)
 	int64 totalpairsplayed;
-	MTRand mersenne; //used for card dealing
+	MTRand mersenne; //used for card dealing, default initialized...that uses clock and time
 };
 
 Playoff::Playoff(string file1, string file2)
@@ -64,8 +70,8 @@ Playoff::Playoff(string file1, string file2)
 	  totalwinningsbot0(0),
 	  totalpairsplayed(0)
 {
-	_bots[0] = new BotAPI(file1);
-	_bots[1] = new BotAPI(file2);
+	_bots[0] = new BotAPI(file1, true);
+	_bots[1] = new BotAPI(file2, true);
 	if(_bots[0]->islimit() != _bots[1]->islimit())
 		REPORT("You can't play a limit bot against a no-limit bot!");
 	double stacksize1 = _bots[0]->getstacksizemult();
@@ -239,30 +245,79 @@ string bot(int i)
 	return ret; 
 }
 
+struct ThreadData
+{
+	ThreadData(string f1, string f2, int i_, int j_) : file1(f1), file2(f2), i(i_), j(j_) {}
+	string file1, file2;
+	int i,j;
+
+	static int64 numgames;
+	static double interval;
+	static vector<vector<double> > results;
+	static pthread_mutex_t lock;
+
+	static void * threadfunction(void * param)
+	{
+		ThreadData* threader = (ThreadData*)param;
+		threader->dowork();
+		delete threader;
+		return NULL;
+	}
+
+	void dowork()
+	{
+		Playoff playoff(file1, file2);
+		playoff.playsomegames(numgames);
+		pthread_mutex_lock(&lock);
+		results[i][j] = playoff.getev(); //ev of file on LEFT, index on LEFT
+		results[j][i] = -playoff.getev();
+		interval = playoff.get95interval(); //same for all playoffs
+		pthread_mutex_unlock(&lock);
+	}
+};
+
+int64 ThreadData::numgames;
+double ThreadData::interval;
+vector<vector<double> > ThreadData::results;
+pthread_mutex_t ThreadData::lock = PTHREAD_MUTEX_INITIALIZER;
+
+double getloadavg()
+{
+	double loadavg[3];
+	if(getloadavg(loadavg, 3) < LOAD_TO_USE)
+		REPORT("load average getting has failed!");
+	return loadavg[LOAD_TO_USE-1]; //return #2 load average, takes 5 minutes to update
+}
+
 int main(int argc, char **argv)
 {
 
-	//two files supplied. play them against each other, repeatedly.
+	//two files supplied. play them against each other, repeatedly, unless number is given.
 
-	if(argc==4)
+	if(argc==3 || argc==4)
 	{
 		Playoff * myplayoff = new Playoff(argv[1], argv[2]);
-		while(1)
+		const int numgames = argc==4 ? atol(argv[3]) : 10000;
+playgames:
+		myplayoff->playsomegames(numgames); 
+		cout << "After " << myplayoff->gettotalpairsplayed() << " pairs of games, ";
+		double ev = myplayoff->getev();
+		double std = myplayoff->get95interval();
+		if(ev > 0)
+			cout << "file on left wins at: ";
+		else if(ev < 0)
 		{
-			myplayoff->playsomegames(atol(argv[3])); 
-			cout << "After " << myplayoff->gettotalpairsplayed() << " pairs of games, ";
-			double ev = myplayoff->getev();
-			double std = myplayoff->get95interval();
-			if(ev > 0)
-				cout << "file on left wins at: ";
-			else if(ev < 0)
-			{
-				cout << "file on right wins at: ";
-				ev = -ev;
-			}
-			else 
-				cout << "they are tied! at: ";
-			cout << ev << " +- " << std << endl;
+			cout << "file on right wins at: ";
+			ev = -ev;
+		}
+		else 
+			cout << "they are tied! at: ";
+		cout << ev << " +- " << std << "     " << endl;
+
+		if(argc == 3)
+		{
+			cout << "\033[1A"; //move cursor up one line
+			goto playgames; //infinite loop
 		}
 	}
 
@@ -271,41 +326,69 @@ int main(int argc, char **argv)
 
 	else if (argc > 4)
 	{
+		//init local variables
+
 		const int numfiles = argc - 2;
 		vector<string> myfiles;
 		myfiles.reserve(numfiles);
-		
-		//initialize islimit so we can error if they aren't all the same
+		for(int i=2; i<argc; i++) myfiles.push_back(argv[i]);
+		vector<vector<bool> > haveplayed(numfiles, vector<bool>(numfiles, false));
+		list<pthread_t *> mythreads;
 
-		bool islimit = BotAPI(argv[3]).islimit(); //creates temporary BotAPI object
+		//init ThreadData
 
-		//load up the files
+		ThreadData::numgames = atol(argv[1]);
+		ThreadData::results.assign(numfiles, vector<double>(numfiles, 0));
+		ThreadData::interval = 0;
 
-		for(int i=2; i<argc; i++)
+		//look for available work, if so start a thread, rest, and see if done.
+		//if not, rest longer.
+
+lookforwork:
+
+		if(getloadavg() < LOAD_LIMIT)
 		{
-			if(BotAPI(argv[i]).islimit() != islimit) //tests if file is okay, and checks limit.
-				REPORT("you entered both limit and no-limit bots!");
-			myfiles.push_back(argv[i]);
-		}
-
-		//play the games, get the results
-
-		const int64 numgames = atol(argv[1]);
-		double interval=0;
-		vector<vector<double> > results(numfiles, vector<double>(numfiles, 0));
-		for(int i=0; i<numfiles; i++)
-		{
-			for(int j=i+1; j<numfiles; j++)
+			for(int i=0; i<numfiles; i++)
 			{
-				cout << "playing " << myfiles[i] << " against " << myfiles[j] << "..." << endl;
-				Playoff playoff(myfiles[i], myfiles[j]);
-				playoff.playsomegames(numgames);
-				results[i][j] = playoff.getev(); //ev of file on LEFT, index on LEFT
-				results[j][i] = -playoff.getev();
-				interval = playoff.get95interval(); //same for all playoffs
+				for(int j=i+1; j<numfiles; j++)
+				{
+					if(haveplayed[i][j] == false && file_exists(myfiles[i]) && file_exists(myfiles[j]))
+					{
+						haveplayed[i][j] = true;
+						cerr << "playing " << myfiles[i] << " against " << myfiles[j] << "..." << endl;
+						//create a new ThreadData here. it will be deleted by ThreadData::threadfunction
+						//which is run by the thread. 
+						ThreadData * newthread = new ThreadData(myfiles[i], myfiles[j], i, j);
+						mythreads.push_back(new pthread_t);
+						//new therad, using the pthread object in the list, using the newthread ThreadData object above
+						if(pthread_create(mythreads.back(), NULL, ThreadData::threadfunction, newthread))
+							REPORT("error creating thread");
+						sleep(60*SLEEP_ON_THREADSTART); //takes that long for #2 load average to update
+						goto amidone;
+					}
+				}
 			}
 		}
-		cout << endl;
+		sleep(60*SLEEP_ON_NOWORK); //we could not find work to do
+
+		//check to see if we are done, if so, join threads, if not, look for work.
+
+amidone:
+		for(int i=0; i<numfiles; i++)
+			for(int j=i+1; j<numfiles; j++) // same loop bounds as are set to true above
+				if(haveplayed[i][j] == false)
+					goto lookforwork;
+
+		//all the work may not be done, but it has been started. wait for threads to finish
+
+		cerr << endl;
+		while(!mythreads.empty())
+		{
+			if(pthread_join(*mythreads.front(),NULL))
+				REPORT("error joining thread");
+			delete mythreads.front();
+			mythreads.pop_front();
+		}
 
 		//get average results
 
@@ -313,7 +396,7 @@ int main(int argc, char **argv)
 		vector<int> sorted(numfiles); //indexes into avgresult.vect
 		for(int i=0; i<numfiles; i++)
 		{
-			avgresult.vect[i] = accumulate(results[i].begin(), results[i].end(), 0.0) / numfiles;
+			avgresult.vect[i] = accumulate(ThreadData::results[i].begin(), ThreadData::results[i].end(), 0.0) / numfiles;
 			sorted[i] = i;
 		}
 
@@ -324,7 +407,8 @@ int main(int argc, char **argv)
 		//print info
 
 		cout << "units are milli-big-blinds/hand, with respect to the ROW bot " << endl;
-		cout << "and are good to plus/minus " << interval << " mb/hand (95% confidence)" << endl;
+		cout << "and are good to plus/minus " << ThreadData::interval << " mb/hand (95% confidence)" << endl;
+		cout << "(averages may be good to ~" << ThreadData::interval / sqrt(numfiles) << "mb/hand)" << endl;
 		cout << endl;
 
 		//print file labels
@@ -342,21 +426,26 @@ int main(int argc, char **argv)
 
 		//print rest of table body
 		
+		const int precision = (ThreadData::interval < 0.3 ? 3 : (ThreadData::interval < 3 ? 2 : 1));
+		const int precisionavg = (ThreadData::interval/sqrt(numfiles) < 0.3 ? 3 : (ThreadData::interval/sqrt(numfiles) < 3 ? 2 : 1));
+
 		for(int i=0; i<numfiles; i++)
 		{
 			cout << setw(8) << right << bot(i)+":  ";
 			for(int j=0; j<numfiles; j++)
 			{
-				cout << fixed << setprecision(1) << left << setw(8) << results[sorted[i]][sorted[j]];
+				cout << fixed << setprecision(precision) << left << setw(8) << ThreadData::results[sorted[i]][sorted[j]];
 			}
-			cout << fixed << setprecision(1) << avgresult.vect[sorted[i]] << endl;
+			cout << fixed << setprecision(precisionavg) << avgresult.vect[sorted[i]] << endl;
 		}
 
 	}
 	else
 	{
+		cout << "Usage: " << argv[0] << " xmlfile1 xmlfile2" << endl;
+		cout << "   prints constantly updating display of results to screen, sweet!" << endl;
 		cout << "Usage: " << argv[0] << " xmlfile1 xmlfile2 numgames" << endl;
-		cout << "   playes numgames and prints the results, over and over.." << endl;
+		cout << "   playes numgames and prints the results, done (appropriate for saving output to a file)" << endl;
 		cout << "Usage: " << argv[0] << " numgames xmlfile1 ... xmlfileN" << endl;
 		cout << "   builds a fuckin chart." << endl;
 	}

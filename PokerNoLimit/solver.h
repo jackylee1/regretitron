@@ -10,6 +10,8 @@
 #endif
 #include <string>
 using std::string;
+#include <list>
+using std::list;
 
 //each is a thread. static means shared among threads
 class Solver
@@ -21,6 +23,7 @@ public:
 	static double solve(int64 iter); //returns elapsed time taken for this run
 	static inline int64 gettotal() { return total; } //returns total iterations done so far
 	static void save(const string &filename, bool writedata); //saves result so far, including optionally whole strategy file
+	static fpworking_type getpfloppushprob(int pushfold_index);
 	
 private:
 	//we do not support copying.
@@ -38,6 +41,11 @@ private:
 	static string getstatus();
 	static void bounder(int gr, int pot, int beti);
 
+	struct iteration_data_t
+	{
+		int cardsi[4][2]; // 4 gamerounds, 2 players.
+		int twoprob0wins;
+	};
 	//this is the per thread data
 	int cardsi[4][2]; // 4 gamerounds, 2 players.
 	int twoprob0wins;
@@ -50,8 +58,14 @@ private:
 	static const BettingTree * tree;
 	static MemoryManager * memory;
 #ifdef DO_THREADS
-	static pthread_mutex_t * cardsilocks[4]; //one lock per player per gameround per cardsi
 	static pthread_mutex_t threaddatalock;
+#if USE_HISTORY
+	static list<iteration_data_t> dataqueue;
+	static bool datainuse[PFLOP_CARDSI_MAX*2];
+	static pthread_cond_t signaler;
+#else
+	static pthread_mutex_t * cardsilocks[4]; //one lock per player per gameround per cardsi
+#endif
 #endif
 	//any info I want to get out of (recursive function) bounder, has to be put here
 	//other alternative is global, or adding more parameters to bounder (both suck)

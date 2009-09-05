@@ -5,8 +5,6 @@
 #include "../utility.h"
 #include <iostream> //for allocate function
 #include <fstream> //for save function
-#include <sstream> //for space function
-#include <iomanip> //for space function
 #include <algorithm> //for max_element
 using namespace std;
 
@@ -14,9 +12,9 @@ template <int N>
 dataN_t<N>::dataN_t() //initialize all to zero
 {
 	for(int a=0; a<N; a++)
-		regret[a] = stratn[a] = 0;
+		regret[a] = stratn[a] = 0.0;
 #if STORE_DENOM
-	stratd = 0;
+	stratd = 0.0;
 #endif
 }
 
@@ -27,7 +25,7 @@ stratN_t<N>::stratN_t(const dataN_t<N> &data) : checksum(0)
 {
 	fpstore_type max_value = *max_element(data.stratn, data.stratn+N);
 
-	if(max_value==0) //algorithm never reached this node.
+	if(max_value==0.0) //algorithm never reached this node.
 		for(int a=0; a<N; a++)
 			checksum += weight[a]=1; //assigns equal probability weighting to each
 	else
@@ -76,24 +74,6 @@ stratN_t<N>::stratN_t(const dataN_t<N> &data) : checksum(0)
 		f.close();
 	}
 #endif
-}
-
-//pretty formatted bytes printing
-//used by below function
-string space(int64 bytes)
-{
-	ostringstream o;
-	if(bytes < 1024)
-		o << bytes << " bytes.";
-	else if(bytes < 1024*1024)
-		o << fixed << setprecision(1) << (double)bytes / 1024 << "KB";
-	else if(bytes < 1024*1024*1024)
-		o << fixed << setprecision(1) << (double)bytes / (1024*1024) << "MB";
-	else if(bytes < 1024LL*1024LL*1024LL*1024LL)
-		o << fixed << setprecision(1) << (double)bytes / (1024*1024*1024) << "GB";
-	else
-		o << "DAYM that's a lotta memory!";
-	return o.str();
 }
 	
 //cout how much memory will use, then allocate it

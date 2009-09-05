@@ -16,11 +16,11 @@ bool fpequal(double a, double b)
 	return isequal;
 }
 
-BotAPI::BotAPI(string xmlfile)
+BotAPI::BotAPI(string xmlfile, bool preload)
    : MyWindow(NULL),
      isdiagnosticson(false),
      actionchooser(), //seeds rand with time and clock
-     mystrats(1, new Strategy(xmlfile)), //initialize to one strat given by xmlfile
+     mystrats(1, new Strategy(xmlfile, preload)), //initialize to one strat given by xmlfile
 	 currstrat(NULL),
 	 actualinv(2, -1), //size is 2, initial values are -1
 	 perceivedinv(2, -1), //size is 2, initial values are -1

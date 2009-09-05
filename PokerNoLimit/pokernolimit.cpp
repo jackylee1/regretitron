@@ -52,6 +52,8 @@ void simulate(int64 iter)
 
 int main(int argc, char* argv[])
 {
+	fpu_fix_start(NULL);
+
 	Solver::initsolver();
 	cout << "starting work..." << endl;
 
@@ -66,7 +68,7 @@ int main(int argc, char* argv[])
 		//save the solution
 
 		if(Solver::gettotal() >= SAVEAFTER)
-			Solver::save(SAVENAME+"-"+iterstring(Solver::gettotal()), true); //true: save strat file
+			Solver::save(SAVENAME+"-"+iterstring(Solver::gettotal()), SAVESTRAT);
 
 		//stop if we've reached our iter goal
 
