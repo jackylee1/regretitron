@@ -2,7 +2,9 @@
 #include "../HandIndexingV1/getindex2N.h" //The feasibility of bin storage is based on this indexing.
 #include "../HandIndexingV1/constants.h"
 #include "../PokerLibrary/binstorage.h" //my standard routines to pack and un-pack data.
+#include "../MersenneTwister.h"
 #include <string>
+#include <iomanip>
 #include "../utility.h"
 #include "../PokerLibrary/floaterfile.h"
 #include <cmath>
@@ -861,6 +863,20 @@ void makehistbin(int pf, int ftr)
 #include <stdlib.h> //atol
 #include <string.h> //strcmp
 
+//utility function used by winrate due to horrible lack of multidimensional array capability.
+inline int oneindex(int a, int b, int c, int d, int e, int f, int g, int h, const int n_bins)
+{
+	return 
+		 a 
+		+b*n_bins
+		+c*n_bins*n_bins
+		+d*n_bins*n_bins*n_bins
+		+e*n_bins*n_bins*n_bins*n_bins
+		+f*n_bins*n_bins*n_bins*n_bins*n_bins
+		+g*n_bins*n_bins*n_bins*n_bins*n_bins*n_bins
+		+h*n_bins*n_bins*n_bins*n_bins*n_bins*n_bins*n_bins;
+}
+
 //where the magic happens
 int main(int argc, char *argv[])
 {
@@ -995,6 +1011,215 @@ int main(int argc, char *argv[])
 		cout << "Total: " << space(total) << endl;
 	}
 	
+	//winrate
+	else if(argc == 4 && strcmp("winrate", argv[1])==0)
+	{
+
+		//variables parsed from the command line
+
+		const int n_bins = atoi(argv[2]);
+		const int n_bins_tothe8 = n_bins*n_bins*n_bins*n_bins*n_bins*n_bins*n_bins*n_bins;
+		const int n_bins_tothe4 = n_bins*n_bins*n_bins*n_bins;
+		const int64 num_iter = (int64)atoi(argv[3])*n_bins_tothe8;
+
+		//variables used as the large count arrays
+
+		int64* totals = new int64[n_bins_tothe8];
+		int64* wins = new int64[n_bins_tothe8];
+		int64* buckettotals = new int64[n_bins_tothe4];
+		memset(totals, 0, n_bins_tothe8*sizeof(int64));
+		memset(wins, 0, n_bins_tothe8*sizeof(int64));
+		memset(buckettotals, 0, n_bins_tothe4*sizeof(int64));
+
+		//variables used to enumerate the cards and compare hands
+
+		CardMask m, h, f, t, r, d, mine, his;
+		HandVal r0, r1;
+		MTRand mersenne; //used for card dealing, default initialized...that uses clock and time
+	
+		//variables used (classes) that represent the bin (bucket) files.
+
+		const PackedBinFile binpf(BINSFOLDER+"preflop"+tostring(n_bins), -1, n_bins, INDEX2_MAX, true);
+		const PackedBinFile binf(BINSFOLDER+"flop"+tostring(n_bins)+'-'+tostring(n_bins), -1, n_bins, INDEX23_MAX, true);
+		const PackedBinFile bint(BINSFOLDER+"turn"+tostring(n_bins)+'-'+tostring(n_bins)+'-'+tostring(n_bins), -1, n_bins, INDEX231_MAX, true);
+		const PackedBinFile binr(BINSFOLDER+"river"+tostring(n_bins)+'-'+tostring(n_bins)+'-'+tostring(n_bins)+'-'+tostring(n_bins), -1, n_bins, INDEX2311_MAX, true);
+		
+
+		//initialization done, begin code
+
+		cout << "Starting to calculate winrate..." << endl;
+		double starttime = getdoubletime();
+
+		//outer loop: do num_iter iterations and write log, repeat.
+
+		for(int k=1;; k++)
+		{
+
+			//inner loop: do 1 iteration
+
+			for(int64 i=0; i<num_iter; i++)
+			{
+
+				//deal cards randomly
+
+				CardMask_RESET(d);
+				MONTECARLO_N_CARDS_D(m, d, 2, 1, );
+				MONTECARLO_N_CARDS_D(h, d, 2, 1, );
+				CardMask_OR(d,m,h);
+				MONTECARLO_N_CARDS_D(f, d, 3, 1, );
+				CardMask_OR(d,d,f);
+				MONTECARLO_N_CARDS_D(t, d, 1, 1, );
+				CardMask_OR(d,d,t);
+				MONTECARLO_N_CARDS_D(r, d, 1, 1, );
+
+				//evaluate the hands -- who won.
+
+				CardMask_OR(mine,m,f);
+				CardMask_OR(mine,mine,t);
+				CardMask_OR(mine,mine,r);
+				CardMask_OR(his,h,f);
+				CardMask_OR(his,his,t);
+				CardMask_OR(his,his,r);
+				r0 = Hand_EVAL_N(mine, 7);
+				r1 = Hand_EVAL_N(his, 7);
+
+				//retreive the index for this deal of cards and tally up totals and wins
+				
+				const int totalindex = oneindex(
+						binpf.retrieve(getindex2(h)),
+						binf.retrieve(getindex23(h,f)),
+						bint.retrieve(getindex231(h,f,t)),
+						binr.retrieve(getindex2311(h,f,t,r)),
+						binpf.retrieve(getindex2(m)),
+						binf.retrieve(getindex23(m,f)),
+						bint.retrieve(getindex231(m,f,t)),
+						binr.retrieve(getindex2311(m,f,t,r)),
+						n_bins);
+
+				if(r0 > r1) //I win
+					wins[totalindex]+=2;
+				else if (r0 == r1) //I tie
+					wins[totalindex]++;
+
+				totals[totalindex]++;
+				buckettotals[totalindex/n_bins_tothe4]++;
+
+				//end of 1 iteration
+			}
+
+			//write the status update to the screen and the logs to disk
+
+			cout << "winrate: finished " << k*num_iter/1000000 << "M iterations." << endl;
+			cout << "          = " << k*num_iter/n_bins_tothe8 << " average iterations per bin combo" << endl;
+			cout << "         time = " << getdoubletime()-starttime << endl;
+
+			ofstream humanlog("winrate-humans.txt");
+			ofstream bucketcoverage("winrate-bucketcoverage.txt");
+			ofstream mathematicalog("winrate-winrates.txt");
+			ofstream mathematicatotals("winrate-totals.txt");
+
+			for(int m1=0; m1<n_bins; m1++) for(int m2=0; m2<n_bins; m2++) for(int m3=0; m3<n_bins; m3++) for(int m4=0; m4<n_bins; m4++) 
+			{
+				bucketcoverage << m1 << '/' << m2 << '/' << m3 << '/' << m4 << ":  "
+					<< setw(10) << buckettotals[oneindex(0, 0, 0, 0, m1, m2, m3, m4, n_bins)/n_bins_tothe4]
+					<< " = " << (float)buckettotals[oneindex(0,0,0,0,m1,m2,m3,m4,n_bins)/n_bins_tothe4]*n_bins_tothe4/(k*num_iter)
+				   	<< "x" << endl; 
+
+				for(int h1=0; h1<n_bins; h1++) for(int h2=0; h2<n_bins; h2++) for(int h3=0; h3<n_bins; h3++) for(int h4=0; h4<n_bins; h4++) 
+				{
+					const int totalindex = oneindex(h1, h2, h3, h4, m1, m2, m3, m4, n_bins); 
+					humanlog << m1 << '/' << m2 << '/' << m3 << '/' << m4 
+						<< " vs " << h1 << '/' << h2 << '/' << h3 << '/' << h4 << ":  "
+						<< setw(5) << wins[totalindex]/2 << " / " << setw(4) << totals[totalindex] 
+						<< "   = " << setw(8) << (float)100*wins[totalindex]/(2*totals[totalindex]) << '%' 
+						<< "   (" << (float)totals[totalindex]*n_bins_tothe8/(k*num_iter) << "x)" << endl; //relative strength
+					mathematicalog << (int)((float)1000*wins[totalindex]/(2*totals[totalindex])) << endl;
+					mathematicatotals << totals[totalindex] << endl;
+				}
+			}
+
+			humanlog.close();
+			bucketcoverage.close();
+			mathematicalog.close();
+			mathematicatotals.close();
+
+			cout << "         log has been written." << endl << endl;
+
+			//end of infinite outer loop
+		}
+		
+		//end of winrate code
+	}
+
+	//graph
+	else if(argc == 3 && strcmp("graph", argv[1])==0)
+	{
+		CardMask m,f,tr,b,d;
+
+		//open all the bins and HSS and EV data that we need
+
+		const PackedBinFile pflopbins(BINSFOLDER+"preflop5", -1, 5, INDEX2_MAX, true);
+		const PackedBinFile flopbins(BINSFOLDER+"flop5-5", -1, 5, INDEX23_MAX, true);
+		const FloaterFile flophss("flopHSS", INDEX23_MAX);
+		const FloaterFile riverev("riverEV", INDEX25_MAX);
+		const int pflopbinnum = atoi(argv[2]); //offset by 0
+		cout << "Using preflop bin " << pflopbinnum << " offset by 0." << endl;
+
+		//prepare the horses
+
+		double starttime = getdoubletime();
+		cout << "begining graph creation. Please standby. (One hour left.)" << endl;
+		
+		ofstream graphlog(("graph-data-bin"+tostring(pflopbinnum)+".txt").c_str());
+
+		//find all Bin 2 preflop hands
+
+		ENUMERATE_2_CARDS(m,
+		{
+			if(pflopbins.retrieve(getindex2(m)) == pflopbinnum)
+			{
+
+				//for each Bin 2 preflop hand, find all possible flops
+
+				ENUMERATE_3_CARDS_D(f,m, 
+				{
+
+					//for each flop, find the Hand Strength, not squared
+
+					double strengthsum=0;
+					int64 total=0;
+					CardMask_OR(d,m,f);
+					ENUMERATE_2_CARDS_D(tr,d,
+					{
+						total++;
+						CardMask_OR(b,f,tr);
+						strengthsum += riverev[getindex2N(m,b,5)];
+					});
+
+					if(total != 47*46/2) REPORT("Enumeration failed count check");
+
+					//for each flop, Print out the Hand Strength, Hand Strength Squared, and the flop bin number (1-5).
+
+					int64 index23 = getindex23(m,f);
+					graphlog
+						<< flopbins.retrieve(index23) + 1 << ", "
+						<< (float)strengthsum / total << ", "
+						<< flophss[index23] << endl;
+
+				});
+			}
+		});
+
+		//epilog. post-mortem.
+
+		graphlog.close();
+		cout << "graph log finished. Should have taken about an hour (took " << getdoubletime()-starttime << " seconds)." << endl;
+		cout << "format of log, at graph-data.txt, is: " << endl;
+		cout << "[flop bin # on a scale of 1-5], [E(hand strength)], [E(hand strength at river ^ 2)]" << endl;
+		cout << "for all hands that shared preflop bin # " << pflopbinnum << " of 4 (so #" << pflopbinnum+1 << " if one offset)." << endl;
+		cout << "that's (52 choose 2)(1/5)(50 choose 3) hands, count them." << endl;
+		cout << "this is for graphing in mathematica to match p.27 of Billings right hand chart" << endl;
+	}
 
 	//usage
 	else
@@ -1009,6 +1234,8 @@ int main(int argc, char *argv[])
 		cout << "Test indexing function:        " << argv[0] << " test" << endl;
 #endif
 		cout << "Diff two bin files:            " << argv[0] << " diff file1 file2 binmax indextype [-f | errmax]" << endl;
+		cout << "Create winrate (histbin only): " << argv[0] << " winrate n_bins num_iter" << endl;
+		cout << "Create graph (p.27 Billings):  " << argv[0] << " graph n_preflop_bin" << endl;
 		exit(-1);
 	}
 
