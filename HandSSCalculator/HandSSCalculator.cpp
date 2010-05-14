@@ -1064,7 +1064,7 @@ int main(int argc, char *argv[])
 
 				CardMask_RESET(d);
 				MONTECARLO_N_CARDS_D(m, d, 2, 1, );
-				MONTECARLO_N_CARDS_D(h, d, 2, 1, );
+				MONTECARLO_N_CARDS_D(h, m, 2, 1, );
 				CardMask_OR(d,m,h);
 				MONTECARLO_N_CARDS_D(f, d, 3, 1, );
 				CardMask_OR(d,d,f);

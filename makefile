@@ -1,7 +1,7 @@
 CPP := g++# for C++ code
 CC := gcc# for C code
 # compiler flags:
-CFLAGS := -Wall -DTIXML_USE_STL -march=native
+CFLAGS := -Wall -DTIXML_USE_STL -march=native -Wno-deprecated
 # linker flags:
 # define library paths in addition to /usr/lib with -L
 # define any libraries to link into executable with -l
@@ -21,10 +21,15 @@ OUT2 := bin/binmaker
 OUT2D := bin/binmakerd
 OUT2P := bin/binmakerp
 
+OUT3 := bin/altsolver
+OUT3D := bin/altsolverd
+OUT3P := bin/altsolverp
+
 ifeq ($(DEBUG),y)
    CFLAGS += -ggdb -D_GLIBCXX_DEBUG
    MYOUT1 := $(OUT1D)
    MYOUT2 := $(OUT2D)
+   MYOUT3 := $(OUT3D)
    CFGDIR := debug
 else 
 ifeq ($(PROFILE),y)
@@ -32,11 +37,13 @@ ifeq ($(PROFILE),y)
    LFLAGS += -pg
    MYOUT1 := $(OUT1P)
    MYOUT2 := $(OUT2P)
+   MYOUT3 := $(OUT3P)
    CFGDIR := profile
 else
    CFLAGS += -O3 -ggdb
    MYOUT1 := $(OUT1)
    MYOUT2 := $(OUT2)
+   MYOUT3 := $(OUT3)
    CFGDIR := release
 endif
 endif
@@ -61,9 +68,15 @@ SRC2 += utility.cpp
 OBJ2 := $(SRC2:%.cpp=$(CFGDIR)/%.o)
 OBJ2 += $(SRCPE:%.c=$(CFGDIR)/%.o) 
 
-.PHONY:	clean all init solver binmaker
+SRC3 := $(wildcard PokerLibrary/*.cpp HandIndexingV1/*.cpp AltSolver/*.cpp)
+SRC3 += utility.cpp
+OBJ3 := $(SRC3:%.cpp=$(CFGDIR)/%.o)
+OBJ3 += $(SRCPE:%.c=$(CFGDIR)/%.o) 
+
+.PHONY:	clean all init solver binmaker altsolver
 
 init:
+	@mkdir -p $(CFGDIR)/AltSolver
 	@mkdir -p $(CFGDIR)/HandSSCalculator
 	@mkdir -p $(CFGDIR)/PokerLibrary
 	@mkdir -p $(CFGDIR)/PokerNoLimit
@@ -72,21 +85,23 @@ init:
 	@mkdir -p $(CFGDIR)/TinyXML++
 	@rm -f $(DEPFILE)
 	@touch $(DEPFILE)
-	@makedepend -Y -p$(CFGDIR)/ -f$(DEPFILE) -- $(CFLAGS) -- $(INCLUDES) $(SRC1) $(SRC2) $(SRCPE) 2>/dev/null
+	@makedepend -Y -p$(CFGDIR)/ -f$(DEPFILE) -- $(CFLAGS) -- $(INCLUDES) $(SRC1) $(SRC2) $(SRC3) $(SRCPE) 2>/dev/null
 	@touch stdafx.h
 	@$(MAKE) all -r --no-print-directory
 	@rm -f $(DEPFILE) $(DEPFILE).bak stdafx.h
 
-all: solver binmaker
+all: solver binmaker altsolver
 
 solver: $(MYOUT1)
 
 binmaker: $(MYOUT2)
 
+altsolver: $(MYOUT3)
+
 clean:
 	@echo "deleting crap..."
 	@find . -name "*.o" -exec rm {} \;
-	@rm -f $(OUT1) $(OUT2) $(OUT1D) $(OUT2D) $(OUT1P) $(OUT2P) $(DEPFILE) $(DEPFILE).bak
+	@rm -f $(OUT1) $(OUT2) $(OUT3) $(OUT1D) $(OUT2D) $(OUT3D) $(OUT1P) $(OUT2P) $(OUT3P) $(DEPFILE) $(DEPFILE).bak
 
 $(MYOUT1): $(OBJ1)
 	@echo "$(CPP) (object files) $(LFLAGS) -o $@"
@@ -95,6 +110,10 @@ $(MYOUT1): $(OBJ1)
 $(MYOUT2): $(OBJ2)
 	@echo "$(CPP) (object files) $(LFLAGS) -o $@"
 	@$(CPP) $(OBJ2) $(LFLAGS) -o $@
+
+$(MYOUT3): $(OBJ3)
+	@echo "$(CPP) (object files) $(LFLAGS) -o $@"
+	@$(CPP) $(OBJ3) $(LFLAGS) -o $@
 
 $(CFGDIR)/%.o : %.cpp
 	@echo "$(CPP) $(CFLAGS) $(INCLUDES) ($<)"

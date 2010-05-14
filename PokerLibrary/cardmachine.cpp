@@ -66,7 +66,7 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, bool seedra
 			//if solving or under 5 megs, preload the file
 			binfiles[gr] = new PackedBinFile(myparams.filename[gr], myparams.filesize[gr], 
 				myparams.bin_max[gr], index_max,
-				(solving || myparams.filesize[gr] < 5 * 1024 * 1024));
+				(solving || (myparams.filesize[gr] != -1 && myparams.filesize[gr] < 5 * 1024 * 1024)));
 		}
 	}
 }
@@ -95,7 +95,7 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 	CardMask_RESET(board[PREFLOP]); //never used. just a placeholder so the indices are right
 
 	MONTECARLO_N_CARDS_D(priv[P0], usedcards, 2, 1, );
-	MONTECARLO_N_CARDS_D(priv[P1], usedcards, 2, 1, );
+	MONTECARLO_N_CARDS_D(priv[P1], priv[P0], 2, 1, );
 
 	CardMask_OR(usedcards, priv[P0], priv[P1]);
 	MONTECARLO_N_CARDS_D(board[FLOP], usedcards, 3, 1, );

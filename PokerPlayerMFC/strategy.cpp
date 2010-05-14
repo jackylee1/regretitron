@@ -54,7 +54,7 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 			if(preload && cardsettings.filename[gr].length()>0)
 				if(system(("cat "+cardsettings.filename[gr]+".bins > /dev/null").c_str()) != 0)
 					REPORT("cat something failed");
-			cardsettings.filesize[gr] = mybin->GetAttribute<uint64>("filesize");
+			cardsettings.filesize[gr] = mybin->GetAttribute<int64>("filesize");
 			cardsettings.bin_max[gr] = mybin->GetAttribute<int>("nbins");
 		}
 		cardmach = new CardMachine(cardsettings, false);
