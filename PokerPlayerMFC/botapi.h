@@ -25,7 +25,7 @@ class DiagnosticsPage; //forward declaration
 class BotAPI
 {
 public:
-	BotAPI(string xmlfile, bool preload = false);
+	BotAPI(string xmlfile, string botname = "bot", bool preload = false);
 	~BotAPI();
 
 	//control game progress
@@ -53,6 +53,11 @@ private:
 	void doallin(Player pl);
 	void processmyturn();
 	double mintotalwager();
+
+	//logging file
+	ostream &logfile;
+	string myname;
+	bool isloggingon;
 
 	//diagnostics window
 	DiagnosticsPage * MyWindow;

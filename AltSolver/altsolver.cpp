@@ -13,6 +13,7 @@
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/multi_array.hpp>
+#include <boost/tuple/tuple.hpp>
 //#include <boost/graph/adj_list_serialize.hpp>
 //#include <stdio.h> //atol
 //#include <stdlib.h> //atol
@@ -33,8 +34,6 @@ using namespace boost;
 typedef multi_array<int64, 2> OrderType;
 OrderType maxorderindex(extents[4][8]);
 bool havesetmaxorderindex = false;
-//int max_bin[4];
-const bool print = false;
 
 //definitions for the Graph datatype 
 //
@@ -92,7 +91,7 @@ void attachPreflopBettingTree(const Vertex &top, const Vertex &T0, const Vertex 
 	add_edge(n0,n2,EdgeProp(0.5),tree);
 
 	add_edge(n1, addpush(BucketR1,tree,ll), EdgeProp(0),tree);
-	add_edge(n1,n5,EdgeProp(1),tree);
+	add_edge(n1,n5,EdgeProp(0),tree);
 
 	add_edge(n5,T0,EdgeProp(0),tree);
 	add_edge(n5, addpush(BucketR1,tree,ll), EdgeProp(1),tree);
@@ -332,9 +331,9 @@ class LimitBuckets : public BucketSequence
 			{
 				// determines order of data in binary strat file
 				case 0: return c[player][0];
-				case 1: return c[player][0]*max_bin[1] + c[player][1];
-				case 2: return c[player][0]*max_bin[1]*max_bin[2] + c[player][1]*max_bin[2] + c[player][2];
-				case 3: return c[player][0]*max_bin[1]*max_bin[2]*max_bin[3] + c[player][1]*max_bin[2]*max_bin[3] + c[player][2]*max_bin[3] + c[player][3];
+				case 1: return c[player][1]*max_bin[0] + c[player][0];
+				case 2: return c[player][2]*max_bin[1]*max_bin[0] + c[player][1]*max_bin[0] + c[player][0];
+				case 3: return c[player][3]*max_bin[2]*max_bin[1]*max_bin[0] + c[player][2]*max_bin[1]*max_bin[0] + c[player][1]*max_bin[0] + c[player][0];
 			}
 			REPORT("failure to yeild."); exit(-1);
 		}
@@ -390,6 +389,103 @@ void LimitBuckets::dealrandomly()
 	else winner = ISTIE;
 }
 
+//
+// Debugging function: find the order index for a tree node. Takes time O(tree size)
+//
+
+multi_array<int,2> orderindexzero(extents[4][multi_array_types::extent_range(2,10)]);
+
+void _getorderindex(Vertex node, const Vertex &nodetofind, const Graph &tree, vector<int> &buckets, multi_array<int,2> &orderindex, int r=0)
+{
+	const Size n = out_degree(node, tree);
+	EIter efirst, elast;
+	tie(efirst, elast) = out_edges(node, tree);
+
+	switch(tree[node])
+	{
+		case BucketR0:
+		case BucketR1:
+		case BucketR2:
+		case BucketR3:
+		{
+			r=tree[node]-BucketR0;
+			if((Size)buckets[r] >= n)
+				throw r;
+
+			return _getorderindex(target(*(efirst+buckets[r]), tree), nodetofind, tree, buckets, orderindex, r);
+		}
+
+		case P0Plays:
+		case P1Plays:
+			if(nodetofind == node)
+				throw make_tuple(r,orderindex[r][n]); //and done
+			orderindex[r][n]++;
+			for(EIter e = efirst; e!=elast; e++)
+				_getorderindex(target(*e, tree), nodetofind, tree, buckets, orderindex, r);
+			return;
+
+		case TerminalP0Wins:
+		case TerminalP1Wins:
+		case TerminalShowDown:
+			return;
+		default:
+			REPORT("tree broke");
+	}
+
+}
+
+tuple<int/*gameround*/, vector<int>/*buckets*/, int/*orderindex*/> 
+getorderindex(Vertex nodetofind, Vertex root, const Graph &tree)
+{
+	EIter efirst, elast;
+	tie(efirst, elast) = out_edges(root, tree);
+
+	if(tree[root] != BucketR0) REPORT("questionable root");
+
+	vector<int> buckets(4);
+
+	// best way I could think of to do this without requiring max_bins as an input. 
+	bool loop0good = true;
+	for(buckets[0]=0; loop0good; buckets[0]++)
+	{
+		bool loop1good = true;
+		for(buckets[1]=0; loop1good; buckets[1]++)
+		{
+			bool loop2good = true;
+			for(buckets[2]=0; loop2good; buckets[2]++)
+			{
+				bool loop3good = true;
+				for(buckets[3]=0; loop3good; buckets[3]++)
+				{
+					for(int r=0; r<4; r++) for(int i=2; i<=9; i++)
+						orderindexzero[r][i] = 0;
+					try
+					{
+						_getorderindex(root, nodetofind, tree, buckets, orderindexzero, 0);
+					}
+					catch(tuple<int/*gameround*/,int/*orderindex*/> result)
+					{
+						for(int r=get<0>(result)+1; r<4; r++)
+							buckets[r]=-1; //these buckets not defined
+						return make_tuple(get<0>(result), buckets, get<1>(result));
+					}
+					catch(int looprbad)
+					{
+						switch(looprbad)
+						{
+							case 0: loop0good = false;
+							case 1: loop1good = false;
+							case 2: loop2good = false;
+							case 3: loop3good = false;
+						}
+					}
+				}
+			}
+		}
+	}
+	REPORT("We missed the throw! Dropped ball! Bobble hands!"); exit(-1);
+}
+
 
 
 //
@@ -414,14 +510,9 @@ double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbuck
 
 			//add up all the regret
 
-			if(print) cout << "found p0 node with regrets ";
 			double totalregret = 0;
 			for(EIter e=edges.first; e!=edges.second; e++)
-			{
-				if(print) cout << setw(10) << tree[*e].regret;
 				totalregret += (tree[*e].regret > 0 ? tree[*e].regret : 0);
-			}
-			if(print) cout << endl;
 
 			//set the current strategy from the regret
 
@@ -473,14 +564,9 @@ double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbuck
 
 			//add up all the regret
 
-			if(print) cout << "found p1 node with regrets ";
 			double totalregret = 0;
 			for(EIter e=edges.first; e!=edges.second; e++)
-			{
-				if(print) cout << setw(10) << tree[*e].regret;
 				totalregret += (tree[*e].regret > 0 ? tree[*e].regret : 0);
-			}
-			if(print) cout << endl;
 
 			//set the current strategy from the regret
 
@@ -593,7 +679,8 @@ void treerunner(Vertex v, int gameround, const BucketSequence &buckets, OrderTyp
 				else for(EIter e = efirst; e != elast; e++)
 				{
 					if(printkuhnstrat) cout << setw(12) << setprecision(6) << tree[*e].strat;
-					mychar[n] += mychar[j++] = (unsigned char)(255.0 * tree[*e].strat / maxstrategy);
+					int temp = (int)(256.0 * tree[*e].strat / maxstrategy);
+					mychar[n] += mychar[j++] = (temp == 256 ? 255 : temp);
 				}
 				if(printkuhnstrat) cout << "   (" << setprecision(3) << 100.0*tree[*(elast-1)].strat / totalstrategy << "%)" << endl;
 				
@@ -647,6 +734,23 @@ int64 save(const string &filename, const Vertex & root, const Graph &tree, const
 			orderindex[gr][numi] = 0;
 		treerunner(root, 0, buckets, orderindex, unwrittendata, tree);
 	}
+
+
+	int countmissed = 0;
+	const int totalnodes = max_bin[0]*(8+70*max_bin[1]*(1+9*max_bin[2]*(1+9*max_bin[3])));
+	for(int r=0; r<4; r++)
+		for(int n=0; n<8; n++)
+			for(unsigned i=0; i<unwrittendata[r][n].size(); i+=n+3)
+			{
+				for(int j=0; j<n+2; j++)
+					if(unwrittendata[r][n][i+j] != (unsigned char)1)
+						goto cont;
+				countmissed++;
+cont:
+				continue;
+			}
+	cout << "Missed " << countmissed << " nodes out of " << totalnodes << " (" << 100.0*countmissed/totalnodes << "%)" << endl;
+
 
 	ofstream f((filename + ".strat").c_str(), ofstream::binary);
 	int64 tableoffset=0;
@@ -747,27 +851,47 @@ void readstrategy(const string &filename, const Vertex & root, Graph &tree, int 
 
 	for(int n=2; n<=9; n++)
 	{
-		vector<int> buckets(4,0);
-		vector<unsigned char>::iterator iter0 = data[0][n].begin();
-		vector<unsigned char>::iterator iter1 = data[1][n].begin();
-		vector<unsigned char>::iterator iter2 = data[2][n].begin();
-		vector<unsigned char>::iterator iter3 = data[3][n].begin();
-		for(buckets[0]=0; buckets[0]<nbins; buckets[0]++) 
+		vector<int> b(4,0);
+
+		//these each must load the data in the correct order to match the file!!!
+
+		if(data[0][n].size()>0)
 		{
-			loadintotree(root, 0, buckets, n, tree, iter0);
-			for(buckets[1]=0; buckets[1]<nbins; buckets[1]++) 
-			{
-				loadintotree(root, 1, buckets, n, tree, iter1);
-				for(buckets[2]=0; buckets[2]<nbins; buckets[2]++) 
-				{
-					loadintotree(root, 2, buckets, n, tree, iter2);
-					for(buckets[3]=0; buckets[3]<nbins; buckets[3]++) 
-						loadintotree(root, 3, buckets, n, tree, iter3);
-				}
-			}
+			vector<unsigned char>::iterator iter = data[0][n].begin();
+			for(b[0]=0; b[0]<nbins; b[0]++) 
+				loadintotree(root, 0, b, n, tree, iter);
+			if(iter != data[0][n].end()) REPORT("did not use all data!");
 		}
-		if(iter0 != data[0][n].end() || iter1 != data[1][n].end() || iter2 != data[2][n].end() || iter3 != data[3][n].end()) 
-			REPORT("did not use all data! "+tostring(n));
+
+		if(data[1][n].size()>0)
+		{
+			vector<unsigned char>::iterator iter = data[1][n].begin();
+			for(b[1]=0; b[1]<nbins; b[1]++) 
+				for(b[0]=0; b[0]<nbins; b[0]++) 
+					loadintotree(root, 1, b, n, tree, iter);
+			if(iter != data[1][n].end()) REPORT("did not use all data!");
+		}
+
+		if(data[2][n].size()>0)
+		{
+			vector<unsigned char>::iterator iter = data[2][n].begin();
+			for(b[2]=0; b[2]<nbins; b[2]++) 
+				for(b[1]=0; b[1]<nbins; b[1]++) 
+					for(b[0]=0; b[0]<nbins; b[0]++) 
+						loadintotree(root, 2, b, n, tree, iter);
+			if(iter != data[2][n].end()) REPORT("did not use all data!");
+		}
+
+		if(data[3][n].size()>0)
+		{
+			vector<unsigned char>::iterator iter = data[3][n].begin();
+			for(b[3]=0; b[3]<nbins; b[3]++) 
+				for(b[2]=0; b[2]<nbins; b[2]++) 
+					for(b[1]=0; b[1]<nbins; b[1]++) 
+						for(b[0]=0; b[0]<nbins; b[0]++) 
+							loadintotree(root, 3, b, n, tree, iter);
+			if(iter != data[3][n].end()) REPORT("did not use all data!");
+		}
 	}
 }
 
@@ -793,7 +917,7 @@ pair<double,NodeType> playgame(const Vertex &player0, const Vertex &player1, dou
 
 		case P0Plays:
 		{
-			double answer = random.rand();
+			double answer = random.randExc();
 			EIter e0 = efirst0, e1 = efirst1;
 			while(e0 != elast0 && e1 != elast1)
 			{
@@ -808,7 +932,7 @@ pair<double,NodeType> playgame(const Vertex &player0, const Vertex &player1, dou
 
 		case P1Plays:
 		{
-			double answer = random.rand();
+			double answer = random.randExc();
 			EIter e0 = efirst0, e1 = efirst1;
 			while(e0 != elast0 && e1 != elast1)
 			{
@@ -856,7 +980,7 @@ void playoffs(const string &tom_file, int tom_bins, const string &mary_file, int
 		mary_bfile[i] = tom_bfile[i];
 
 	bool infiniterepeat = (numgames == 0);
-	if(numgames == 0) numgames = 10000;
+	if(numgames == 0) numgames = 20000;
 	vector<int> tom_buckets(4), mary_buckets(4);
 	double tom_utilitysum=0;
 	int64 iterations=0;
@@ -869,75 +993,81 @@ void playoffs(const string &tom_file, int tom_bins, const string &mary_file, int
 		{
 			iterations++;
 
-			CardMask tom,mary,f,t,r;
-			tom.cards_n = mary.cards_n = f.cards_n = t.cards_n = r.cards_n = 0;
+			CardMask hand0,hand1,f,t,r;
+			hand0.cards_n = hand1.cards_n = f.cards_n = t.cards_n = r.cards_n = 0;
 			for(int i=0; i<52; i++) random_vector[i] = i;
 			for(int i=0; i<9; i++) swap(random_vector[i], random_vector[i+random.randInt(51-i)]);
-			CardMask_SET(tom,random_vector[0]);
-			CardMask_SET(tom,random_vector[1]);
-			CardMask_SET(mary,random_vector[2]);
-			CardMask_SET(mary,random_vector[3]);
+			CardMask_SET(hand0,random_vector[0]);
+			CardMask_SET(hand0,random_vector[1]);
+			CardMask_SET(hand1,random_vector[2]);
+			CardMask_SET(hand1,random_vector[3]);
 			CardMask_SET(f,random_vector[4]);
 			CardMask_SET(f,random_vector[5]);
 			CardMask_SET(f,random_vector[6]);
 			CardMask_SET(t,random_vector[7]);
 			CardMask_SET(r,random_vector[8]);
 
-			for(int swapper=0; swapper<2; swapper++)
+			CardMask hand0full, hand1full;
+			hand0full.cards_n = hand0.cards_n | f.cards_n | t.cards_n | r.cards_n; 
+			hand1full.cards_n = hand1.cards_n | f.cards_n | t.cards_n | r.cards_n;
+			HandVal hand0_val = StdDeck_StdRules_EVAL_N(hand0full,7);
+			HandVal hand1_val = StdDeck_StdRules_EVAL_N(hand1full,7);
+
+			double utility;
+			NodeType resulttype;
+
+			//First, TOM plays as player ZERO with hand ZERO
+			//      MARY plays as player ONE with hand ONE
+
+			tom_buckets[0] = tom_bfile[0]->retrieve(getindex2(hand0));
+			tom_buckets[1] = tom_bfile[1]->retrieve(getindex23(hand0,f));
+			tom_buckets[2] = tom_bfile[2]->retrieve(getindex231(hand0,f,t));
+			tom_buckets[3] = tom_bfile[3]->retrieve(getindex2311(hand0,f,t,r));
+			mary_buckets[0] = mary_bfile[0]->retrieve(getindex2(hand1));
+			mary_buckets[1] = mary_bfile[1]->retrieve(getindex23(hand1,f));
+			mary_buckets[2] = mary_bfile[2]->retrieve(getindex231(hand1,f,t));
+			mary_buckets[3] = mary_bfile[3]->retrieve(getindex2311(hand1,f,t,r));
+
+			tie(utility, resulttype) = playgame(tom_root, mary_root, 0, tom_buckets, mary_buckets, tom_tree, mary_tree, random);
+			if(resulttype == TerminalP0Wins)
+				tom_utilitysum += utility;
+			else if(resulttype == TerminalP1Wins)
+				tom_utilitysum -= utility;
+			else if(resulttype == TerminalShowDown)
 			{
-				tom_buckets[0] = tom_bfile[0]->retrieve(getindex2(tom));
-				tom_buckets[1] = tom_bfile[1]->retrieve(getindex23(tom,f));
-				tom_buckets[2] = tom_bfile[2]->retrieve(getindex231(tom,f,t));
-				tom_buckets[3] = tom_bfile[3]->retrieve(getindex2311(tom,f,t,r));
-				mary_buckets[0] = mary_bfile[0]->retrieve(getindex2(mary));
-				mary_buckets[1] = mary_bfile[1]->retrieve(getindex23(mary,f));
-				mary_buckets[2] = mary_bfile[2]->retrieve(getindex231(mary,f,t));
-				mary_buckets[3] = mary_bfile[3]->retrieve(getindex2311(mary,f,t,r));
-
-				CardMask tomfull, maryfull;
-			   	tomfull.cards_n = tom.cards_n | f.cards_n | t.cards_n | r.cards_n; 
-				maryfull.cards_n = mary.cards_n | f.cards_n | t.cards_n | r.cards_n;
-				HandVal tom_val = StdDeck_StdRules_EVAL_N(tomfull,7);
-				HandVal mary_val = StdDeck_StdRules_EVAL_N(maryfull,7);
-
-				double utility;
-				NodeType resulttype;
-
-				if(x%2==0)
-				{
-					tie(utility, resulttype) = playgame(tom_root, mary_root, 0, tom_buckets, mary_buckets, tom_tree, mary_tree, random);
-					if(resulttype == TerminalP0Wins)
-						tom_utilitysum += utility;
-					else if(resulttype == TerminalP1Wins)
-						tom_utilitysum -= utility;
-					else if(resulttype == TerminalShowDown)
-					{
-						if(tom_val > mary_val)
-							tom_utilitysum +=utility;
-						else if(mary_val > tom_val)
-							tom_utilitysum -=utility;
-					}
-					else REPORT("err");
-				}
-				else
-				{
-					tie(utility, resulttype) = playgame(mary_root, tom_root, 0, mary_buckets, tom_buckets, mary_tree, tom_tree, random);
-					if(resulttype == TerminalP0Wins)
-						tom_utilitysum -= utility;
-					else if(resulttype == TerminalP1Wins)
-						tom_utilitysum += utility;
-					else if(resulttype == TerminalShowDown)
-					{
-						if(tom_val > mary_val)
-							tom_utilitysum +=utility;
-						else if(mary_val > tom_val)
-							tom_utilitysum -=utility;
-					}
-					else REPORT("err");
-				}
-
-				swap(tom,mary); //swap their cards.
+				if(hand0_val > hand1_val)
+					tom_utilitysum +=utility;
+				else if(hand1_val > hand0_val)
+					tom_utilitysum -=utility;
 			}
+			else REPORT("err");
+
+			//Now, MARY plays as player ZERO with hand ZERO
+			//      TOM plays as player ONE with hand ONE
+
+			tom_buckets[0] = tom_bfile[0]->retrieve(getindex2(hand1));
+			tom_buckets[1] = tom_bfile[1]->retrieve(getindex23(hand1,f));
+			tom_buckets[2] = tom_bfile[2]->retrieve(getindex231(hand1,f,t));
+			tom_buckets[3] = tom_bfile[3]->retrieve(getindex2311(hand1,f,t,r));
+			mary_buckets[0] = mary_bfile[0]->retrieve(getindex2(hand0));
+			mary_buckets[1] = mary_bfile[1]->retrieve(getindex23(hand0,f));
+			mary_buckets[2] = mary_bfile[2]->retrieve(getindex231(hand0,f,t));
+			mary_buckets[3] = mary_bfile[3]->retrieve(getindex2311(hand0,f,t,r));
+
+			tie(utility, resulttype) = playgame(mary_root, tom_root, 0, mary_buckets, tom_buckets, mary_tree, tom_tree, random);
+			if(resulttype == TerminalP0Wins)
+				tom_utilitysum -= utility;
+			else if(resulttype == TerminalP1Wins)
+				tom_utilitysum += utility;
+			else if(resulttype == TerminalShowDown)
+			{
+				if(hand0_val > hand1_val)
+					tom_utilitysum -=utility;
+				else if(hand1_val > hand0_val)
+					tom_utilitysum +=utility;
+			}
+			else REPORT("err");
+
 		}
 
 		cout << setw(7) << (double)iterations/1000000 << "M game pairs: "
@@ -959,24 +1089,24 @@ int main(int argc, char *argv[])
 		playoffs(argv[2], atoi(argv[3]), argv[4], atoi(argv[5]));
 	else if(argc==7 && strcmp(argv[1],"playoff")==0)
 		playoffs(argv[2], atoi(argv[3]), argv[4], atoi(argv[5]), atol(argv[6]));
-	else if (argc==3 && strcmp(argv[1],"solve")==0)
+	else if(argc==4 && strcmp(argv[1],"solve")==0)
 	{
 		Graph tree;
 
-		vector<int> max_bin(4, atoi(argv[1]));
-		int64 maxiterations = (int64)atoi(argv[2])*1000000;
+		vector<int> max_bin(4, atoi(argv[2]));
+		int64 maxiterations = (int64)atoi(argv[3])*1000000;
 
 		Vertex root = createLimitTree(tree,max_bin);
-		string filename = "limit-"+tostring(max_bin[0])+"bin";
+		string filename = "alt-limit-"+tostring(max_bin[0])+"bin";
 
 		LimitBuckets myseq(max_bin, 3/*seed*/);
-		char counter = 'A';
+		char counter = 'B';
 		int64 iterations = 0;
 		double starttime = getdoubletime();
 
-		for(int x=0; x<5; x++)
+		for(int x=0; x<2; x++)
 		{
-			for(int64 i=0; i<maxiterations/5; i++)
+			for(int64 i=0; i<maxiterations/2; i++)
 			{
 				myseq.dealrandomly();
 				WalkTrees(root, root, myseq, 1.0, 1.0, 0.0, tree);
@@ -985,7 +1115,7 @@ int main(int argc, char *argv[])
 
 			cout << setprecision(3) << (double)iterations/1000000 << "M iterations done in " << (getdoubletime() - starttime)/3600 << " hours" << endl;
 
-			string fullname = filename + "-" + tostring(counter++);
+			string fullname = filename + "-" + tostring(counter--);
 			int64 savelength = save("strategy/"+fullname,root,tree,max_bin);
 
 			ofstream savelog((fullname+".xml").c_str());

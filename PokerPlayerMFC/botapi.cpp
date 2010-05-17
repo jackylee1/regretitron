@@ -16,8 +16,10 @@ bool fpequal(double a, double b)
 	return isequal;
 }
 
-BotAPI::BotAPI(string xmlfile, bool preload)
-   : MyWindow(NULL),
+BotAPI::BotAPI(string xmlfile, string botname, bool preload)
+   : logfile(cout),
+	 isloggingon(false),
+	 MyWindow(NULL),
      isdiagnosticson(false),
      actionchooser(), //seeds rand with time and clock
      mystrats(1, new Strategy(xmlfile, preload)), //initialize to one strat given by xmlfile
@@ -28,7 +30,11 @@ BotAPI::BotAPI(string xmlfile, bool preload)
 	 answer(-1), 
 	 bot_status(INVALID),
 	 historyindexer(this)
-{ }
+{ 
+	ostringstream f;
+	f << setw(10) << botname << ": ";
+	myname = f.str();
+}
 
 BotAPI::~BotAPI()
 {
@@ -46,6 +52,12 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	if(playernum != P0 && playernum != P1)
 		REPORT("invalid myplayer number in BotAPI::setnewgame()");
 
+	if(isloggingon)
+	{
+		logfile << endl << endl << myname << "Starting game as P" << playernum << "." << endl;
+		logfile << myname << " My hole cards: " << tostring(myhand) << endl;
+	}
+
 	//find the strategy with the nearest stacksize
 	
 	double besterror = numeric_limits<double>::infinity();
@@ -60,6 +72,9 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 			currstrat = mystrats[i]; //pointer
 		}
 	}
+
+	if(isloggingon)
+		logfile << myname << "Chose strategy " << currstrat->getfilename() << endl;
 
 	//We go through the list of our private data and update each.
 
@@ -90,7 +105,7 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	processmyturn();
 }
 
-void BotAPI::setnextround(int gr, CardMask newboard, double newpot)
+void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just needed for error checking*/)
 {
 	//check input parameters
 
@@ -98,7 +113,10 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot)
 	if (bot_status != WAITING_ROUND) REPORT("you must advancetree before you setflop");
 	if (actualinv[0] != actualinv[1]) REPORT("you both best be betting the same.");
 	if (perceivedinv[0] != perceivedinv[1]) REPORT("perceived state is messed up");
-	if (!fpequal(actualpot + actualinv[0],newpot/multiplier)) REPORT("your new pot is unexpected.");
+	if (!fpequal(actualpot+actualinv[0], newpot/multiplier)) REPORT("your new pot is unexpected.");
+
+	if(isloggingon)
+		logfile << endl << myname << gameroundstring(gr) << ": " << tostring(newboard) << " (pot = " << newpot << ")" << endl;
 
 	//Update the state of our private data members
 
@@ -140,6 +158,8 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 	processmyturn();
 }
 
+//amount is the total amount of a wager when betting/raising (relative to the beginning of the round)
+//          the amount aggreed upon when calling (same as above) or folding (not same as above)
 Action BotAPI::getbotaction(double &amount)
 {
 	//error checking
@@ -177,13 +197,15 @@ Action BotAPI::getbotaction(double &amount)
 		REPORT("we chose an invalid action. no good guys.");
 
 	case BetNode::FD:
-		amount = -1;
+		if(mynode.potcontrib[answer] != perceivedinv[myplayer])
+			REPORT("tree value does not match folding reality");
+		amount = multiplier * actualinv[myplayer];
 		myact = FOLD;
 		break;
 
 	case BetNode::GO:
 		if(mynode.potcontrib[answer] != perceivedinv[1-myplayer])
-			REPORT("tree value does not match reality");
+			REPORT("tree value does not match calling reality");
 		amount = multiplier * actualinv[1-myplayer];
 		myact = CALL;
 		break;
@@ -191,14 +213,14 @@ Action BotAPI::getbotaction(double &amount)
 	case BetNode::AI: //called all-in
 		if(!offtreebetallins) //as it should be
 		{
-			amount = 0;
+			amount = -999999; //should be unused
 			myact = CALL;
 		}
 		else //but sometimes, we treat these nodes as BET all in instead of call.
 		{
 			if(mynode.numacts != 2)
 				REPORT("I thought we should be at a 2-membered node now! (fold or call all-in)");
-			amount = 0;
+			amount = -999999; //should be unused
 			myact = ALLIN;
 		}
 		break;
@@ -206,7 +228,7 @@ Action BotAPI::getbotaction(double &amount)
 	default:
 		if(currstrat->gettree().isallin(mynode.result[answer],mynode.potcontrib[answer],currentgr))
 		{
-			amount = 0;
+			amount = -999999; //should be unused
 			myact = ALLIN;
 		}
 		else
@@ -214,6 +236,8 @@ Action BotAPI::getbotaction(double &amount)
 			amount = multiplier * (mynode.potcontrib[answer] + actualinv[1-myplayer]-perceivedinv[1-myplayer]);
 			if(amount < multiplier * mintotalwager())
 			{
+				if(isloggingon)
+					logfile << myname << "...changing bet amount from " << amount << " to " << multiplier * mintotalwager() << " ... " << endl;
 				REPORT("bot bet amount was less than multiplier * mintotalwager()", WARN);
 				amount = multiplier * mintotalwager();
 			}
@@ -245,6 +269,9 @@ void BotAPI::docall(Player pl, double amount)
 {
 	if(!fpequal(amount,actualinv[1-pl])) REPORT("you called the wrong amount");
 
+	if(isloggingon)
+		logfile << (pl == myplayer ? myname : "  opponent: ") << "called $" << amount << endl;
+
 	actualinv[pl] = actualinv[1-pl];
 	perceivedinv[pl] = perceivedinv[1-pl];
 	bot_status = WAITING_ROUND;
@@ -256,8 +283,11 @@ void BotAPI::dobet(Player pl, double amount)
 
 	//error checking 
 
-	if(amount < mintotalwager() || amount >= currstrat->gettree().getparams().stacksize)
+	if(amount < mintotalwager() || actualpot+amount >= currstrat->gettree().getparams().stacksize)
 		REPORT("Invalid bet amount");
+
+	if(isloggingon)
+		logfile << (pl == myplayer ? myname : "  opponent: ") << "bet/raised $" << amount << endl;
 
 	//try to find the bet action that will set the new perceived pot closest to the actual
 
@@ -286,12 +316,14 @@ void BotAPI::dobet(Player pl, double amount)
 			}
 		}
 	}
+	if(besterror > 0.01 && isloggingon)
+		logfile << myname << "... best betting action found was a bet of $" << mynode.potcontrib[bestaction]*multiplier << " ..." << endl;
 
 	// if there's no bet, doallin, otherwise, update state.
 
 	if (bestaction == -1)
 	{
-		if(pl == myplayer) REPORT("bot the bot HAD to have bet from the tree. we should find a bet action.");
+		if(pl == myplayer) REPORT("the bot HAD to have bet from the tree. we should find a bet action.");
 		else REPORT("the oppenent bet when the tree had no betting actions. off tree -> treating as all-in", INFO);
 		offtreebetallins = true;
 		doallin(pl);
@@ -320,6 +352,9 @@ void BotAPI::doallin(Player pl)
 	}
 	if(total != 1) REPORT("not exactly 1 all-in action found!");
 
+	if(isloggingon)
+		logfile << (pl == myplayer ? myname : "  opponent: ") << "bet/raised All-In" << endl;
+
 	actualinv[pl] = currstrat->gettree().getparams().stacksize-actualpot;
 	perceivedinv[pl] = currstrat->gettree().getparams().stacksize-perceivedpot;
 	currentbeti = mynode.result[allinaction];
@@ -346,13 +381,28 @@ void BotAPI::processmyturn()
 			for(int a=0; a<mynode.numacts; a++)
 			{
 				cumulativeprob += probabilities[a];
-				if (cumulativeprob > randomprob)
+				if (cumulativeprob >= randomprob)
 				{
 					answer = a;
 					break;
 				}
 			}
 		}while(answer==-1); //just in case due to rounding errors cumulative prob never reaches randomprob
+
+		//log results
+
+		if(isloggingon)
+		{
+			logfile << myname << "At node: gameround = " << currentgr << ", cardsi = " << currstrat->getcardmach().getcardsi(currentgr, cards) << ", actioni = " << historyindexer.getactioni() << endl;
+			logfile << myname << "My options: ((";
+			for(int i=0; i<mynode.numacts; i++)
+				logfile << currstrat->gettree().actionstring(currentgr, i, mynode, multiplier) << "  ";
+			logfile << ")) = < ";
+			for(int i=0; i<mynode.numacts; i++)
+				logfile << setprecision(3) << fixed << 100*probabilities[i] << "% ";
+			logfile << ">" << endl;
+			logfile << myname << "Chose " << answer << " = " << currstrat->gettree().actionstring(currentgr, answer, mynode, multiplier) << endl << endl;
+		}
 	}
 
 	//update diagnostics window

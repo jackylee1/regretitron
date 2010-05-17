@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <poker_defs.h>
 #include <inlines/eval.h>
+using namespace std;
 
 //static non-integral data member initialization
 const int CardMachine::FLOPALYZER_MAX[4]= { 1, 6, 17, 37 };
@@ -82,29 +83,23 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 {
 	if(!solving) REPORT("I didn't expect PokerPlayer to call this function");
 
-	//alias our MTRand object so I can control which rand the archaic macros use
-
-	MTRand &mersenne = randforsolver;
-
 	//deal out the cards randomly.
 
-	CardMask usedcards;
-	CardMask_RESET(usedcards);
-	CardMask priv[2]; //don't want to create vectors here, just for speed (as they have to allocate)
-	CardMask board[4];
-	CardMask_RESET(board[PREFLOP]); //never used. just a placeholder so the indices are right
-
-	MONTECARLO_N_CARDS_D(priv[P0], usedcards, 2, 1, );
-	MONTECARLO_N_CARDS_D(priv[P1], priv[P0], 2, 1, );
-
-	CardMask_OR(usedcards, priv[P0], priv[P1]);
-	MONTECARLO_N_CARDS_D(board[FLOP], usedcards, 3, 1, );
-
-	CardMask_OR(usedcards, usedcards, board[FLOP]);
-	MONTECARLO_N_CARDS_D(board[TURN], usedcards, 1, 1, );
-
-	CardMask_OR(usedcards, usedcards, board[TURN]);
-	MONTECARLO_N_CARDS_D(board[RIVER], usedcards, 1, 1, );
+	CardMask priv[2], board[4];
+	int random_vector[52] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,
+		30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
+	for(int i=0; i<2; i++) CardMask_RESET(priv[i]);
+	for(int i=0; i<4; i++) CardMask_RESET(board[i]);
+	for(int i=0; i<9; i++) swap(random_vector[i], random_vector[i+randforsolver.randInt(51-i)]);
+	CardMask_SET(priv[P0],random_vector[0]);
+	CardMask_SET(priv[P0],random_vector[1]);
+	CardMask_SET(priv[P1],random_vector[2]);
+	CardMask_SET(priv[P1],random_vector[3]);
+	CardMask_SET(board[FLOP],random_vector[4]);
+	CardMask_SET(board[FLOP],random_vector[5]);
+	CardMask_SET(board[FLOP],random_vector[6]);
+	CardMask_SET(board[TURN],random_vector[7]);
+	CardMask_SET(board[RIVER],random_vector[8]);
 
 	//initialize cardsi with bin numbers
 
@@ -412,7 +407,7 @@ int CardMachine::preflophandinfo(int index, string &handstring) //index is getin
 
 	CardMask mymask, usedcards;
 	CardMask_RESET(usedcards);
-	MTRand &mersenne = randforsolver;
+	MTRand &mersenne = randforexamplehands;
 	while(1)
 	{
 		MONTECARLO_N_CARDS_D(mymask, usedcards, 2, 1, );

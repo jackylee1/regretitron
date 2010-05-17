@@ -16,8 +16,8 @@
 #include <list>
 using namespace std;
 
-const double LOAD_LIMIT = 35; //load average number
-const int LOAD_TO_USE = 2; //1, 2, or 3, for 1 min, 5 min, or 15 min.
+const double LOAD_LIMIT = 3.5; //load average number
+const int LOAD_TO_USE = 1; //1, 2, or 3, for 1 min, 5 min, or 15 min.
 const int SLEEP_ON_THREADSTART = 1; // in minutes
 const int SLEEP_ON_NOWORK = 1; // in minutes
 
@@ -70,8 +70,8 @@ Playoff::Playoff(string file1, string file2)
 	  totalwinningsbot0(0),
 	  totalpairsplayed(0)
 {
-	_bots[0] = new BotAPI(file1, true);
-	_bots[1] = new BotAPI(file2, true);
+	_bots[0] = new BotAPI(file1, "Tom", true);
+	_bots[1] = new BotAPI(file2, "Mary", true);
 	if(_bots[0]->islimit() != _bots[1]->islimit())
 		REPORT("You can't play a limit bot against a no-limit bot!");
 	double stacksize1 = _bots[0]->getstacksizemult();
@@ -107,27 +107,21 @@ void Playoff::playgamepair()
 
 	//generate the random cards
 
-	CardMask priv[2]; //these are for PLAYER 0 and 1
-	CardMask board[4];
-	CardMask_RESET(board[PREFLOP]); //never used
-
-	CardMask usedcards;
-
-	CardMask_RESET(usedcards);
-	MONTECARLO_N_CARDS_D(priv[P0], usedcards, 2, 1, );
-	CardMask_OR(usedcards, usedcards, priv[P0]);
-
-	MONTECARLO_N_CARDS_D(priv[P1], usedcards, 2, 1, );
-	CardMask_OR(usedcards, usedcards, priv[P1]);
-
-	MONTECARLO_N_CARDS_D(board[FLOP], usedcards, 3, 1, );
-	CardMask_OR(usedcards, usedcards, board[FLOP]);
-
-	MONTECARLO_N_CARDS_D(board[TURN], usedcards, 1, 1, );
-	CardMask_OR(usedcards, usedcards, board[TURN]);
-
-	MONTECARLO_N_CARDS_D(board[RIVER], usedcards, 1, 1, );
-	CardMask_OR(usedcards, usedcards, board[RIVER]);
+	CardMask priv[2], board[4];
+	int random_vector[52] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,
+		30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
+	for(int i=0; i<2; i++) CardMask_RESET(priv[i]);
+	for(int i=0; i<4; i++) CardMask_RESET(board[i]);
+	for(int i=0; i<9; i++) swap(random_vector[i], random_vector[i+mersenne.randInt(51-i)]);
+	CardMask_SET(priv[P0],random_vector[0]);
+	CardMask_SET(priv[P0],random_vector[1]);
+	CardMask_SET(priv[P1],random_vector[2]);
+	CardMask_SET(priv[P1],random_vector[3]);
+	CardMask_SET(board[FLOP],random_vector[4]);
+	CardMask_SET(board[FLOP],random_vector[5]);
+	CardMask_SET(board[FLOP],random_vector[6]);
+	CardMask_SET(board[TURN],random_vector[7]);
+	CardMask_SET(board[RIVER],random_vector[8]);
 
 	//figure the winner
 
@@ -187,6 +181,8 @@ double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0win
 	return (twoprob0wins-1) * pot; //this is the showdown
 }
 
+//pot starts at the agreed upon pot size (per player) at the start of the round
+//we update it here to the that value that it takes upon completion of this round
 Result Playoff::playoutaround(Player nexttogo, double &pot)
 {
 	bool prev_act_was_allin = false;
