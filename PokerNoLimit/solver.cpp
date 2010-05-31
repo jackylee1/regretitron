@@ -17,11 +17,14 @@ const BettingTree * Solver::tree = NULL;
 MemoryManager * Solver::memory = NULL;
 #ifdef DO_THREADS
 pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
-#if USE_HISTORY
-list<Solver::iteration_data_t> Solver::dataqueue(N_LOOKAHEAD);
-bool Solver::datainuse[PFLOP_CARDSI_MAX*2];
 pthread_cond_t Solver::signaler;
-#else
+list<Solver::iteration_data_t> Solver::dataqueue(N_LOOKAHEAD);
+bool Solver::datainuse0[PFLOP_CARDSI_MAX*2];
+#if !USE_HISTORY //then we need to account for all data in use, not just first round
+#error hello
+bool Solver::datainuse1[FLOP_CARDSI_MAX*2];
+bool Solver::datainuse2[TURN_CARDSI_MAX*2];
+bool Solver::datainuse3[RIVER_CARDSI_MAX*2];
 #endif
 #endif
 vector< vector<int> > Solver::staticactioncounters(4, vector<int>(MAX_NODETYPES, 0));
@@ -36,20 +39,20 @@ void Solver::initsolver()
 	inittime = getdoubletime();
 
 #ifdef DO_THREADS
-#if USE_HISTORY 
 	pthread_cond_init(&signaler, NULL);
+
 	for(int i=0; i<PFLOP_CARDSI_MAX*2; i++)
-		datainuse[i] = false;
+		datainuse0[i] = false;
+#if !USE_HISTORY 
+	for(int i=0; i<FLOP_CARDSI_MAX*2; i++)
+		datainuse1[i] = false;
+	for(int i=0; i<TURN_CARDSI_MAX*2; i++)
+		datainuse2[i] = false;
+	for(int i=0; i<RIVER_CARDSI_MAX*2; i++)
+		datainuse3[i] = false;
+#endif
 	for(list<iteration_data_t>::iterator data = dataqueue.begin(); data!=dataqueue.end(); data++)
 		cardmachine->getnewgame(data->cardsi, data->twoprob0wins); //get new data
-#else 
-	for(int gr=0; gr<4; gr++) //need locks for all rounds
-	{
-		cardsilocks[gr] = new pthread_mutex_t[2*cardmachine->getcardsimax(gr)];
-		for(int i=0; i<2*cardmachine->getcardsimax(gr); i++)
-			pthread_mutex_init(&cardsilocks[gr][i], NULL);
-	}
-#endif
 #endif
 }
 
@@ -58,13 +61,6 @@ void Solver::destructsolver()
 	delete cardmachine;
 	delete tree;
 	delete memory;
-#ifdef DO_THREADS
-#if !USE_HISTORY
-	for(int gr=0; gr<4; gr++)
-		if(cardsilocks[gr]!=NULL)
-			delete[] cardsilocks[gr];
-#endif
-#endif
 }
 
 //function called by main()
@@ -555,17 +551,17 @@ inline bool check(int a1, int a2, int b1, int b2)
 
 void Solver::threadloop()
 {
-#ifdef DO_THREADS
-	pthread_mutex_lock(&threaddatalock);
-#endif
-
 	fpu_fix_start(NULL);
 
-	while(1)
+#ifdef DO_THREADS //MULTI THREADED
+	pthread_mutex_lock(&threaddatalock);
+#endif //ALL THEADEDNESS
+
+	while(1) //each loop does one iteration
 	{
-#ifdef DO_THREADS
+#ifdef DO_THREADS //MULTI THREADED
 		list<iteration_data_t>::iterator my_data_it; //iterator pointing to my data I want to use
-		while(1) //loop till we find something
+		while(1) //each loop checks for available data
 		{
 			if(iterations==0) //check if we're all done.
 			{
@@ -576,12 +572,27 @@ void Solver::threadloop()
 
 			for(my_data_it = dataqueue.begin(); my_data_it!=dataqueue.end(); my_data_it++)
 			{
-				if(!datainuse[2*my_data_it->cardsi[PREFLOP][P0]] && !datainuse[2*my_data_it->cardsi[PREFLOP][P1]+1])
+				if(!datainuse0[2*my_data_it->cardsi[PREFLOP][P0]] && !datainuse0[2*my_data_it->cardsi[PREFLOP][P1]+1]
+#if !USE_HISTORY
+					&& !datainuse1[2*my_data_it->cardsi[FLOP][P0]] && !datainuse1[2*my_data_it->cardsi[FLOP][P1]+1]
+					&& !datainuse2[2*my_data_it->cardsi[TURN][P0]] && !datainuse2[2*my_data_it->cardsi[TURN][P1]+1]
+					&& !datainuse3[2*my_data_it->cardsi[RIVER][P0]] && !datainuse3[2*my_data_it->cardsi[RIVER][P1]+1]
+#endif
+				)
 				{
 					for(list<iteration_data_t>::iterator to_be_skipped=dataqueue.begin(); to_be_skipped != my_data_it; to_be_skipped++)
 					{
-						if(my_data_it->cardsi[PREFLOP][P0] == to_be_skipped->cardsi[PREFLOP][P0] ||
-								my_data_it->cardsi[PREFLOP][P1] == to_be_skipped->cardsi[PREFLOP][P1])
+						if(my_data_it->cardsi[PREFLOP][P0] == to_be_skipped->cardsi[PREFLOP][P0] 
+							|| my_data_it->cardsi[PREFLOP][P1] == to_be_skipped->cardsi[PREFLOP][P1]
+#if !USE_HISTORY
+							|| my_data_it->cardsi[FLOP][P0] == to_be_skipped->cardsi[FLOP][P0]
+							|| my_data_it->cardsi[FLOP][P1] == to_be_skipped->cardsi[FLOP][P1]
+							|| my_data_it->cardsi[TURN][P0] == to_be_skipped->cardsi[TURN][P0]
+							|| my_data_it->cardsi[TURN][P1] == to_be_skipped->cardsi[TURN][P1]
+							|| my_data_it->cardsi[RIVER][P0] == to_be_skipped->cardsi[RIVER][P0]
+							|| my_data_it->cardsi[RIVER][P1] == to_be_skipped->cardsi[RIVER][P1]
+#endif
+						)
 						{
 							goto cannot_skip;
 						}
@@ -605,34 +616,49 @@ found_good_data:
 		}
 		memcpy(cardsi, my_data_it->cardsi, sizeof(cardsi)); //copy that data into our non-static variables
 		twoprob0wins = my_data_it->twoprob0wins;
-		datainuse[2*cardsi[PREFLOP][P0]] = true;
-		datainuse[2*cardsi[PREFLOP][P1]+1] = true;
+
+		datainuse0[2*cardsi[PREFLOP][P0]] = true;
+		datainuse0[2*cardsi[PREFLOP][P1]+1] = true;
+#if !USE_HISTORY
+		datainuse1[2*cardsi[FLOP][P0]] = true;
+		datainuse1[2*cardsi[FLOP][P1]+1] = true;
+		datainuse2[2*cardsi[TURN][P0]] = true;
+		datainuse2[2*cardsi[TURN][P1]+1] = true;
+		datainuse3[2*cardsi[RIVER][P0]] = true;
+		datainuse3[2*cardsi[RIVER][P1]+1] = true;
+#endif
 		cardmachine->getnewgame(my_data_it->cardsi, my_data_it->twoprob0wins); //get new data
 		dataqueue.splice(dataqueue.end(), dataqueue, my_data_it); //move that node to the end of the list
 		iterations--;
 		if(THREADLOOPTRACE)
 			cerr << /*this <<*/ ": Solving " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
 		pthread_mutex_unlock(&threaddatalock);
-#else
+#else //SINGLE THREADED
 		if(iterations-- == 0)
 			break;
 		cardmachine->getnewgame(cardsi, twoprob0wins);
 		if(THREADLOOPTRACE)
 			cerr << /*this <<*/ ": Solving " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
-#endif
+#endif //ALL THREADEDNESS
 		for(int i=0; i<4; i++) 
 			for(int j=0; j<MAX_NODETYPES; j++)
 				actioncounters[i][j] = 0;
 		walker(PREFLOP,0,0,1,1);
-#ifdef DO_THREADS
+#ifdef DO_THREADS //MULTI THREADED
 		pthread_mutex_lock(&threaddatalock);
 		if(THREADLOOPTRACE && false)
 			cerr << this << ": Done with " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
 		//set datainuse of whatever we were doing to false
-		if(!datainuse[2*cardsi[PREFLOP][P0]] || !datainuse[2*cardsi[PREFLOP][P1]+1])
-			REPORT("we didn't have the lock... sadness...");
-		datainuse[2*cardsi[PREFLOP][P0]] = false;
-		datainuse[2*cardsi[PREFLOP][P1]+1] = false;
+		datainuse0[2*cardsi[PREFLOP][P0]] = false;
+		datainuse0[2*cardsi[PREFLOP][P1]+1] = false;
+#if !USE_HISTORY
+		datainuse1[2*cardsi[FLOP][P0]] = false;
+		datainuse1[2*cardsi[FLOP][P1]+1] = false;
+		datainuse2[2*cardsi[TURN][P0]] = false;
+		datainuse2[2*cardsi[TURN][P1]+1] = false;
+		datainuse3[2*cardsi[RIVER][P0]] = false;
+		datainuse3[2*cardsi[RIVER][P1]+1] = false;
+#endif
 		pthread_cond_signal(&signaler); //new data is availble to be touched, so signal
 #endif
 	}
@@ -695,7 +721,7 @@ fpworking_type Solver::walker(int gr, int pot, int beti, fpworking_type prob0, f
 	{
 		//utility will be unused, children's regret will be unaffected
 		//performance hack
-		if(stratt[i]==0.0 && ((mynode.playertoact==0.0 && prob1==0.0) || (mynode.playertoact==1 && prob0==0.0)) )
+		if(stratt[i]==0.0 && ((mynode.playertoact==0 && prob1==0.0) || (mynode.playertoact==1 && prob0==0.0)) )
 		{
 			//same code as in dummywalker
 			switch(mynode.result[i])

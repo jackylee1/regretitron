@@ -59,12 +59,13 @@ private:
 	static MemoryManager * memory;
 #ifdef DO_THREADS
 	static pthread_mutex_t threaddatalock;
-#if USE_HISTORY
-	static list<iteration_data_t> dataqueue;
-	static bool datainuse[PFLOP_CARDSI_MAX*2];
 	static pthread_cond_t signaler;
-#else
-	static pthread_mutex_t * cardsilocks[4]; //one lock per player per gameround per cardsi
+	static list<iteration_data_t> dataqueue;
+	static bool datainuse0[PFLOP_CARDSI_MAX*2];
+#if !USE_HISTORY
+	static bool datainuse1[FLOP_CARDSI_MAX*2];
+	static bool datainuse2[TURN_CARDSI_MAX*2];
+	static bool datainuse3[RIVER_CARDSI_MAX*2];
 #endif
 #endif
 	//any info I want to get out of (recursive function) bounder, has to be put here
