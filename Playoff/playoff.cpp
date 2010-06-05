@@ -62,7 +62,11 @@ private:
 	double _stacksize;
 	double totalwinningsbot0; //this refers to the bot ORIGINALLY placed in slot 0. (swaps always done in pairs)
 	int64 totalpairsplayed;
+#if PLAYOFFDEBUG > 0
+	MTRand &mersenne;
+#else
 	MTRand mersenne; //used for card dealing, default initialized...that uses clock and time
+#endif
 };
 
 const double Playoff::_sblind = 1.0;
@@ -71,7 +75,12 @@ const double Playoff::_bblind = 2.0;
 Playoff::Playoff(string file1, string file2)
 	: _bots(2, NULL),
 	  totalwinningsbot0(0),
-	  totalpairsplayed(0)
+	  totalpairsplayed(0),
+#if PLAYOFFDEBUG > 0
+	  mersenne(playoff_rand) //alias to globally defined object
+#else
+	  mersenne() //my own local object seeded with time and clock
+#endif
 {
 	_bots[0] = new BotAPI(file1, "Tom", true);
 	_bots[1] = new BotAPI(file2, "Mary", true);
@@ -150,10 +159,14 @@ void Playoff::playgamepair()
 	//play a game each way, make sure to never swap once, as then we'd lose track of which bot is which
 	//_bots of zero is always player zero, _bots of one is always player one
 
-	totalwinningsbot0 += playonegame(priv, board, twoprob0wins); //returns utility of player/bot 0
+	double game1 = playonegame(priv, board, twoprob0wins); //returns utility of player/bot 0
 	swap(_bots[0], _bots[1]);
-	totalwinningsbot0 -= playonegame(priv, board, twoprob0wins); //returns utility of player/bot 0
+	double game2 = -playonegame(priv, board, twoprob0wins); //returns utility of player/bot 0
 	swap(_bots[0], _bots[1]);
+#if PLAYOFFDEBUG > 0
+	cout << game1 << "  " << (game2 != 0 ? game2 : 0) << endl; //avoid "-0" printing
+#endif
+	totalwinningsbot0 += game1 + game2;
 }
 
 double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0wins) //return utility to player/bot 0

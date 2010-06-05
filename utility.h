@@ -5,6 +5,15 @@
 #include <sstream>
 #include <vector>
 #include <poker_defs.h>
+#include "MersenneTwister.h"
+
+// this is useful for debugging playoff
+
+#define PLAYOFFDEBUG -1 //if > 0 will seed playoff and use this MTRand
+#if PLAYOFFDEBUG > 0
+#warning Playoff debug is ON. A global MTRand will be created.
+extern MTRand playoff_rand;
+#endif
 
 // how to get a 64 bit integer type
 

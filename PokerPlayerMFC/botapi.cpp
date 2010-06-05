@@ -22,7 +22,11 @@ BotAPI::BotAPI(string xmlfile, string botname, bool preload)
 	 isloggingon(false),
 	 MyWindow(NULL),
      isdiagnosticson(false),
-     actionchooser(), //seeds rand with time and clock
+#if PLAYOFFDEBUG > 0
+	 actionchooser(playoff_rand), //alias to globally defined object from utility.cpp
+#else
+     actionchooser(), //per BotAPI object, seeded with time and clock
+#endif
 	 mystrats(0), //initialize empty
 	 currstrat(NULL),
 	 actualinv(2, -1), //size is 2, initial values are -1
@@ -129,6 +133,10 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 			besterror = error;
 			currstrat = mystrats[i]; //pointer
 		}
+	}
+	if(besterror > 1e20)
+	{
+		REPORT("Could find no suitable strategy to play with a stacksize of "+tostring(stacksize/bblind)+" bblinds in "+(islimit()?"limit.":"no-limit."));
 	}
 
 	if(isloggingon)

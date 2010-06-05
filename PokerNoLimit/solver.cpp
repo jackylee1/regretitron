@@ -367,12 +367,14 @@ found_good_data:
 	}
 }
 
-inline pair<fpworking_type, fpworking_type> utilpair(fpworking_type p0utility)
+inline pair<fpworking_type, fpworking_type> utilpair(int p0utility)
 {
+	const fpworking_type aggression_multiplier = (fpworking_type)1 + (fpworking_type)AGGRESSION_FACTOR/100;
+
 	if(p0utility>0)
-		return make_pair(AGGRESSION_FACTOR*p0utility, -p0utility);
+		return make_pair( aggression_multiplier * (fpworking_type)rake(p0utility), -p0utility);
 	else
-		return make_pair(p0utility, -AGGRESSION_FACTOR*p0utility);
+		return make_pair( p0utility, aggression_multiplier * (fpworking_type)rake(-p0utility));
 }
 
 

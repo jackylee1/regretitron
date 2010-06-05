@@ -1,11 +1,16 @@
-#include "stdafx.h"
 #include "utility.h"
+#include "stdafx.h"
 #include "PokerLibrary/constants.h"
 #include <sstream>
 #include <iomanip>
-#include "MersenneTwister.h"
 #include <fstream>
 using namespace std;
+
+// this is useful for debugging playoff
+
+#if PLAYOFFDEBUG > 0
+MTRand playoff_rand(PLAYOFFDEBUG);
+#endif
 
 // how to get seconds with milliseconds
 

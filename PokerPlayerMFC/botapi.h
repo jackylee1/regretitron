@@ -5,6 +5,7 @@
 #include "../PokerLibrary/treenolimit.h"
 #include "../PokerLibrary/constants.h"
 #include "../MersenneTwister.h"
+#include "../utility.h"
 #include <vector>
 #include <string>
 #include <poker_defs.h>
@@ -68,7 +69,11 @@ private:
 	bool isdiagnosticson;
 
 	//private data
+#if PLAYOFFDEBUG > 0
+	MTRand &actionchooser;
+#else
 	MTRand actionchooser;
+#endif
 	vector<Strategy*> mystrats;
 	Strategy * currstrat; //pointer from above array
 

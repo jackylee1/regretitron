@@ -1,4 +1,4 @@
-#include "../HandIndexingV1/getindex2N.h"
+ #include "../HandIndexingV1/getindex2N.h"
 #include "../HandIndexingV1/constants.h"
 #include "../PokerLibrary/binstorage.h"
 #include "../MersenneTwister.h"
@@ -21,7 +21,8 @@
 using namespace std;
 using namespace boost;
 
-const bool WalkTrees_debug = true;
+const bool WalkTrees_debug = false;
+const int Playoff_debug = -1; //if > 0 will seed random
 const double Multiplier_debug = 2.0;
 
 
@@ -1042,6 +1043,9 @@ void playoffs(const string &tom_file, int tom_bins, const string &mary_file, int
 	vector<int> random_vector(52);
 	MTRand random;
 
+	if(Playoff_debug>0) //useful for debugging
+		random.seed(Playoff_debug);
+
 	do
 	{
 		for(int x=0; x<numgames; x++)
@@ -1085,17 +1089,25 @@ void playoffs(const string &tom_file, int tom_bins, const string &mary_file, int
 
 			tie(utility, resulttype) = playgame(tom_root, mary_root, 0, tom_buckets, mary_buckets, tom_tree, mary_tree, random);
 			if(resulttype == TerminalP0Wins)
-				tom_utilitysum += utility;
+				utility *= 1;
 			else if(resulttype == TerminalP1Wins)
-				tom_utilitysum -= utility;
+				utility *= -1;
+
 			else if(resulttype == TerminalShowDown)
 			{
 				if(hand0_val > hand1_val)
-					tom_utilitysum +=utility;
+					utility *= 1;
 				else if(hand1_val > hand0_val)
-					tom_utilitysum -=utility;
+					utility *= -1;
+				else //tie
+					utility = 0;
 			}
 			else REPORT("err");
+
+			if(Playoff_debug > 0)
+				cout << Multiplier_debug*(utility == 0 ? 0 : utility) << "  ";
+
+			tom_utilitysum += utility;
 
 			//Now, MARY plays as player ZERO with hand ZERO
 			//      TOM plays as player ONE with hand ONE
@@ -1111,17 +1123,24 @@ void playoffs(const string &tom_file, int tom_bins, const string &mary_file, int
 
 			tie(utility, resulttype) = playgame(mary_root, tom_root, 0, mary_buckets, tom_buckets, mary_tree, tom_tree, random);
 			if(resulttype == TerminalP0Wins)
-				tom_utilitysum -= utility;
+				utility *= -1;
 			else if(resulttype == TerminalP1Wins)
-				tom_utilitysum += utility;
+				utility *= 1;
 			else if(resulttype == TerminalShowDown)
 			{
 				if(hand0_val > hand1_val)
-					tom_utilitysum -=utility;
+					utility *= -1;
 				else if(hand1_val > hand0_val)
-					tom_utilitysum +=utility;
+					utility *= 1;
+				else //tie
+					utility = 0;
 			}
 			else REPORT("err");
+
+			if(Playoff_debug > 0)
+				cout << Multiplier_debug*(utility == 0 ? 0 : utility) << endl;
+
+			tom_utilitysum += utility;
 
 		}
 
