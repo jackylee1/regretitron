@@ -57,13 +57,16 @@ private:
 	// private data members
 
 	vector<BotAPI*> _bots; //_bots[0] always plays as P0, same for _bots[1].
-	static const double _sblind = 1.0;
-	static const double _bblind = 2.0;
+	static const double _sblind;
+	static const double _bblind;
 	double _stacksize;
 	double totalwinningsbot0; //this refers to the bot ORIGINALLY placed in slot 0. (swaps always done in pairs)
 	int64 totalpairsplayed;
 	MTRand mersenne; //used for card dealing, default initialized...that uses clock and time
 };
+
+const double Playoff::_sblind = 1.0;
+const double Playoff::_bblind = 2.0;
 
 Playoff::Playoff(string file1, string file2)
 	: _bots(2, NULL),
