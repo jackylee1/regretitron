@@ -14,7 +14,6 @@
 Strategy::Strategy(string xmlfilename, bool preload) : 
 	_xmlfilename(xmlfilename),
 	tree(NULL),
-	actionmax(4, vector<int>(MAX_NODETYPES, 0)), // 2D array of ints all zero
 	cardmach(NULL),
 	dataoffset(4, vector<int64>(MAX_NODETYPES, 0)) // array of (4 x MAX_NODETYPES) 0's
 {
@@ -82,10 +81,7 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 		treesettings.pushfold = xmltree->FirstChildElement("meta")->GetAttribute<bool>("pushfold");
 		treesettings.limit = xmltree->FirstChildElement("meta")->GetAttribute<bool>("limit");
 		tree = new BettingTree(treesettings);
-
-		//set action max
-
-		GetTreeSize(*tree, actionmax);
+		treeroot = createtree(*tree);
 
 		//set strategy file
 
@@ -115,14 +111,14 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 	int64 nextoffset = 4*MAX_NODETYPES*8; //should be start of data
 	for(int gr=0; gr<4; gr++)
 	{
-		for(int i=7; i>=0; i--) //loops must go in same order as done in memorymgr.
+		for(int n=9; n>=2; n--) //loops must go in same order as done in memorymgr.
 		{
 			int64 thisoffset;
 			strategyfile.read((char*)&thisoffset, 8);
 			if(thisoffset != nextoffset)
 				REPORT("redundant offset storage has revealed errors in strategy file");
-			dataoffset[gr][i] = thisoffset;
-			nextoffset = thisoffset + actionmax[gr][i]*cardmach->getcardsimax(gr)*(i+3);
+			dataoffset[gr][n-2] = thisoffset;
+			nextoffset = thisoffset + get_property(gettree(), maxorderindex_tag())[gr][n] * cardmach->getcardsimax(gr) * (n+1);
 		}
 	}
 	if(dataoffset[0][7] != strategyfile.tellg() || strategyfilesize != nextoffset || !strategyfile.good())
@@ -149,7 +145,7 @@ void Strategy::getprobs(int gr, int actioni, int numa, const vector<CardMask> &c
 	unsigned char charprobs[MAX_ACTIONS];
 	unsigned char checksum;
 	//seekg ( offset + combinedindex * sizeofeachdata )
-	strategyfile.seekg( dataoffset[gr][numa-2] + combine(cardsi, actioni, actionmax[gr][numa-2]) * (numa+1) );
+	strategyfile.seekg( dataoffset[gr][numa-2] + combine(cardsi, actioni, get_property(gettree(), maxorderindex_tag())[gr][numa]) * (numa+1) );
 	strategyfile.read((char*)charprobs, numa);
 	if(strategyfile.gcount()!=numa || strategyfile.eof())
 		REPORT("strategy file has failed us - reading data.");

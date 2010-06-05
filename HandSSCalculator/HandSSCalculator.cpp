@@ -7,7 +7,6 @@
 #include <iomanip>
 #include "../utility.h"
 #include "../PokerLibrary/floaterfile.h"
-#include <cmath>
 using namespace std;
 
 const string BINSFOLDER = ""; //current directory
@@ -286,7 +285,7 @@ inline bool fpcompare(floater x, floater y)
 	// those two indices to not be recognized as teh same HSS, and then
 	// they HAPPEN to fall on the edge of a bin, and go into different bins.
 	//that is the bug
-	return std::abs(x - y) <= EPSILON * std::abs(x);
+	return myabs(x - y) <= EPSILON * myabs(x);
 }
 
 struct RawHand

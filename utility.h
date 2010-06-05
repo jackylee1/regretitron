@@ -33,6 +33,15 @@ extern std::string getdirectory();
 extern std::string space(int64 bytes);
 extern bool file_exists(std::string filename);
 
+//floating point comparison!
+
+template <typename Num> inline Num myabs(Num x) { return (x < 0 ? -x : x); } //this fucking thing
+template <typename Num> inline Num mymin(Num x, Num y) { return (x < y ? x : y); }
+template <typename Num> inline Num mymax(Num x, Num y) { return (x > y ? x : y); }
+extern bool fpequal(double x, double y, int maxUlps=10);
+inline bool fpgreater(double x, double y) { return x > y && !fpequal(x,y); }
+inline bool fpgreatereq(double x, double y) { return x > y || fpequal(x,y); }
+
 //how to get strings of things!
 
 template <typename T> 

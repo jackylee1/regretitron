@@ -167,6 +167,34 @@ bool file_exists(string filename)
 	return test.good() && test.is_open();
 }
 
+//comparing floating point values
+
+inline bool issmall(double small) { return myabs(small) < 1e-9; }
+
+bool fpequal(double x, double y, int maxUlps) //from http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
+{
+	if(issmall(x) && issmall(y) && x*y >= 0.0)
+		return true;
+
+	// Make sure maxUlps is non-negative and small enough that the
+	// default NAN won't compare as equal to anything.
+	if(!(maxUlps > 0 && maxUlps < 4 * 1024 * 1024)) REPORT("bad ulps");
+
+	//voodoo!
+	union { int64 asint; double asdouble; } xInt, yInt;
+	xInt.asdouble = x;
+	yInt.asdouble = y;
+
+	// Make the ints lexicographically ordered as a twos-complement int
+	if (xInt.asint < 0) xInt.asint = 0x8000000000000000 - xInt.asint;
+	if (yInt.asint < 0) yInt.asint = 0x8000000000000000 - yInt.asint;
+
+	//compare and done!
+	if(myabs(xInt.asint - yInt.asint) <= maxUlps)
+		return true;
+	return false;
+}
+
 // perform the magic numbers test, validates data integrity on multiple systems
 
 template <typename T> //only used below

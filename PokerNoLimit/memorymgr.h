@@ -8,9 +8,9 @@ using std::string;
 #include <vector>
 using std::vector;
 #include "../utility.h"
+#include "../PokerLibrary/treenolimit.h"
 
 //forward declaration
-class BettingTree;
 class CardMachine;
 
 //algorithm data

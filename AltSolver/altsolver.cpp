@@ -21,6 +21,9 @@
 using namespace std;
 using namespace boost;
 
+const bool WalkTrees_debug = true;
+const double Multiplier_debug = 2.0;
+
 
 /*************************
   this code is designed for up to 4 game rounds and up to 9 actions per node.
@@ -492,7 +495,7 @@ getorderindex(Vertex nodetofind, Vertex root, const Graph &tree)
 //  Main Recursive Algorithm
 //
 
-double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbucketsequence, double prob0, double prob1, double runningcost, Graph &tree)
+double WalkTrees(Vertex root, Vertex player0, Vertex player1, const BucketSequence &jointbucketsequence, double prob0, double prob1, double runningcost, Graph &tree)
 {
 	if(tree[player0] != tree[player1])
 		REPORT("trees got mismatched somewhere....");
@@ -524,6 +527,18 @@ double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbuck
 					strategy[j++] = (tree[*e].regret > 0 ? tree[*e].regret/totalregret : 0);
 			}
 
+			//debug printing
+
+			if(WalkTrees_debug)
+			{
+				int gr, actioni;
+				tie(gr, tuples::ignore, actioni) = getorderindex(player0, root, tree);
+				cout << "Starting Gameround: " << gr << /*" Pot: " << pot <<*/ " Actioni: " << actioni << " Cardsi: " << jointbucketsequence.index(0,gr) << endl;
+				cout << "Prob0: " << prob0 << " Prob1: " << prob1 << " Stratt[]: { ";
+				for(Size i=0; i<n; i++) cout << strategy[i] << " ";
+				cout << "}" << endl << endl;
+			}
+
 			//set the utility from the children and get average utility
 
 			vector<double> utility(n);
@@ -533,7 +548,7 @@ double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbuck
 				for(Size j=0; j<n; j++)
 				{
 					utility[j] = (prob1==0 && strategy[j]==0 ? 0 : //speed hack
-						WalkTrees(target(*e, tree), target(*eo, tree), jointbucketsequence, strategy[j] * prob0, prob1, runningcost + tree[*e].cost, tree));
+						WalkTrees(root, target(*e, tree), target(*eo, tree), jointbucketsequence, strategy[j] * prob0, prob1, runningcost + tree[*e].cost, tree));
 					e++; eo++;
 					totalutility += utility[j] * strategy[j];
 				}
@@ -548,6 +563,20 @@ double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbuck
 					tree[*e].strat += prob0 * strategy[j];
 					tree[*e++].regret += prob1 * (utility[j] - totalutility);
 				}
+			}
+
+			//debug printing
+
+			if(WalkTrees_debug)
+			{
+				int gr, actioni;
+				tie(gr, tuples::ignore, actioni) = getorderindex(player0, root, tree);
+				cout << "Ending Gameround: " << gr << /*" Pot: " << pot <<*/ " Actioni: " << actioni << " Cardsi: " << jointbucketsequence.index(0,gr) << endl;
+				cout << "Utility[].first: { ";
+				for(Size i=0; i<n; i++) cout << Multiplier_debug*utility[i] << " ";
+				cout << "} Utility[].second: { ";
+				for(Size i=0; i<n; i++) cout << -Multiplier_debug*utility[i] << " ";
+				cout << "}" << endl << endl;
 			}
 
 			return totalutility;
@@ -578,6 +607,18 @@ double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbuck
 					strategy[j++] = (tree[*e].regret > 0 ? tree[*e].regret/totalregret : 0);
 			}
 
+			//debug printing
+
+			if(WalkTrees_debug)
+			{
+				int gr, actioni;
+				tie(gr, tuples::ignore, actioni) = getorderindex(player1, root, tree);
+				cout << "Starting Gameround: " << gr << /*" Pot: " << pot <<*/ " Actioni: " << actioni << " Cardsi: " << jointbucketsequence.index(1,gr) << endl;
+				cout << "Prob0: " << prob0 << " Prob1: " << prob1 << " Stratt[]: { ";
+				for(Size i=0; i<n; i++) cout << strategy[i] << " ";
+				cout << "}" << endl << endl;
+			}
+
 			//set the utility from the children and get average utility
 
 			vector<double> utility(n);
@@ -587,7 +628,7 @@ double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbuck
 				for(Size j=0; j<n; j++)
 				{
 					utility[j] = (prob0 == 0 && strategy[j] == 0 ? 0 : //speed hack
-							-WalkTrees(target(*eo, tree), target(*e, tree), jointbucketsequence, prob0, strategy[j] * prob1, runningcost + tree[*e].cost, tree));
+							-WalkTrees(root, target(*eo, tree), target(*e, tree), jointbucketsequence, prob0, strategy[j] * prob1, runningcost + tree[*e].cost, tree));
 					e++; eo++;
 					totalutility += utility[j] * strategy[j];
 				}
@@ -604,6 +645,20 @@ double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbuck
 				}
 			}
 
+			//debug printing
+
+			if(WalkTrees_debug)
+			{
+				int gr, actioni;
+				tie(gr, tuples::ignore, actioni) = getorderindex(player1, root, tree);
+				cout << "Ending Gameround: " << gr << /*" Pot: " << pot <<*/ " Actioni: " << actioni << " Cardsi: " << jointbucketsequence.index(1,gr) << endl;
+				cout << "Utility[].first: { ";
+				for(Size i=0; i<n; i++) cout << -Multiplier_debug*utility[i] << " ";
+				cout << "} Utility[].second: { ";
+				for(Size i=0; i<n; i++) cout << Multiplier_debug*utility[i] << " ";
+				cout << "}" << endl << endl;
+			}
+
 			return -totalutility;
 		}
 		case BucketR0:
@@ -614,7 +669,7 @@ double WalkTrees(Vertex player0, Vertex player1, const BucketSequence &jointbuck
 			int r = tree[player0] - BucketR0;
 			Edge e0 = *(out_edges(player0,tree).first + jointbucketsequence.access(0,r));
 			Edge e1 = *(out_edges(player1,tree).first + jointbucketsequence.access(1,r));
-			return WalkTrees(target(e0,tree), target(e1,tree), jointbucketsequence, prob0, prob1, runningcost + tree[e0].cost, tree);
+			return WalkTrees(root, target(e0,tree), target(e1,tree), jointbucketsequence, prob0, prob1, runningcost + tree[e0].cost, tree);
 		}
 
 		case TerminalP0Wins:
@@ -1089,27 +1144,40 @@ int main(int argc, char *argv[])
 		playoffs(argv[2], atoi(argv[3]), argv[4], atoi(argv[5]));
 	else if(argc==7 && strcmp(argv[1],"playoff")==0)
 		playoffs(argv[2], atoi(argv[3]), argv[4], atoi(argv[5]), atol(argv[6]));
-	else if(argc==4 && strcmp(argv[1],"solve")==0)
+	else if(argc==5 && strcmp(argv[1],"solve")==0)
 	{
 		Graph tree;
 
+		//parse number of iterations
+
 		vector<int> max_bin(4, atoi(argv[2]));
-		int64 maxiterations = (int64)atoi(argv[3])*1000000;
+		int64 maxiterations = 1;
+		if(argv[3][strlen(argv[3])-1]=='M')
+		{
+			maxiterations = 1e6;
+			argv[3][strlen(argv[3])-1]='\0';
+		}
+		maxiterations *= (int64)atoi(argv[3]);
+
+		//initialize some data
 
 		Vertex root = createLimitTree(tree,max_bin);
-		string filename = "alt-limit-"+tostring(max_bin[0])+"bin";
+		string filename = string(argv[4])+"-"+tostring(max_bin[0])+"bin";
 
 		LimitBuckets myseq(max_bin, 3/*seed*/);
-		char counter = 'B';
+		const int iterdivide = 1;
+		char counter = 'A'+iterdivide-1;
 		int64 iterations = 0;
 		double starttime = getdoubletime();
 
-		for(int x=0; x<2; x++)
+		//do iterations in iterdivide many blocks
+
+		for(int x=0; x<iterdivide; x++)
 		{
-			for(int64 i=0; i<maxiterations/2; i++)
+			for(int64 i=0; i<maxiterations/iterdivide; i++)
 			{
 				myseq.dealrandomly();
-				WalkTrees(root, root, myseq, 1.0, 1.0, 0.0, tree);
+				WalkTrees(root/*(for debugging)*/, root, root, myseq, 1.0, 1.0, 0.0, tree);
 				iterations++;
 			}
 
@@ -1156,7 +1224,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	{ 
-		cout << "Usage: " << argv[0] << " solve [number of bins] [number of total iterations in millions]" << endl; 
+		cout << "Usage: " << argv[0] << " solve [number of bins] [number of total iterations (append 'M' for millions)] [filename prefix]" << endl; 
 		cout << "              solves that many iterations of limit with histbin n-n-n-n" << endl;
 		cout << "       " << argv[0] << " playoff [strat file 1] [number of bins 1] [strat file 2] [number of bins 2]" << endl;
 		cout << "              plays games continually outputting the result to the screen." << endl;

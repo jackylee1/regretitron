@@ -74,18 +74,19 @@ Playoff::Playoff(string file1, string file2)
 	_bots[1] = new BotAPI(file2, "Mary", true);
 	if(_bots[0]->islimit() != _bots[1]->islimit())
 		REPORT("You can't play a limit bot against a no-limit bot!");
-	double stacksize1 = _bots[0]->getstacksizemult();
-	double stacksize2 = _bots[1]->getstacksizemult();
-	if(stacksize1 != stacksize2)
+	double stacksizemult1 = _bots[0]->getstacksizemult();
+	double stacksizemult2 = _bots[1]->getstacksizemult();
+	if(!fpequal(stacksizemult1, stacksizemult2))
 	{
-		_stacksize = (stacksize1 + stacksize2) / 2;
-		string gametype = _bots[0]->islimit() ? "limit" : "no-limit";
-		REPORT(file1+" has stacksize "+tostring(stacksize1)+" while "+file2+" has stacksize "
-				+tostring(stacksize2)+" for "+gametype+" poker... using "+tostring(_stacksize)+".", WARN);
+
+		_stacksize = _bots[0]->islimit() ? min(stacksizemult1,stacksizemult2) : (stacksizemult1+stacksizemult2) / 2.0;
+		REPORT(file1+" has stacksize "+tostring(stacksizemult1)+"bb while "+file2+" has stacksize "
+				+tostring(stacksizemult2)+"bb for "+(_bots[0]->islimit() ? "limit" : "no-limit")
+				+" poker... using "+tostring(_stacksize)+"bb.", WARN);
 		_stacksize *= _bblind;
 	}
 	else
-		_stacksize = stacksize1 * _bblind;
+		_stacksize = stacksizemult1 * _bblind;
 }
 
 Playoff::~Playoff()
@@ -193,7 +194,7 @@ Result Playoff::playoutaround(Player nexttogo, double &pot)
 		double amount;
 		Action act = _bots[nexttogo]->getbotaction(amount);
 
-		if(pot+amount >= _stacksize)
+		if(fpgreater(pot+amount, _stacksize))
 			REPORT("my bot bet more than the set stacksize");
 
 		//handle each type of bot action, telling the bots only if further action needed
@@ -216,12 +217,12 @@ Result Playoff::playoutaround(Player nexttogo, double &pot)
 			}
 		}
 
-		//The bot bet: either BET or ALLIN. Either way, continue the loop.
+		//The bot bet: either BET or BETALLIN. Either way, continue the loop.
 
 		_bots[P0]->doaction(nexttogo, act, amount);
 		_bots[P1]->doaction(nexttogo, act, amount);
 		nexttogo = (nexttogo == P0) ? P1 : P0;
-		if(act == ALLIN) prev_act_was_allin = true;
+		if(act == BETALLIN) prev_act_was_allin = true;
 	}
 }
 

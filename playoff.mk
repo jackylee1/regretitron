@@ -1,7 +1,7 @@
 CPP := g++# for C++ code
 CC := gcc# for C code
 # compiler flags:
-CFLAGS := -Wall -DTIXML_USE_TICPP -march=native
+CFLAGS := -Wall -DTIXML_USE_TICPP -march=native -Wno-deprecated
 # linker flags:
 # define library paths in addition to /usr/lib with -L
 # define any libraries to link into executable with -l

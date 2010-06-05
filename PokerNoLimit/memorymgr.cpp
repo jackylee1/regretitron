@@ -78,8 +78,12 @@ stratN_t<N>::stratN_t(const dataN_t<N> &data) : checksum(0)
 	
 //cout how much memory will use, then allocate it
 MemoryManager::MemoryManager(const BettingTree &tree, const CardMachine &cardmach)
+	: actionmax(4, vector<int>(MAX_NODETYPES, 0))
 {
-	GetTreeSize(tree, actionmax); //fills actionmax from the tree
+	//this is just easier, to store the actionmax here, and then not change this code.
+	for(int gr=0; gr<4; gr++)
+		for(int a=0; a<MAX_NODETYPES; a++)
+			actionmax[gr][a] = get_property(tree, maxorderindex_tag())[gr][a+2];
 
 	//print out space requirements, then pause
 

@@ -67,7 +67,8 @@ private:
 	int handsplayed;
 	const double _sblind;
 	const double _bblind;
-	double _stacksize;
+	vector<double> stacksizes;
+	double effstacksize;
 	Player human, bot;
 	CardMask humancards, botcards, flop, turn, river;
 	CardMask botcm0, botcm1, humancm0, humancm1;

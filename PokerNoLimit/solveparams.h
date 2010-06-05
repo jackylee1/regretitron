@@ -13,29 +13,32 @@ const int64 MILLION = 1000000;
 const int64 BILLION = THOUSAND*MILLION;
 
 //main settings
-const string SAVENAME = "E-8-s17429085";
-const int64 TESTING_AMT = 100; //do this many iterations as a test for speed
-const int64 STARTING_AMT = 100*MILLION; //do this many iterations, then...
-const double MULTIPLIER = 1.25; //multiply by this amount, do that many, repeat ....
+const string SAVENAME = "limit-4bin-test";
+const int64 TESTING_AMT = 1; //do this many iterations as a test for speed
+const int64 STARTING_AMT = 10;//22300*MILLION/4; //do this many iterations, then...
+const double MULTIPLIER = 1; //multiply by this amount, do that many, repeat ....
 const int64 SAVEAFTER = 0; // save xml after this amount
 const bool SAVESTRAT = true; //save strategy file when saving xml
-const int64 DO_BOUNDS_EVERY = MILLION*MILLION; //in addition to whenever the thing is saved
-const int64 STOPAFTER = 1*MILLION;  //stop after (at least) this amount of iterations
+const int64 STOPAFTER = 1*STARTING_AMT; //stop after (at least) this amount of iterations
 
 //solver settings
 #define FPSTORE_T double
 #define FPWORKING_T long double
-#define STORE_DENOM 1
+typedef FPWORKING_T fpworking_type;
+typedef FPSTORE_T fpstore_type;
+const fpworking_type AGGRESSION_FACTOR = 1.0; //slightly larger than one turns up the aggression, slightly less than one effectively emulates rake
+#define STORE_DENOM 0
 #define NUM_THREADS 1
 #define USE_HISTORY 1 //affects threading method
-const int N_LOOKAHEAD = 4; //affects threading performance
+const int N_LOOKAHEAD = 0; //affects threading performance
 const bool SEED_RAND = true;
-const int  SEED_WITH = 17429085;
+const int  SEED_WITH = 3;
 const bool THREADLOOPTRACE = false; //prints out debugging
+const bool WALKERDEBUG = true; //debug print
 
 //bin settings
 #if USE_HISTORY // this for my new binning method with history
-#define TEMP 8
+#define TEMP 4
 #define PFBIN TEMP
 #define FBIN TEMP
 #define TBIN TEMP
@@ -201,8 +204,6 @@ const treesettings_t TREESETTINGS =
 #endif
 
 //typedef the data types and store as strings for logging
-typedef FPWORKING_T fpworking_type;
-typedef FPSTORE_T fpstore_type;
 const char * const FPWORKING_TYPENAME = TOSTRING(FPWORKING_T);
 const char * const FPSTORE_TYPENAME = TOSTRING(FPSTORE_T);
 #undef FPWORKING_T

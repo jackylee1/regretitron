@@ -7,13 +7,14 @@
 #include "DiagnosticsPage.h" //to access radios for answer
 #include "../utility.h"
 #include <iomanip>
+#ifndef TIXML_USE_TICPP
+#define TIXML_USE_TICPP
+#endif
+#include "../TinyXML++/ticpp.h"
 
-bool fpequal(double a, double b)
+inline bool playerequal(Player player, NodeType nodetype)
 {
-	bool isequal = (a > b-0.00001 && a < b+0.00001);
-	if(isequal && a!=b)
-		REPORT("fpequal did something! a-b = "+tostring(a)+" - "+tostring(b)+" = "+tostring(a-b), INFO);
-	return isequal;
+	return ((player == P0 && nodetype == P0Plays) || (player == P1 && nodetype == P1Plays));
 }
 
 BotAPI::BotAPI(string xmlfile, string botname, bool preload)
@@ -22,15 +23,62 @@ BotAPI::BotAPI(string xmlfile, string botname, bool preload)
 	 MyWindow(NULL),
      isdiagnosticson(false),
      actionchooser(), //seeds rand with time and clock
-     mystrats(1, new Strategy(xmlfile, preload)), //initialize to one strat given by xmlfile
+	 mystrats(0), //initialize empty
 	 currstrat(NULL),
 	 actualinv(2, -1), //size is 2, initial values are -1
 	 perceivedinv(2, -1), //size is 2, initial values are -1
 	 cards(), //size is 0, will be resized
-	 answer(-1), 
-	 bot_status(INVALID),
-	 historyindexer(this)
+	 bot_status(INVALID)
 { 
+	//check the xml file to see if it's a bot or a collection of bots
+
+	using namespace ticpp;
+	const string olddirectory = getdirectory();
+	try
+	{
+		//load the xml
+		Document doc(xmlfile);
+		doc.LoadFile();
+
+		//check if it is a portfolio (false means do not throw if node not found
+		Element* root = doc.FirstChildElement("portfolio", false);
+		if(root == NULL) //this is not a portfolio, it is just a bot. 
+		{
+			mystrats.push_back(new Strategy(xmlfile, preload));
+		}
+		else //we actually have a portfolio
+		{
+
+			//check version
+			if(!root->HasAttribute("version") || root->GetAttribute<int>("version") != 0)
+				REPORT("Unsupported portfolio XML file (older/newer version).");
+
+			//set working directory to portfolio directory
+			string newdirectory = xmlfile.substr(0,xmlfile.find_last_of("/\\"));
+			if(newdirectory != xmlfile) //has directory info
+				setdirectory(xmlfile.substr(0,xmlfile.find_last_of("/\\")));
+
+			//loop, read each filename
+			Iterator<Element> child("bot");
+			for(child = child.begin(root); child != child.end(); child++)
+				mystrats.push_back(new Strategy(child->GetText(), preload));
+
+			if(mystrats.size() < 2)
+				REPORT("Portfolio only had "+tostring(mystrats.size())+" bots!");
+		}
+	}
+	catch(Exception &ex) //error parsing XML
+	{
+		REPORT(ex.what());
+		exit(-1);
+	}
+
+	//restore directory
+
+	setdirectory(olddirectory);
+
+	//set for logging
+
 	ostringstream f;
 	f << setw(10) << botname << ": ";
 	myname = f.str();
@@ -63,9 +111,19 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	double besterror = numeric_limits<double>::infinity();
 	for(unsigned int i=0; i<mystrats.size(); i++)
 	{
-		double error = mystrats[i]->gettree().getparams().stacksize 
-			/ mystrats[i]->gettree().getparams().bblind - stacksize/bblind;
-		if(error < 0) error = -error;
+		double error = (double)get_property(mystrats[i]->gettree(), settings_tag()).stacksize 
+				/ get_property(mystrats[i]->gettree(), settings_tag()).bblind  -  stacksize / bblind;
+
+		//in LIMIT, the bot MUST have at least as much chips as it has in real life.
+		//in NO LIMIT, it doesn't matter as much: if the bot thinks it has only a couple chips left
+		//  and pushes, it can still push in real life with its larger real-life stack and everything 
+		//  is approximately cool. But a limit bot can't do that - it can't bet all-in unless it can't
+		//  meet the current bet amount. So when it thinks that its only option is pushing and chooses
+		//  to do so, it will then be DONE and have NO more information for you to play the game with.
+		//so if it's limit, we ignore all bots with less stacksize than reality.
+		if(islimit() && fpgreater(0, error))
+		   continue;
+		error = myabs(error);
 		if(error < besterror)
 		{
 			besterror = error;
@@ -79,13 +137,15 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	//We go through the list of our private data and update each.
 
 	if(islimit())
-		multiplier = bblind / currstrat->gettree().getparams().bblind;
+		multiplier = bblind / get_property(currstrat->gettree(), settings_tag()).bblind;
 	else
-		multiplier = stacksize / currstrat->gettree().getparams().stacksize;
+		multiplier = stacksize / get_property(currstrat->gettree(), settings_tag()).stacksize;
+	//in no limit, we don't need to use this because we normalize the bet amounts to match stacksize
+	truestacksize = stacksize/multiplier;
 	actualinv[P0] = bblind/multiplier;
 	actualinv[P1] = sblind/multiplier;
-	perceivedinv[P0] = currstrat->gettree().getparams().bblind;
-	perceivedinv[P1] = currstrat->gettree().getparams().sblind;
+	perceivedinv[P0] = get_property(currstrat->gettree(), settings_tag()).bblind;
+	perceivedinv[P1] = get_property(currstrat->gettree(), settings_tag()).sblind;
 	actualpot = 0.0;
 	perceivedpot = 0;
 
@@ -94,14 +154,11 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	cards[PREFLOP] = myhand;
 
 	currentgr = PREFLOP;
-	currentbeti = 0;
-	currstrat->gettree().getnode(PREFLOP,perceivedpot,currentbeti,mynode);
+	currentnode = currstrat->gettreeroot();
 
 	offtreebetallins = false;
-	answer = -1;
 	bot_status = WAITING_ACTION;
 
-	historyindexer.reset(); //primes with PREFLOP info
 	processmyturn();
 }
 
@@ -111,7 +168,7 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 
 	if ((int)cards.size() != gr || currentgr != gr-1 || gr < FLOP || gr > RIVER) REPORT("you set the next round at the wrong time");
 	if (bot_status != WAITING_ROUND) REPORT("you must advancetree before you setflop");
-	if (actualinv[0] != actualinv[1]) REPORT("you both best be betting the same.");
+	if (!fpequal(actualinv[0], actualinv[1])) REPORT("you both best be betting the same.");
 	if (perceivedinv[0] != perceivedinv[1]) REPORT("perceived state is messed up");
 	if (!fpequal(actualpot+actualinv[0], newpot/multiplier)) REPORT("your new pot is unexpected.");
 
@@ -128,10 +185,18 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 	actualpot = newpot/multiplier;
 	cards.push_back(newboard);
 	currentgr = gr;
-	currentbeti = 0; //ready for P0 to act
-	currstrat->gettree().getnode(gr,perceivedpot,currentbeti,mynode);
+
+	EIter e, elast;
+	for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++)
+	{
+		if((currstrat->gettree())[*e].type == Call)
+		{
+			currentnode = target(*e, currstrat->gettree());
+			break;
+		}
+	}
+
 	bot_status = WAITING_ACTION;
-	historyindexer.push(currentgr, perceivedpot, currentbeti);
 	processmyturn();
 }
 
@@ -139,9 +204,9 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 void BotAPI::doaction(Player pl, Action a, double amount)
 {
 	if(bot_status != WAITING_ACTION) REPORT("doaction called at wrong time");
-	if(pl != mynode.playertoact) REPORT("doaction thought the other player should be acting");
+	if(!playerequal(pl, currstrat->gettree()[currentnode].type)) REPORT("doaction thought the other player should be acting");
 
-	if(a == ALLIN && pl == myplayer && offtreebetallins) 
+	if(a == BETALLIN && pl == myplayer && offtreebetallins) 
 	//if true, there would be no all-in node to find
 	//we just bet an allin, instead of call, due to offtreebetallins
 		return;
@@ -151,7 +216,7 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 	case FOLD:  REPORT("The bot does not need to know about folds");
 	case CALL:  docall (pl, amount/multiplier); break;
 	case BET:   dobet  (pl, amount/multiplier); break;
-	case ALLIN: doallin(pl);   break;
+	case BETALLIN: if(islimit()) REPORT("NO ALLIN 4 u!"); doallin(pl); break;
 	default:    REPORT("You advanced tree with an invalid action.");
 	}
 
@@ -160,92 +225,136 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 
 //amount is the total amount of a wager when betting/raising (relative to the beginning of the round)
 //          the amount aggreed upon when calling (same as above) or folding (not same as above)
+//amount is equal to a POTCONTRIB style of amount. see how you defined potcontrib in the betting tree for details.
+//amount is scaled and computed to be correct in the real game, regardless of what the bot sees.
+//we've already chosen our action already, this is just the function that the outside world
+//calls to get that answer.
 Action BotAPI::getbotaction(double &amount)
 {
 	//error checking
 
-	if(myplayer != mynode.playertoact) REPORT("You asked for an answer when the bot thought action was on opp.");
-	if(answer<0 || answer>=MAX_ACTIONS) REPORT("Inconsistant BotAPI state.");
+	if(bot_status != WAITING_ACTION) REPORT("bot is waiting for a round or is inconsistent state");
+	if(!playerequal(myplayer, currstrat->gettree()[currentnode].type)) REPORT("You asked for an answer when the bot thought action was on opp.");
+
+	//get the probabilities
+
+	vector<double> probabilities(out_degree(currentnode, currstrat->gettree()));
+	currstrat->getprobs(currentgr, (currstrat->gettree())[currentnode].actioni,
+			out_degree(currentnode, currstrat->gettree()), cards, probabilities);
+
+	if(isloggingon)
+	{
+		logfile << myname << "At node: gameround = " << currentgr << ", cardsi = " << currstrat->getcardmach().getcardsi(currentgr, cards) << ", actioni = " << (currstrat->gettree())[currentnode].actioni << endl;
+		logfile << myname << "My options: ((";
+		EIter e, elast;
+		for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++)
+			logfile << actionstring(currstrat->gettree(), *e, multiplier) << "  ";
+		logfile << ")) = < ";
+		for(unsigned i=0; i<out_degree(currentnode, currstrat->gettree()); i++)
+			logfile << setprecision(3) << fixed << 100*probabilities[i] << "% ";
+		logfile << ">" << endl;
+	}
+
+	//choose an action
+
+	//in limit, we choose either the random one, or the most expensive affordable action, whichever is less
+	//uses fact that the edges are inserted in tree in order of cost (or potcontrib that is)
+
+	double randomprob = actionchooser.randExc(), cumulativeprob = 0;
+	EIter eanswer, efirst, elast;
+	tie(efirst, elast) = out_edges(currentnode, currstrat->gettree());
+	int i=0;
+	for(tie(eanswer, elast) = out_edges(currentnode, currstrat->gettree()); eanswer!=elast; eanswer++, i++)
+	{
+		cumulativeprob += probabilities[i];
+		if( (cumulativeprob > randomprob || (fpequal(cumulativeprob, 1) && fpequal(randomprob, 1)))
+				|| ( islimit() && fpgreatereq(perceivedpot + (currstrat->gettree())[*eanswer].potcontrib, truestacksize) ) )
+			break;
+	}
+
+	if(eanswer == elast) //can't be rounding error
+		REPORT("broken answer choosing mechanism!");
+
+	if(isloggingon)
+		logfile << myname << "Chose " << actionstring(currstrat->gettree(), *eanswer, multiplier) << endl << endl;
+
+	//potentially over-ride choice with diagnostics window
 
 #ifdef _MFC_VER
-	//replace strategy-chosen answer with answer from window if available
-
 	if(MyWindow!=NULL)
 	{
 		switch(MyWindow->GetCheckedRadioButton(IDC_RADIO1, IDC_RADIO9))
 		{
-		case IDC_RADIO1: answer=0; break;
-		case IDC_RADIO2: answer=1; break;
-		case IDC_RADIO3: answer=2; break;
-		case IDC_RADIO4: answer=3; break;
-		case IDC_RADIO5: answer=4; break;
-		case IDC_RADIO6: answer=5; break;
-		case IDC_RADIO7: answer=6; break;
-		case IDC_RADIO8: answer=7; break;
-		case IDC_RADIO9: answer=8; break;
-		default: REPORT("Failure of buttons.");
+			case IDC_RADIO1: eanswer=efirst+0; break;
+			case IDC_RADIO2: eanswer=efirst+1; break;
+			case IDC_RADIO3: eanswer=efirst+2; break;
+			case IDC_RADIO4: eanswer=efirst+3; break;
+			case IDC_RADIO5: eanswer=efirst+4; break;
+			case IDC_RADIO6: eanswer=efirst+5; break;
+			case IDC_RADIO7: eanswer=efirst+6; break;
+			case IDC_RADIO8: eanswer=efirst+7; break;
+			case IDC_RADIO9: eanswer=efirst+8; break;
+			case 0: break; //this is what we get if no radio button is chosen
+			default: REPORT("Failure of buttons.");
 		}
 	}
 #endif
 
 	//translate to Action type and set amount
 
-	Action myact;
-	switch(mynode.result[answer])
+	Action myact=BETALLIN; //compiler warnings. could put exit() after each REPORT to fix warnings.
+	switch((currstrat->gettree())[*eanswer].type)
 	{
-	case BetNode::NA:
-		REPORT("we chose an invalid action. no good guys.");
+		case Fold:
+			if((currstrat->gettree())[*eanswer].potcontrib != perceivedinv[myplayer])
+				REPORT("tree value does not match folding reality");
+			amount = multiplier * actualinv[myplayer];
+			myact = FOLD;
+			break;
 
-	case BetNode::FD:
-		if(mynode.potcontrib[answer] != perceivedinv[myplayer])
-			REPORT("tree value does not match folding reality");
-		amount = multiplier * actualinv[myplayer];
-		myact = FOLD;
-		break;
-
-	case BetNode::GO:
-		if(mynode.potcontrib[answer] != perceivedinv[1-myplayer])
-			REPORT("tree value does not match calling reality");
-		amount = multiplier * actualinv[1-myplayer];
-		myact = CALL;
-		break;
-
-	case BetNode::AI: //called all-in
-		if(!offtreebetallins) //as it should be
-		{
-			amount = -999999; //should be unused
+		case Call:
+			if((currstrat->gettree())[*eanswer].potcontrib != perceivedinv[1-myplayer])
+				REPORT("tree value does not match calling reality");
+			amount = multiplier * actualinv[1-myplayer];
 			myact = CALL;
-		}
-		else //but sometimes, we treat these nodes as BET all in instead of call.
-		{
-			if(mynode.numacts != 2)
-				REPORT("I thought we should be at a 2-membered node now! (fold or call all-in)");
-			amount = -999999; //should be unused
-			myact = ALLIN;
-		}
-		break;
+			break;
 
-	default:
-		if(currstrat->gettree().isallin(mynode.result[answer],mynode.potcontrib[answer],currentgr))
-		{
-			amount = -999999; //should be unused
-			myact = ALLIN;
-		}
-		else
-		{
-			amount = multiplier * (mynode.potcontrib[answer] + actualinv[1-myplayer]-perceivedinv[1-myplayer]);
-			if(amount < multiplier * mintotalwager())
+		case CallAllin:
+			amount = multiplier * (truestacksize - actualpot);
+			if(!offtreebetallins) //as it should be
+				myact = CALL;
+			else if(islimit() || out_degree(currentnode, currstrat->gettree()) != 2)
+				REPORT("Limit, or I thought we should be at a 2-membered node now! (fold or call all-in)");
+			else //but sometimes, we treat these nodes as BET all in instead of call.
+				myact = BETALLIN;
+			break;
+
+		case BetAllin:
+			amount = multiplier * (truestacksize - actualpot);
+			if(islimit()) //in limit, we acknowledge that a "bet allin" is actually a bet that we can't fully cover...
+				myact = BET;
+			else
+				myact = BETALLIN;
+			break;
+
+		case Bet:
+			if(islimit()) //this could be a covert all-in, as the bot has generally more chips than reality
+				amount = multiplier * mymin(truestacksize - actualpot, (double)(currstrat->gettree()[*eanswer].potcontrib));
+			else //all-ins would be handled above
 			{
-				if(isloggingon)
-					logfile << myname << "...changing bet amount from " << amount << " to " << multiplier * mintotalwager() << " ... " << endl;
-				REPORT("bot bet amount was less than multiplier * mintotalwager()", WARN);
-				amount = multiplier * mintotalwager();
+				amount = multiplier * ((currstrat->gettree())[*eanswer].potcontrib + actualinv[1-myplayer]-perceivedinv[1-myplayer]);
+				if(fpgreater(multiplier * mintotalwager(), amount))
+				{
+					if(isloggingon)
+						logfile << myname << "...changing bet amount from " << amount << " to " << multiplier * mintotalwager() << " ... " << endl;
+					REPORT("bot bet amount was less than multiplier * mintotalwager()", WARN);
+					amount = multiplier * mintotalwager();
+				}
 			}
 			myact = BET;
-		}
+			break;
 	}
 
-	answer = -1;
 	return myact;
 }
 
@@ -283,128 +392,86 @@ void BotAPI::dobet(Player pl, double amount)
 
 	//error checking 
 
-	if(amount < mintotalwager() || actualpot+amount >= currstrat->gettree().getparams().stacksize)
+	if(fpgreater(mintotalwager(), amount) || fpgreater(actualpot + amount, truestacksize))
 		REPORT("Invalid bet amount");
 
 	if(isloggingon)
 		logfile << (pl == myplayer ? myname : "  opponent: ") << "bet/raised $" << amount << endl;
 
-	//try to find the bet action that will set the new perceived pot closest to the actual
+	//NO LIMIT: try to find the bet action that will set the new perceived pot closest to the actual.
+	// if no bet actions, then offtreebetallins is invoked to handle this human's behavior that my tree does not have.
+	//LIMIT: we handle true bets and covert all-in's aka bets someone can't fully cover here. we want the 'Bet'
+	// or 'BetAllin' from the tree (doesn't matter) that has potcontrib equal-to or greater-than the given real-world
+	// amount. The only time it will be greater-than is if the real world is short-stacked
 
-	int bestaction=-1;
+	//find the 'Bet' node with amount closest to reality
 	double besterror = numeric_limits<double>::infinity();
-	for(int a=0; a<mynode.numacts; a++)
+	EIter e, elast, ebest;
+	for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++)
 	{
-		switch(mynode.result[a])
+		if((currstrat->gettree())[*e].type == Bet || (islimit() && (currstrat->gettree())[*e].type == BetAllin))
 		{
-		case BetNode::FD: 
-		case BetNode::GO: 
-		case BetNode::AI: 
-		case BetNode::NA:
-			continue;
-
-		default:
-			if(currstrat->gettree().isallin(mynode.result[a],mynode.potcontrib[a],currentgr))
+			double error = (double) (perceivedpot + (currstrat->gettree())[*e].potcontrib) - (actualpot + amount);
+			if(islimit() and fpgreater(0, error))
 				continue;
-
-			double error = (double)(perceivedpot + mynode.potcontrib[a]) - (actualpot + amount);
-			if(error < 0) error = -error;
+			error = myabs(error);
 			if(error < besterror)
 			{
-				bestaction = a;
+				ebest = e;
 				besterror = error;
 			}
 		}
 	}
-	if(besterror > 0.01 && isloggingon)
-		logfile << myname << "... best betting action found was a bet of $" << mynode.potcontrib[bestaction]*multiplier << " ..." << endl;
 
-	// if there's no bet, doallin, otherwise, update state.
-
-	if (bestaction == -1)
+	if(besterror > 1e20) //probably still infinity -> found no node
 	{
-		if(pl == myplayer) REPORT("the bot HAD to have bet from the tree. we should find a bet action.");
+		if(islimit()) REPORT("in limit, we could not find a 'Bet' node to match some player's Bet. Fatal.");
+		if(pl == myplayer) REPORT("could not find Bot's own bet action in tree. the bot HAD to have bet from the tree. we should find a bet action.");
 		else REPORT("the oppenent bet when the tree had no betting actions. off tree -> treating as all-in", INFO);
 		offtreebetallins = true;
 		doallin(pl);
 	}
 	else
 	{
+		if(islimit() && !( fpequal(besterror, 0) ||
+					   ( fpequal(actualpot + amount, truestacksize) && !fpequal(get_property(currstrat->gettree(), settings_tag()).stacksize, truestacksize) )))
+			REPORT("in limit, we expect bets to either exactly match the tree's bets or this to be a covert all-in");
+		if(!fpequal(besterror, 0) && isloggingon)
+			logfile << myname << "... best betting action found was a bet of $" << currstrat->gettree()[*ebest].potcontrib*multiplier << " ..." << endl;
 		actualinv[pl] = amount;
-		perceivedinv[pl] = mynode.potcontrib[bestaction];
-		currentbeti = mynode.result[bestaction];
-		historyindexer.push(currentgr, perceivedpot, currentbeti);
-		currstrat->gettree().getnode(currentgr,perceivedpot,currentbeti,mynode);
+		perceivedinv[pl] = currstrat->gettree()[*ebest].potcontrib;
+		currentnode = target(*ebest, currstrat->gettree());
 	}
 }
 
 //this is a "bet" of amount all-in
+//used by NO-LIMIT only.
 void BotAPI::doallin(Player pl)
 {
-	int allinaction=-1, total=0;
-	for(int a=0; a<mynode.numacts; a++)
-	{
-		if(currstrat->gettree().isallin(mynode.result[a],mynode.potcontrib[a],currentgr))
-		{
-			allinaction = a;
-			total++;
-		}
-	}
-	if(total != 1) REPORT("not exactly 1 all-in action found!");
+	if(islimit()) REPORT("!");
+	EIter e, elast;
+	for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++)
+		if((currstrat->gettree())[*e].type == BetAllin)
+			break;
+
+	if(e==elast)
+		REPORT("in no limit, we could not find a BetAllin. What gives?");
+
+	currentnode = target(*e, currstrat->gettree());
+
+	if(perceivedpot + (currstrat->gettree())[*e].potcontrib != get_property(currstrat->gettree(), settings_tag()).stacksize) 
+		REPORT("all-in potcontrib set incorrectly",WARN);
 
 	if(isloggingon)
 		logfile << (pl == myplayer ? myname : "  opponent: ") << "bet/raised All-In" << endl;
 
-	actualinv[pl] = currstrat->gettree().getparams().stacksize-actualpot;
-	perceivedinv[pl] = currstrat->gettree().getparams().stacksize-perceivedpot;
-	currentbeti = mynode.result[allinaction];
-	historyindexer.push(currentgr, perceivedpot, currentbeti);
-	currstrat->gettree().getnode(currentgr,perceivedpot,currentbeti,mynode);
+	actualinv[pl] = get_property(currstrat->gettree(), settings_tag()).stacksize-actualpot;
+	perceivedinv[pl] = (currstrat->gettree())[*e].potcontrib;
 }
 
-//this function gets called indiscriminately
+//this function gets called all the time
 void BotAPI::processmyturn()
 {
-	//choose an action if we are next to act
-
-	if(bot_status == WAITING_ACTION && mynode.playertoact == myplayer)
-	{
-		double cumulativeprob = 0, randomprob;
-		if(historyindexer.getnuma() != mynode.numacts)
-			REPORT("Indexer has FAILED!"); //only reason for hist indexer getnuma
-		vector<double> probabilities(mynode.numacts);
-		currstrat->getprobs(currentgr, historyindexer.getactioni(),
-			mynode.numacts, cards, probabilities);
-		randomprob = actionchooser.randExc(); //generates the answer!
-		answer = -1;
-		do{
-			for(int a=0; a<mynode.numacts; a++)
-			{
-				cumulativeprob += probabilities[a];
-				if (cumulativeprob >= randomprob)
-				{
-					answer = a;
-					break;
-				}
-			}
-		}while(answer==-1); //just in case due to rounding errors cumulative prob never reaches randomprob
-
-		//log results
-
-		if(isloggingon)
-		{
-			logfile << myname << "At node: gameround = " << currentgr << ", cardsi = " << currstrat->getcardmach().getcardsi(currentgr, cards) << ", actioni = " << historyindexer.getactioni() << endl;
-			logfile << myname << "My options: ((";
-			for(int i=0; i<mynode.numacts; i++)
-				logfile << currstrat->gettree().actionstring(currentgr, i, mynode, multiplier) << "  ";
-			logfile << ")) = < ";
-			for(int i=0; i<mynode.numacts; i++)
-				logfile << setprecision(3) << fixed << 100*probabilities[i] << "% ";
-			logfile << ">" << endl;
-			logfile << myname << "Chose " << answer << " = " << currstrat->gettree().actionstring(currentgr, answer, mynode, multiplier) << endl << endl;
-		}
-	}
-
 	//update diagnostics window
 
 #ifdef _MFC_VER
@@ -415,18 +482,18 @@ void BotAPI::processmyturn()
 
 double BotAPI::mintotalwager()
 {
-	Player acting = (Player)mynode.playertoact;
+	Player acting = (Player)(currstrat->gettree())[currentnode].type;
 	//calling from the SBLIND is a special case of how much we can wager
-	if(currentgr == PREFLOP && actualinv[acting]<(double)currstrat->gettree().getparams().bblind)
-		return (double)currstrat->gettree().getparams().bblind;
+	if(currentgr == PREFLOP && fpgreater(get_property(currstrat->gettree(), settings_tag()).bblind, actualinv[acting]))
+		return (double)get_property(currstrat->gettree(), settings_tag()).bblind;
 	
 	//we're going first and nothing's been bet yet
-	if(currentgr != PREFLOP && acting==P0 && actualinv[1-acting]==0)
+	if(currentgr != PREFLOP && acting==P0 && fpequal(actualinv[1-acting],0))
 		return 0;
 
 	//otherwise, this is the standard formula that FullTilt seems to follow
 	double prevwager = actualinv[1-acting]-actualinv[acting];
-	return actualinv[1-acting] + max((double)currstrat->gettree().getparams().bblind, prevwager);
+	return actualinv[1-acting] + mymax((double)get_property(currstrat->gettree(), settings_tag()).bblind, prevwager);
 }
 
 #ifdef _MFC_VER
@@ -451,14 +518,16 @@ void BotAPI::populatewindow(CWnd* parentwin)
 
 	//set actions
 
-	if(mynode.playertoact == myplayer)
+	if(playercompare(myplayer, currstrat->gettree()[currentnode].type))
 	{
-		vector<double> probabilities(mynode.numacts);
-		currstrat->getprobs(currentgr, historyindexer.getactioni(),
-			mynode.numacts, cards, probabilities);
-		for(int a=0; a<mynode.numacts; a++)
+		vector<double> probabilities(out_degree(currentnode, currstrat->gettree()));
+		currstrat->getprobs(currentgr, (currstrat->gettree())[currentnode].actioni,
+			out_degree(currentnode, currstrat->gettree()), cards, probabilities);
+		EIter e, elast;
+		int a=0;
+		for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++, a++)
 		{
-			MyWindow->ActButton[a].SetWindowText(toCString(currstrat->gettree().actionstring(currentgr,a,mynode,multiplier)));
+			MyWindow->ActButton[a].SetWindowText(toCString(actionstring(currstrat->gettree(), *e, multiplier)));
 			MyWindow->ActButton[a].EnableWindow(TRUE);
 			MyWindow->ActionBars[a].ShowWindow(SW_SHOW);
 			int position = (int)(probabilities[a]*101.0);
@@ -467,12 +536,9 @@ void BotAPI::populatewindow(CWnd* parentwin)
 			if(position < 0 || position > 100)
 				REPORT("failure of probabilities");
 			MyWindow->ActionBars[a].SetPos(position);
-			if(answer==a)
-				MyWindow->ActButton[a].SetCheck(BST_CHECKED);
-			else
-				MyWindow->ActButton[a].SetCheck(BST_UNCHECKED);
+			MyWindow->ActButton[a].SetCheck(BST_UNCHECKED);
 		}
-		for(int a=mynode.numacts; a<MAX_ACTIONS; a++)
+		for(int a=out_degree(currentnode, currstrat->gettree()); a<MAX_ACTIONS; a++)
 		{
 			MyWindow->ActButton[a].SetWindowText(TEXT(""));
 			MyWindow->ActButton[a].EnableWindow(FALSE);
@@ -483,7 +549,7 @@ void BotAPI::populatewindow(CWnd* parentwin)
 	{
 		for(int a=0; a<MAX_ACTIONS; a++)
 		{
-			if(currentgr == PREFLOP && currentbeti == 0) //start of game, human is first, so reset
+			if(currentnode == currstrat->gettreeroot()) //start of game, human is first, so reset
 			{
 				MyWindow->ActButton[a].SetWindowText(TEXT(""));
 				MyWindow->ActButton[a].SetCheck(BST_UNCHECKED);
@@ -495,6 +561,7 @@ void BotAPI::populatewindow(CWnd* parentwin)
 
 	//set beti history
 
+	/****** NOTE: if I want this functionality back I will implement it another way
 	const vector<HistoryNode> &myhist = historyindexer.gethistory();
 	text.Format("(bot = P%d, human = P%d)\n", myplayer, 1-myplayer);
 	for(unsigned int i=0; i<myhist.size(); i++)
@@ -515,7 +582,8 @@ void BotAPI::populatewindow(CWnd* parentwin)
 			text.AppendFormat(" - %d", myhist[i].beti);
 
 	}
-	MyWindow->BetHistory.SetWindowText(text);
+	*******/
+	MyWindow->BetHistory.SetWindowText(TEXT(""));
 
 	//set pot amount
 
@@ -600,78 +668,4 @@ void BotAPI::destroywindow()
 	}
 }
 #endif //_MFC_VER
-
-void BotAPI::BetHistoryIndexer::push(int gr, int pot, int beti) //or could have go return pot
-{
-	history.push_back(HistoryNode(gr, pot, beti));
-	HistoryNode &prev = history[history.size()-2];
-	if(!go(prev.gr, prev.pot, prev.beti))
-		REPORT("could not find matching node in the tree in BetHistoryIndexer::push()");
-	for(int i=0; i<4; i++) 
-		for(int j=0; j<MAX_NODETYPES; j++) 
-			if(counters[i][j]<0 || counters[i][j]>parentbotapi->currstrat->getactionmax(i,j))
-				REPORT("counters too high!");
-	if(current_actioni < 0 || current_actioni >= parentbotapi->currstrat->getactionmax(gr, current_numa-2))
-		REPORT("current_actioni is bad!");
-	if(current_actioni != counters[gr][current_numa-2])
-		REPORT("huh?");
-}
-
-void BotAPI::BetHistoryIndexer::reset() //clear and prime with preflop info
-{ 
-	current_actioni = -1;
-	current_numa = -1;
-	history.clear();
-	for(int i=0; i<4; i++) 
-		for(int j=0; j<MAX_NODETYPES; j++) 
-			counters[i][j]=0;
-
-	//now do same as push, but can't call push as don't have previous HistoryNode from history vect.
-	history.push_back(HistoryNode(PREFLOP, 0, 0));
-	if(!go(PREFLOP, 0, 0)) //will just find it right away and set what it needs to set
-		REPORT("could not find matching node in the tree in BetHistoryIndexer::push()");
-
-}
-
-bool BotAPI::BetHistoryIndexer::go(int gr, int pot, int beti)
-{
-	BetNode mynode;
-	parentbotapi->currstrat->gettree().getnode(gr, pot, beti, mynode);
-	const int &numa = mynode.numacts; //for ease of typing
-
-	if(history.back().beti==beti && history.back().gr==gr && history.back().pot==pot)
-	{
-		//need to save at least one of these. we save both for cleanliness and fun. 
-		current_numa = numa;
-		current_actioni = counters[gr][numa-2];
-		return true; //found it!
-	}
-
-	counters[gr][numa-2]++;
-
-	for(int a=0; a<numa; a++) //looking for actions that lead to more play
-	{
-		switch(mynode.result[a])
-		{
-		case BetNode::NA:
-			REPORT("invalid tree");
-		case BetNode::FD: //no next action
-		case BetNode::AI: //no next action
-			continue;
-		case BetNode::GO:
-			if(gr!=RIVER) //RIVER would mean no next action
-				if(go(gr+1, pot+mynode.potcontrib[a], 0)) //run go and test value to see if we found it
-					return true; //found it!
-			continue; //didn't find it (or if RIVER not even a next action), keep trying
-
-		default://child node
-			if(go(gr, pot, mynode.result[a]))
-				return true; //found it!
-			continue; //keep tryin..
-		}
-	}
-
-	//we went through all the actions, and didn't find it.
-	return false;
-}
 

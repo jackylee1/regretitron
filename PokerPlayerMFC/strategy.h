@@ -2,6 +2,7 @@
 #define __strategy_h__
 
 #include "../PokerLibrary/constants.h"
+#include "../PokerLibrary/treenolimit.h"
 #include "../utility.h"
 #include <poker_defs.h>
 #include <fstream>
@@ -11,7 +12,6 @@
 using namespace std;
 
 class CardMachine;
-class BettingTree;
 
 
 class Strategy
@@ -24,16 +24,15 @@ public:
 	//access to filename of this bot
 	inline string getfilename() const { return _xmlfilename; }
 
-	//access to BettingTree functions
+	//access to BettingTree
 	inline const BettingTree& gettree() const { return *tree; }
+	inline const Vertex& gettreeroot() const { return treeroot; }
 
 	//access to CardMachine functions
 	inline CardMachine& getcardmach() const { return *cardmach; }
 
 	//my own strategy file reading implementation
 	void getprobs(int gr, int actioni, int numa, const vector<CardMask> &cards, vector<double> &probs);
-
-	int getactionmax(int gr, int nodei) const { return actionmax[gr][nodei]; }
 
 private:
 	//we do not support copying.
@@ -45,7 +44,7 @@ private:
 
 	//the betting tree
 	BettingTree * tree;
-	vector< vector<int> > actionmax;
+	Vertex treeroot;
 
 	//the card machine
 	CardMachine * cardmach;

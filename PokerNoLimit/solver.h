@@ -23,7 +23,6 @@ public:
 	static double solve(int64 iter); //returns elapsed time taken for this run
 	static inline int64 gettotal() { return total; } //returns total iterations done so far
 	static void save(const string &filename, bool writedata); //saves result so far, including optionally whole strategy file
-	static fpworking_type getpfloppushprob(int pushfold_index);
 	
 private:
 	//we do not support copying.
@@ -35,11 +34,7 @@ private:
 
 	//only these 3 functions can access per thread data, as they are non-static
 	void threadloop(); //master loop function, called first by each thread
-	fpworking_type walker(int gr, int pot, int beti, fpworking_type prob0, fpworking_type prob1); //the algorithm
-	void dummywalker(int gr, int pot, int beti); //faster version of the above when no data needs updating
-
-	static string getstatus();
-	static void bounder(int gr, int pot, int beti);
+	pair<fpworking_type,fpworking_type> walker(int gr, int pot, Vertex node, fpworking_type prob0, fpworking_type prob1);
 
 	struct iteration_data_t
 	{
@@ -49,13 +44,13 @@ private:
 	//this is the per thread data
 	int cardsi[4][2]; // 4 gamerounds, 2 players.
 	int twoprob0wins;
-	int actioncounters[4][MAX_NODETYPES];
 
 	static int64 iterations, total; //number of iterations remaining and total done so far
 	static double inittime; //to find total elapsed for logging purposes
 	
 	static CardMachine * cardmachine; //created as pointers so I do not statically initialize them (fiasco...)
-	static const BettingTree * tree;
+	static BettingTree * tree;
+	static Vertex treeroot;
 	static MemoryManager * memory;
 #ifdef DO_THREADS
 	static pthread_mutex_t threaddatalock;
@@ -68,10 +63,6 @@ private:
 	static bool datainuse3[RIVER_CARDSI_MAX*2];
 #endif
 #endif
-	//any info I want to get out of (recursive function) bounder, has to be put here
-	//other alternative is global, or adding more parameters to bounder (both suck)
-	static vector< vector<int> > staticactioncounters; //need static version for bounder
-	static vector< fpworking_type > accumulated_regret;
 };
 
 #endif

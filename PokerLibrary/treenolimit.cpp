@@ -5,23 +5,288 @@
 #include <sstream>
 #include <iomanip>
 
-#define NA6 NA,NA,NA,NA,NA,NA
-#define NA7 NA,NA,NA,NA,NA,NA,NA
 
-#if __GNUC__
-//static integral members of BetNode
-//GNUC does this correctly and requires these definitions to be here
-//MSVC gives linking errors when they are here
-//see standard here: http://bytes.com/groups/cpp/156707-static-const-data-member
-const unsigned char BetNode::NA; //invalid action
-const unsigned char BetNode::AI; //action is called all-in
-const unsigned char BetNode::FD; //action is fold
-const unsigned char BetNode::GO; //action ends betting for this round
-#endif
+//
+//  functions to create a bitchin limit tree.
+//
 
-//constructor for BettingTree
-BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings)
+void prunelimit(int gr, int pot, int prev_potcontrib, BettingTree &tree, const Vertex &node, const Vertex &T0, const Vertex &T1, const Vertex &TSD)
 {
+	//make sure this is a player node
+
+	switch(tree[node].type)
+	{
+		case P0Plays:
+		case P1Plays:
+			break;
+		default:
+			REPORT("tree broke");
+	}
+
+	//remove edges that put us all in
+
+	EIter e, elast;
+	int total = 0, removed = 0;
+	for(tie(e,elast) = out_edges(node, tree); e!=elast; e++)
+	{
+		total++;
+		if(pot + tree[*e].potcontrib >= get_property(tree, settings_tag()).stacksize)
+		{
+			remove_edge(e, tree); //leave the vertices in there so I don't invalidate pointers.....
+			removed++;
+		}
+	}
+
+	if(removed >= total) REPORT("should be some nodes you can afford.....");
+
+	//replace them with a single all-in sub-tree
+
+	if(removed > 0)
+	{
+		if(get_property(tree, settings_tag()).stacksize > 24 * get_property(tree, settings_tag()).bblind)
+			REPORT("stacksize is big enough that we should be playing deep-stacked limit");
+
+		Vertex x;
+
+		if(tree[node].type == P0Plays)
+		{
+			x = add_vertex(NodeProp(P1Plays), tree);
+			add_edge(x, T0, EdgeProp(Fold, prev_potcontrib), tree);
+		}
+		else 
+		{
+			x = add_vertex(NodeProp(P0Plays), tree);
+			add_edge(x, T1, EdgeProp(Fold, prev_potcontrib), tree);
+		}
+
+		add_edge(node, x, EdgeProp(BetAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
+		add_edge(x, TSD, EdgeProp(CallAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
+	}
+
+	//okay, now iterate through them like a normal person and get on goin'!
+
+	tree[node].actioni = get_property(tree, maxorderindex_tag())[gr][out_degree(node, tree)]++;
+
+	for(tie(e,elast) = out_edges(node, tree); e!=elast; e++)
+	{
+		switch(tree[*e].type)
+		{
+			case Bet:
+			case BetAllin:
+				prunelimit(gr, pot, tree[*e].potcontrib, tree, target(*e, tree), T0, T1, TSD);
+				break;
+			case Call:
+				if(gr < 3)
+					prunelimit(gr+1, pot+tree[*e].potcontrib, 0, tree, target(*e, tree), T0, T1, TSD);
+			default: //this is river Call's, CallAllin's and Fold's
+				break; //they all lead to terminal nodes.
+		}
+	}
+}
+
+
+//add on a limit tree for the flop/turn/river rounds
+Vertex addlimit(int gr, BettingTree &tree, const Vertex &T0, const Vertex &T1, const Vertex &TSD)
+{
+	if(gr > 3) return TSD;
+	if(gr < 1) REPORT("bad tree creation!!");
+
+	Vertex n0 = add_vertex(NodeProp(P0Plays), tree);
+	Vertex n1 = add_vertex(NodeProp(P1Plays), tree);
+	Vertex n2 = add_vertex(NodeProp(P0Plays), tree);
+	Vertex n3 = add_vertex(NodeProp(P1Plays), tree);
+	Vertex n4 = add_vertex(NodeProp(P0Plays), tree);
+	Vertex n5 = add_vertex(NodeProp(P1Plays), tree);
+	Vertex n6 = add_vertex(NodeProp(P0Plays), tree);
+	Vertex n7 = add_vertex(NodeProp(P1Plays), tree);
+	Vertex n8 = add_vertex(NodeProp(P0Plays), tree);
+	Vertex n9 = add_vertex(NodeProp(P1Plays), tree);
+
+	const int b = get_property(tree, settings_tag()).bblind * (gr == 1 ? 1 : 2); //use big-bet for turn and river
+
+	add_edge(n0,n5,EdgeProp(Bet,0), tree);
+	add_edge(n0,n1,EdgeProp(Bet,1*b), tree);
+
+	add_edge(n1,T0,EdgeProp(Fold,0), tree);
+	add_edge(n1, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,1*b), tree);
+	add_edge(n1,n2,EdgeProp(Bet,2*b), tree);
+
+	add_edge(n2,T1,EdgeProp(Fold,1*b), tree);
+	add_edge(n2, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,2*b), tree);
+	add_edge(n2,n3,EdgeProp(Bet,3*b),tree);
+
+	add_edge(n3,T0,EdgeProp(Fold,2*b),tree);
+	add_edge(n3, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,3*b), tree);
+	add_edge(n3,n4,EdgeProp(Bet,4*b),tree);
+
+	add_edge(n4,T1,EdgeProp(Fold,3*b),tree);
+	add_edge(n4, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,4*b), tree);
+
+	add_edge(n5, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,0*b), tree);
+	add_edge(n5,n6,EdgeProp(Bet,1*b),tree);
+
+	add_edge(n6,T1,EdgeProp(Fold,0*b),tree);
+	add_edge(n6, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,1*b), tree);
+	add_edge(n6,n7,EdgeProp(Bet,2*b),tree);
+
+	add_edge(n7,T0,EdgeProp(Fold,1*b),tree);
+	add_edge(n7, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,2*b), tree);
+	add_edge(n7,n8,EdgeProp(Bet,3*b),tree);
+
+	add_edge(n8,T1,EdgeProp(Fold,2*b),tree);
+	add_edge(n8, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,3*b), tree);
+	add_edge(n8,n9,EdgeProp(Bet,4*b),tree);
+
+	add_edge(n9,T0,EdgeProp(Fold,3*b),tree);
+	add_edge(n9, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,4*b), tree);
+
+	return n0;
+}
+
+
+//tests to make sure edge ordering is preserved
+void testtree()
+{
+	const int N = 753; //oughta do it
+	BettingTree t;
+	Vertex root = add_vertex(t);
+	Vertex n[N];
+	for(int i=0; i<N; i++)
+	{
+		n[i] = add_vertex(t);
+		add_edge(root, n[i], EdgeProp(Fold, i), t);
+	}
+	for(int i=0; i<N; i++)
+		for(int j=0; j<N; j++)
+			add_edge(n[i], add_vertex(t), EdgeProp(Fold, j), t);
+
+	// now check it
+
+	EIter e1, e1last;
+	EIter e2, e2last;
+	int i=0;
+	for(tie(e1,e1last) = out_edges(root, t); e1!=e1last; e1++, i++)
+	{
+		if(t[*e1].potcontrib != i)
+			REPORT("edge ordering not preserved...");
+		int j=0;
+		for(tie(e2,e2last) = out_edges(target(*e1, t), t); e2!=e2last; e2++, j++)
+			if(t[*e2].potcontrib != j)
+				REPORT("edge ordering not preserved...");
+	}
+}
+
+Vertex createtree(BettingTree &tree)
+{
+	testtree();
+
+	if(!get_property(tree, settings_tag()).limit)
+		REPORT("no limit tree is not implemented. come back later. shouldn't be too hard. all code is in place. "
+			   "basically, you just need to copy the huge comment below into boost-graph language. That is all. ");
+
+	//erase whatevers there
+	tree.clear(); //shouldn't erase properties
+	get_property(tree, maxorderindex_tag()).resize(extents[4][multi_array_types::extent_range(2,10)]);
+	for(int i=0; i<4; i++) for(int j=2; j<10; j++) get_property(tree, maxorderindex_tag())[i][j] = 0;
+
+	const int &SB = get_property(tree, settings_tag()).sblind;
+	const int &BB = get_property(tree, settings_tag()).bblind;
+
+	//create terminal nodes
+	Vertex T0 = add_vertex(NodeProp(TerminalP0Wins), tree);
+	Vertex T1 = add_vertex(NodeProp(TerminalP1Wins), tree);
+	Vertex TSD = add_vertex(NodeProp(TerminalShowDown), tree);
+
+	//put in the preflop, recursively adding in the rest
+	Vertex n0 = add_vertex(NodeProp(P1Plays), tree);
+	Vertex n1 = add_vertex(NodeProp(P0Plays), tree);
+	Vertex n2 = add_vertex(NodeProp(P0Plays), tree);
+	Vertex n3 = add_vertex(NodeProp(P1Plays), tree);
+	Vertex n4 = add_vertex(NodeProp(P0Plays), tree);
+	Vertex n5 = add_vertex(NodeProp(P1Plays), tree);
+	Vertex n6 = add_vertex(NodeProp(P0Plays), tree);
+	Vertex n7 = add_vertex(NodeProp(P1Plays), tree);
+
+	add_edge(n0,T0,EdgeProp(Fold,SB),tree);
+	add_edge(n0,n1,EdgeProp(Bet,1*BB),tree);
+	add_edge(n0,n2,EdgeProp(Bet,2*BB),tree);
+
+	add_edge(n1, addlimit(1,tree,T0,T1,TSD), EdgeProp(Call,1*BB), tree);
+	add_edge(n1,n5,EdgeProp(Bet,2*BB),tree);
+
+	add_edge(n5,T0,EdgeProp(Fold,1*BB),tree);
+	add_edge(n5, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,2*BB),tree);
+	add_edge(n5,n6,EdgeProp(Bet,3*BB),tree);
+
+	add_edge(n6,T1,EdgeProp(Fold,2*BB),tree);
+	add_edge(n6, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,3*BB),tree);
+	add_edge(n6,n7,EdgeProp(Bet,4*BB),tree);
+	
+	add_edge(n7,T0,EdgeProp(Fold,3*BB),tree);
+	add_edge(n7, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,4*BB),tree);
+
+	add_edge(n2,T1,EdgeProp(Fold,1*BB),tree);
+	add_edge(n2, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,2*BB),tree);
+	add_edge(n2,n3,EdgeProp(Bet,3*BB),tree);
+
+	add_edge(n3,T0,EdgeProp(Fold,2*BB),tree);
+	add_edge(n3, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,3*BB),tree);
+	add_edge(n3,n4,EdgeProp(Bet,4*BB),tree);
+
+	add_edge(n4,T1,EdgeProp(Fold,3*BB),tree);
+	add_edge(n4, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,4*BB),tree);
+
+	if(num_vertices(tree) != 6378 + 3)
+		REPORT("Tree is not verified. Repeat. Tree is not good.");
+
+	//prune it down to size according to stacksize
+	prunelimit(0, 0, BB, tree, n0, T0, T1, TSD);
+
+	//at most (4 + 4 + 8 + 8) small bets = 24 bblinds can be spent in a game
+	if(get_property(tree, settings_tag()).stacksize <= 24 * get_property(tree, settings_tag()).bblind)
+		REPORT("Pruned tree has "+tostring(num_vertices(tree)-3)+" nodes, and 3 terminal nodes also. Lost "
+				+tostring(6378+3-num_vertices(tree))+" nodes compared to the full tree.",INFO);
+	else if(num_vertices(tree) != 6378 + 3)
+		REPORT("Pruned tree is not good. NO GOOD! DO NOT USE!!");
+
+	//return the root
+	return n0;
+}
+
+//takes an action index, the gameround, a pointer to the relevant
+//betting tree node, and a multiplier.
+//returns a string that reports info on what that action represents.
+//it's units are the native ones for the poker engine (sblind = 1) times
+//the multiplier.
+string actionstring(const BettingTree &tree, const Edge &edge, double multiplier)
+{
+	ostringstream str;
+	str << fixed << setprecision(2);
+
+	switch(tree[edge].type)
+	{
+	case Fold:
+		str << "Fold";
+		break;
+	case Call:
+		str << "Call " << multiplier*(tree[edge].potcontrib);
+		break;
+	case Bet:
+		str << "Bet " << multiplier*(tree[edge].potcontrib);
+		break;
+	case CallAllin:
+		str << "Call All-in";
+		break;
+	case BetAllin:
+		str << "Bet All-in";
+		break;
+	}
+
+	return str.str();
+}
+
+
+	/*
 	//used for both trees...
 	
 	if(myparams.limit && myparams.pushfold)
@@ -34,55 +299,6 @@ BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings
 	const unsigned char &AI = BetNode::AI;
 	const unsigned char &FD = BetNode::FD;
 	const unsigned char &GO = BetNode::GO;
-
-	//define limit tree...
-
-	const unsigned char &SB = myparams.sblind; //for limit
-	const unsigned char &BET = myparams.bblind; //for limit
-	const int N_NODES_LIMIT = 10;
-	const int N_NODES_LIMIT_PFLOP = 8;
-
-	//Allowed result values: 
-	// FD if the player to act folds.
-	// GO if the play goes on in the next game round (including showdowns)
-	// AI if an all-in bet is called
-	// the beti of a child node if the betting continues in the present round
-	// or NA if this action is not used.
-	//   beti's are indexes into these such arrays
-	const BetNode LIMITTREE[10] = 
-	{
-		// {P#, #A, {result}, {potcontrib}}
-		{ P0, 2, {1, 2, NA7}, {0, BET, NA7} }, //0
-		{ P1, 2, {GO, 3, NA7}, {0, BET, NA7} }, //1
-
-		{ P1, 3,  {FD, GO, 4, NA6},  {0*BET, 1*BET, 2*BET, NA6} }, //2
-		{ P0, 3,  {FD, GO, 5, NA6},  {0*BET, 1*BET, 2*BET, NA6} }, //3
-
-		{ P0, 3,  {FD, GO, 6, NA6},  {1*BET, 2*BET, 3*BET, NA6} }, //4
-		{ P1, 3,  {FD, GO, 7, NA6},  {1*BET, 2*BET, 3*BET, NA6} }, //5
-
-		{ P1, 3,  {FD, GO, 8, NA6},  {2*BET, 3*BET, 4*BET, NA6} }, //6
-		{ P0, 3,  {FD, GO, 9, NA6},  {2*BET, 3*BET, 4*BET, NA6} }, //7
-
-		{ P0, 2,  {FD, GO, NA7},  {3*BET, 4*BET, NA7} }, //8
-		{ P1, 2,  {FD, GO, NA7},  {3*BET, 4*BET, NA7} } //9
-	};
-
-	const BetNode LIMITTREEPFLOP[8] = 
-	{
-		// {P#, #A, {result}, {potcontrib}}
-		{ P1, 3, {FD, 1, 2, NA6}, {SB, 1*BET, 2*BET, NA6} }, //0
-		{ P0, 2, {GO, 3, NA7}, {1*BET, 2*BET, NA7} }, //1
-
-		{ P0, 3,  {FD, GO, 4, NA6},  {1*BET, 2*BET, 3*BET, NA6} }, //2
-		{ P1, 3,  {FD, GO, 5, NA6},  {1*BET, 2*BET, 3*BET, NA6} }, //3
-
-		{ P1, 3,  {FD, GO, 6, NA6},  {2*BET, 3*BET, 4*BET, NA6} }, //4
-		{ P0, 3,  {FD, GO, 7, NA6},  {2*BET, 3*BET, 4*BET, NA6} }, //5
-
-		{ P0, 2,  {FD, GO, NA7},  {3*BET, 4*BET, NA7} }, //6
-		{ P1, 2,  {FD, GO, NA7},  {3*BET, 4*BET, NA7} } //7
-	};
 
 
 	// define no limit tree...
@@ -470,208 +686,5 @@ BettingTree::BettingTree(const treesettings_t &mysettings) : myparams(mysettings
 		tree[PREFLOP][98].potcontrib[0] = myparams.bblind;
 		tree[PREFLOP][99].potcontrib[0] = myparams.bblind;
 	}
-}
-
-//destructor for BettingTree
-//just removes memory from the preflop tree and flop/turn/river tree
-BettingTree::~BettingTree()
-{
-	delete[] tree[PREFLOP];
-	delete[] tree[FLOP];
-	if(myparams.limit) // limit actually uses different tree. no-limit does not.
-		delete[] tree[TURN];
-}
-
-//since my betting tree can be ambiguous, more extensive tests
-//are needed to check if a node is a BET allin. this function takes
-//the result and potcontrib of a BetNode, and the gameround,
-//and tells you if that action is a BET allin. It assumes the 
-//BetNode came from these trees.
-//used by BotAPI (in PokerPlayer) and actionstring in rephands.cpp (of PokerLibrary)
-bool BettingTree::isallin(int result, int potcontrib, int gr) const
-{
-	if(myparams.limit)
-		return false;
-
-	switch(result)
-	{
-	case BetNode::FD:
-	case BetNode::GO: 
-	case BetNode::AI: 
-	case BetNode::NA:
-		return false;
-	}
-
-	if(potcontrib != 0)
-		return false;
-
-	//must check to see if child node has 2 actions
-	if(tree[gr][result].numacts == 2)
-		return true;
-	else
-		return false;
-}
-
-//takes an action index, the gameround, a pointer to the relevant
-//betting tree node, and a multiplier.
-//returns a string that reports info on what that action represents.
-//it's units are the native ones for the poker engine (sblind = 1) times
-//the multiplier.
-string BettingTree::actionstring(int gr, int action, const BetNode &bn, double multiplier) const
-{
-	ostringstream str;
-	str << fixed << setprecision(2);
-
-	switch(bn.result[action])
-	{
-	case BetNode::NA:
-		str << "Not an action";
-		break;
-	case BetNode::FD:
-		str << "Fold";
-		break;
-	case BetNode::GO:
-		if(bn.potcontrib[action]==0 || (gr==PREFLOP && bn.potcontrib[action]==myparams.bblind))
-			str << "Check";
-		else
-			str << "Call $" << multiplier*(bn.potcontrib[action]);
-		break;
-	case BetNode::AI:
-		str << "Call All-In";
-		break;
-	default:
-		if(isallin(bn.result[action], bn.potcontrib[action], gr))
-			str << "All-In";
-		else if(bn.potcontrib[action]==0)
-			str << "Check";
-		else if(gr==PREFLOP && bn.potcontrib[action]==myparams.bblind)
-			str << "Call $" << multiplier*(bn.potcontrib[action]);
-		else
-			str << "Bet $" << multiplier*(bn.potcontrib[action]);
-		break;
-	}
-
-	return str.str();
-}
-
-
-
-
-GetTreeSize::GetTreeSize(const BettingTree &tree, vector<vector<int> > &actionmax) :
-	mytree(tree), myactionmax(actionmax)
-{
-	myactionmax.clear(); //kill whatever was in it
-	myactionmax.resize(4, vector<int>(MAX_NODETYPES, 0)); //reset to 4xMAX_NODETYPES, filled with 0's
-	walkercount(0,0,0);
-}
-	
-//fills in actionmax
-void GetTreeSize::walkercount(int gr, int pot, int beti)
-{
-	BetNode mynode;
-	mytree.getnode(gr, pot, beti, mynode);
-	int numa = mynode.numacts; //for ease of typing
-
-	myactionmax[gr][numa-2]++;
-
-	for(int a=0; a<numa; a++)
-	{
-		switch(mynode.result[a])
-		{
-		case BetNode::NA:
-			REPORT("invalid tree");
-		case BetNode::FD:
-		case BetNode::AI:
-			continue;
-		case BetNode::GO:
-			if(gr!=RIVER)
-				walkercount(gr+1, pot+mynode.potcontrib[a], 0);
-			continue;
-
-		default://child node
-			walkercount(gr, pot, mynode.result[a]);
-		}
-	}
-}
-
-
-
-
-
-
-// ------------- code that may be used in future ----------------
-
-//this used to be the body of getnode, could be the future body of getnode,
-//in a post-tree world
-#if 0
-inline void getnode(int gameround, Action prevact, int betturn, int invprev, 
-					int invacting, int moneyleft, int prevbeti, actiondef &ad)
-{
-	//currently reproduces standard betting trees
-	switch(prevact)
-	{
-	case NONE:
-		if(gameround == PREFLOP) //first to act pre-flop
-		{
-			ad.numactions = 9;
-			ad.action[0] = FOLD; //fold the small blind
-			ad.value[0]  = SB;
-			ad.action[1] = BET; //really check
-			ad.value[1]  = BB;
-			ad.action[2] = BET; //the six betting amounts
-			ad.action[3] = BET;
-			ad.action[4] = BET;
-			ad.action[5] = BET;
-			ad.action[6] = BET;
-			ad.action[7] = BET;
-			ad.value[2]  = B1+BB;
-			ad.value[3]  = B2+BB;
-			ad.value[4]  = B3+BB;
-			ad.value[5]  = B4+BB;
-			ad.value[6]  = B5+BB;
-			ad.value[7]  = B6+BB;
-			ad.action[8] = BETALL; //bet all n
-			ad.value[8]  = -1;
-			return;
-		}
-		else //first to act post-flop
-		{
-			ad.numactions = 8;
-			ad.action[0] = BET; //really, it's check
-			ad.value[0]  = 0;
-			ad.action[1] = BET; //the six betting amounts
-			ad.action[2] = BET;
-			ad.action[3] = BET;
-			ad.action[4] = BET;
-			ad.action[5] = BET;
-			ad.action[6] = BET;
-			ad.value[1]  = B1;
-			ad.value[2]  = B2;
-			ad.value[3]  = B3;
-			ad.value[4]  = B4;
-			ad.value[5]  = B5;
-			ad.value[6]  = B6;
-			ad.action[7] = BETALL;
-			ad.value[7]  = -1;
-			return;
-		}
-	case BET:
-
-		return;
-	case BETALL:
-		ad.numactions = 2;
-		ad.action[0] = FOLD;
-		ad.value[0]  = invacting;
-		ad.action[1] = CALLALL;
-		ad.value[1]  = -1;
-		return;
-	case CALLALL:
-	case CALL:
-	case FOLD:
-		REPORT("no actions available once folded/called in gameround");
-	default:
-		REPORT("wtf?");
-	}
-}
-#endif
+	*/
 

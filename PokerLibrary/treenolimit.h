@@ -2,120 +2,102 @@
 #define _treenolimit_h_
 
 #include "constants.h" //needed for MAX_ACTIONS and gamerounds
-#include <vector> //needed for GetTreeSize
 #include <string>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/multi_array.hpp>
 using namespace std;
+using namespace boost;
 
+//define new names for the data my graph will hold. see http://www.boost.org/doc/libs/1_43_0/libs/graph/doc/using_adjacency_list.html#sec:custom-edge-properties
+struct settings_tag { typedef graph_property_tag kind; };
+struct maxorderindex_tag { typedef graph_property_tag kind; };
 
 //used to set the betting values, and hence the entire tree shape
 struct treesettings_t
 {
-	unsigned char sblind, bblind;
-	unsigned char bets[6];
-	unsigned char raises[6][6];
-	unsigned char stacksize;
+	int sblind, bblind;
+	int bets[6];
+	int raises[6][6];
+	int stacksize;
 	bool pushfold;
 	bool limit;
 };
 
-struct BetNode
-{  
-	char playertoact; // zero or one, may be casted to Player type
-	char numacts; // the total number of actions available at this node
+//used by the edges of the tree
+enum EdgeType { Fold, Call, Bet, BetAllin, CallAllin };
 
-	//this is hardcoded in the tree
-	unsigned char result[MAX_ACTIONS]; 
-
-	//values used for result[], if not a child node
-	static const unsigned char NA=0xFF; //invalid action
-	static const unsigned char AI=0xFE; //action is called all-in
-	static const unsigned char FD=0xFD; //action is fold
-	static const unsigned char GO=0xFC; //action ends betting for this round
-
-	//how much is needed for this action / how much pot gains if betting ends
-	unsigned char potcontrib[MAX_ACTIONS]; 
+struct EdgeProp
+{
+	EdgeProp(EdgeType t, int p) : type(t), potcontrib(p) {}
+	EdgeType type;
+	int potcontrib;
 };
 
-class BettingTree
+//used by the nodes of the tree
+enum NodeType {P0Plays = 0, P1Plays = 1, TerminalP0Wins, TerminalP1Wins, TerminalShowDown, ERROR};
+
+struct NodeProp
 {
-public:
-
-	BettingTree(const treesettings_t &mysettings);
-	~BettingTree();
-
-	//given a beti, pot, and gameround, gives you available bets
-	//including children (of actions) referenced by beti
-	inline void getnode(int gr, int pot, int beti, BetNode &bn) const;
-
-	bool isallin(int result, int potcontrib, int gr) const;
-	string actionstring(int gr, int action, const BetNode &bn, double multiplier) const;
-	inline const treesettings_t& getparams() const { return myparams; }
-
-private:
-	//we do not support copying.
-	BettingTree(const BettingTree& rhs);
-	BettingTree& operator=(const BettingTree& rhs);
-
-	//none of these are altered after the constructor is done
-	BetNode * tree[4];
-	const treesettings_t myparams;
+	NodeProp() : type(ERROR), actioni(-999999999) {}
+	NodeProp(NodeType t) : type(t), actioni(-999999999) {}
+	NodeType type;
+	int actioni;
 };
 
-inline void BettingTree::getnode(int gr, int pot, int beti, BetNode &bn) const
+//define the tree types
+
+/* ********* Boost Graph container selector issues **************
+   Boost Graph allows you to chooese the edge list, and vertex list for your tree. 
+   Compiled from Boost Graph documentation:
+
+Out Edge Selector                                                  Invalidates          preserves edge
+   Selector      (selects)        Space?          Time?             iterators        ordering (my own tests)
+   vecS          vector           least           fastest             YES*                  yes
+   listS         list             2nd most        3rd fastest          no                   yes
+   slistS        slist            2nd least       2nd fastest          no                   NO!
+   setS          set              most            2nd slowest          no                     
+   multisetS     multiset                                              no                     
+   hash_setS     hash_set                         slowest              no                     
+     * invalidates adjacency iterators when an edge is added or removed
+     * invalidates edge iterators when an edge is added or removed from a directedS graph
+
+Vertex Selector                                                    Invalidates
+   Selector      (selects)        Space?          Time?             iterators
+   vecS          vector           good            all good            YES*
+   listS         list             +3 ptrs           "                  no
+   slistS        slist                              "                  no
+   setS          set                                "                  no
+   multisetS     multiset                           "                  no
+   hash_setS     hash_set                         all good             no
+     * invalidates edge and adjacenecy iterators when a vertex is added to a directedS graph
+	 * invalidates all descriptors and iterators when a vertex is removed from any type of graph
+
+===> CHOOSE listS for everything until space and time are a PROVEN ISSUE!
+   */
+typedef adjacency_list<listS, listS, directedS, NodeProp, EdgeProp, 
+		property<settings_tag, treesettings_t, 
+		property<maxorderindex_tag, multi_array<int,2> > > > BettingTree;
+typedef graph_traits<BettingTree>::vertex_descriptor Vertex;
+typedef graph_traits<BettingTree>::edge_descriptor Edge;
+typedef graph_traits<BettingTree>::out_edge_iterator EIter;
+typedef graph_traits<BettingTree>::degree_size_type Size;
+
+
+//functions provided here to manipulate the trees
+
+Vertex createtree(BettingTree &tree); //assumes tree object exists already, with settings inside
+string actionstring(const BettingTree &tree, const Edge &edge, double multiplier);
+inline int playerindex(NodeType nodetype)
 {
-	bn.playertoact = tree[gr][beti].playertoact;
-	bn.numacts = 0;
-	for(int i=0; i < tree[gr][beti].numacts; i++)
+	switch(nodetype)
 	{
-		if(pot + tree[gr][beti].potcontrib[i] < myparams.stacksize)
-		{
-			bn.potcontrib[(int)bn.numacts] = tree[gr][beti].potcontrib[i];
-			bn.result[(int)bn.numacts] = tree[gr][beti].result[i];
-			bn.numacts++;
-		}
+		case P0Plays: return 0;
+		case P1Plays: return 1;
+		default: REPORT("invalid node in playerindex"); exit(-1);
 	}
 }
 
-class GetTreeSize
-{
-public:
-	GetTreeSize(const BettingTree &tree, vector<vector<int> > &actionmax);
-private:
-	void walkercount(int gr, int pot, int beti);
-	const BettingTree &mytree;
-	vector<vector<int> > &myactionmax;
-};
-
-
-
-
-
-
-
-//------------------- code i may use in future --------------------
-
-// may switch to this type of system in the future
-#if 0
-enum Action
-{
-	NONE, //used for previous action at beginning of gameround
-	FOLD, //a player has folded
-	CALL, //ends the betting, continuing at next round
-	BET,  //keeps the betting going. could be check
-	BETALL, //special actions to quickly identify all-in scenarios
-	CALLALL
-};
-
-struct actiondef
-{
-	int numactions; //actual size of array
-	Action action[MAX_ACTIONS];
-	int value[MAX_ACTIONS]; // negative if not applicable.
-};
-
-extern inline void getnode(int gameround, Action prevact, int betturn, int invprev, int invacting, 
-						   int moneyleft, int prevbeti, actiondef &ad);
-#endif
 
 
 #endif
