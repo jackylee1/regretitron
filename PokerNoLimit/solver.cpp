@@ -147,11 +147,18 @@ void Solver::save(const string &filename, bool writedata)
 	data->SetAttribute("fpworking_type", FPWORKING_TYPENAME);
 	data->SetAttribute("fpstore_type", FPSTORE_TYPENAME);
 
+	//solve parameters
+
+	TiXmlElement * params = new TiXmlElement("parameters");
+	params->SetAttribute("aggression", AGGRESSION_FACTOR);
+	params->SetAttribute("raketype", RAKE_TYPE);
+
 	//link xml node..
 
 	TiXmlElement * strat = new TiXmlElement("solver");
 	strat->LinkEndChild(file);
 	strat->LinkEndChild(run);
+	strat->LinkEndChild(params);
 	strat->LinkEndChild(data);
 	root->LinkEndChild(strat);
 

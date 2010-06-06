@@ -36,11 +36,16 @@ const bool WALKERDEBUG = false; //debug print
 //tree settings
 #define SB 1
 #define BB 2
+#ifndef CMD_LINE_VAR
+#warning CMD_LINE_VAR is used but not set
+#define CMD_LINE_VAR -1
+#endif
 #define SS CMD_LINE_VAR
 
 const string SAVENAME = "limit-5bin-newsys-ss" TOSTRING(SS);
 
 //add your rake graduations in here if solving for a cash game
+const string RAKE_TYPE = "none"; //added to XML file
 inline int rake(int winningutility) { return winningutility; }
 
 //bin settings
