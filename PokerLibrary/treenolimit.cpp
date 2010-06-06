@@ -10,6 +10,31 @@
 //  functions to create a bitchin limit tree.
 //
 
+void killtree(Vertex node, BettingTree &tree)
+{
+	switch(tree[node].type)
+	{
+		case TerminalP0Wins:
+		case TerminalP1Wins:
+		case TerminalShowDown:
+			return;
+		case ERROR:
+			REPORT("ERROR");
+		case P0Plays:
+		case P1Plays:
+			break;
+	}
+
+	EIter e, elast;
+	for(tie(e,elast) = out_edges(node, tree); e!=elast; )
+	{
+		Vertex tokill = target(*e, tree);
+		remove_edge(e++, tree); // must have e++ here. must remove an edge that e does not point to. 
+		killtree(tokill, tree);
+	}
+	remove_vertex(node, tree);
+}
+
 void prunelimit(int gr, int pot, int prev_potcontrib, BettingTree &tree, const Vertex &node, const Vertex &T0, const Vertex &T1, const Vertex &TSD)
 {
 	//make sure this is a player node
@@ -23,21 +48,43 @@ void prunelimit(int gr, int pot, int prev_potcontrib, BettingTree &tree, const V
 			REPORT("tree broke");
 	}
 
+	if(get_property(tree, settings_tag()).stacksize <= get_property(tree, settings_tag()).sblind)
+	{
+		REPORT("I don't think a game is possible with that stacksize. No decisions are possible.");
+	}
+
 	//remove edges that put us all in
 
 	EIter e, elast;
-	int total = 0, removed = 0;
-	for(tie(e,elast) = out_edges(node, tree); e!=elast; e++)
+	const unsigned total = out_degree(node, tree);
+	unsigned removed = 0;
+	for(tie(e,elast) = out_edges(node, tree); e!=elast; )
 	{
-		total++;
 		if(pot + tree[*e].potcontrib >= get_property(tree, settings_tag()).stacksize)
 		{
-			remove_edge(e, tree); //leave the vertices in there so I don't invalidate pointers.....
-			removed++;
+			switch(tree[*e].type)
+			{
+				case Fold:
+				case Call:
+					REPORT("these should be afordable or have been removed from the tree.");
+				case Bet:
+					killtree(target(*e, tree), tree); //comment out if vertex removal voids iterators
+					remove_edge(e++, tree); // must have e++ here. must remove an edge that e does not point to. 
+					removed++;
+					break;
+				case BetAllin: //leave these as is
+				case CallAllin:
+					e++;
+					break;
+			}
+		}
+		else
+		{
+			e++;
 		}
 	}
 
-	if(removed >= total) REPORT("should be some nodes you can afford.....");
+	if(removed != total - out_degree(node, tree)) REPORT("baaaad");
 
 	//replace them with a single all-in sub-tree
 
@@ -48,23 +95,34 @@ void prunelimit(int gr, int pot, int prev_potcontrib, BettingTree &tree, const V
 
 		Vertex x;
 
-		if(tree[node].type == P0Plays)
-		{
-			x = add_vertex(NodeProp(P1Plays), tree);
-			add_edge(x, T0, EdgeProp(Fold, prev_potcontrib), tree);
+		if(get_property(tree, settings_tag()).stacksize <= get_property(tree, settings_tag()).bblind)
+		{ 
+			//we are instantly all in in this, and only this, case. 
+			add_edge(node, TSD, EdgeProp(CallAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
 		}
-		else 
+		else
 		{
-			x = add_vertex(NodeProp(P0Plays), tree);
-			add_edge(x, T1, EdgeProp(Fold, prev_potcontrib), tree);
-		}
+			//here, our opponent has the ability to respond.
+			if(tree[node].type == P0Plays)
+			{
+				x = add_vertex(NodeProp(P1Plays), tree);
+				add_edge(x, T0, EdgeProp(Fold, prev_potcontrib), tree);
+			}
+			else 
+			{
+				x = add_vertex(NodeProp(P0Plays), tree);
+				add_edge(x, T1, EdgeProp(Fold, prev_potcontrib), tree);
+			}
 
-		add_edge(node, x, EdgeProp(BetAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
-		add_edge(x, TSD, EdgeProp(CallAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
+			add_edge(node, x, EdgeProp(BetAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
+			add_edge(x, TSD, EdgeProp(CallAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
+		}
 	}
 
 	//okay, now iterate through them like a normal person and get on goin'!
 
+	if(out_degree(node, tree) < 2 || out_degree(node, tree) > 9)
+		REPORT("you have a "+tostring(out_degree(node, tree))+" membered node!");
 	tree[node].actioni = get_property(tree, maxorderindex_tag())[gr][out_degree(node, tree)]++;
 
 	for(tie(e,elast) = out_edges(node, tree); e!=elast; e++)

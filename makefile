@@ -25,6 +25,10 @@ OUT3 := bin/altsolver
 OUT3D := bin/altsolverd
 OUT3P := bin/altsolverp
 
+ifdef CMD_LINE_VAR
+   CFLAGS += -DCMD_LINE_VAR=$(CMD_LINE_VAR)
+endif
+
 ifeq ($(DEBUG),y)
    CFLAGS += -ggdb -D_GLIBCXX_DEBUG
    MYOUT1 := $(OUT1D)

@@ -13,13 +13,12 @@ const int64 MILLION = 1000000;
 const int64 BILLION = THOUSAND*MILLION;
 
 //main settings
-const string SAVENAME = "limit-10bin-newsys";
 const int64 TESTING_AMT = 10*THOUSAND; //do this many iterations as a test for speed
-const int64 STARTING_AMT = 1*BILLION;//22300*MILLION/4; //do this many iterations, then...
+const int64 STARTING_AMT = 100*MILLION;//22300*MILLION/4; //do this many iterations, then...
 const double MULTIPLIER = 1; //multiply by this amount, do that many, repeat ....
 const int64 SAVEAFTER = 0; // save xml after this amount
 const bool SAVESTRAT = true; //save strategy file when saving xml
-const int64 STOPAFTER = 2*STARTING_AMT; //stop after (at least) this amount of iterations
+const int64 STOPAFTER = 1*STARTING_AMT; //stop after (at least) this amount of iterations
 
 //solver settings
 #define FPSTORE_T double
@@ -34,12 +33,19 @@ const int  SEED_WITH = 3;
 const bool THREADLOOPTRACE = false; //prints out debugging
 const bool WALKERDEBUG = false; //debug print
 
+//tree settings
+#define SB 1
+#define BB 2
+#define SS CMD_LINE_VAR
+
+const string SAVENAME = "limit-5bin-newsys-ss" TOSTRING(SS);
+
 //add your rake graduations in here if solving for a cash game
 inline int rake(int winningutility) { return winningutility; }
 
 //bin settings
 #if USE_HISTORY // this for my new binning method with history
-#define TEMP 10
+#define TEMP 5
 #define PFBIN TEMP
 #define FBIN TEMP
 #define TBIN TEMP
@@ -93,9 +99,6 @@ const cardsettings_t CARDSETTINGS =
 
 
 //tree settings
-#define SB 1
-#define BB 2
-#define SS 200
 #define PUSHFOLD 0
 #define LIMIT 1
 const treesettings_t TREESETTINGS = 

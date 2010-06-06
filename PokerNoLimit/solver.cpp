@@ -32,9 +32,9 @@ bool Solver::datainuse3[RIVER_CARDSI_MAX*2];
 
 void Solver::initsolver()
 {
-	cardmachine = new CardMachine(CARDSETTINGS, true, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
 	tree = new BettingTree(TREESETTINGS); //the settings are taken from solveparams.h
 	treeroot = createtree(*tree);
+	cardmachine = new CardMachine(CARDSETTINGS, true, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
 	memory = new MemoryManager(*tree, *cardmachine);
 	inittime = getdoubletime();
 
