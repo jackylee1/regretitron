@@ -16,12 +16,15 @@ MTRand playoff_rand(PLAYOFFDEBUG);
 
 bool mylogindicator = false;
 ostream * mylogfile;
-void turnloggingon(bool turnon, string filename)
+void turnloggingon(bool turnon, string what)
 {
 	if(turnon && !mylogindicator)
 	{
 		mylogindicator = true;
-		mylogfile = new ofstream(filename.c_str());
+		if(what == "cout")
+			mylogfile = &cout;
+		else
+			mylogfile = new ofstream(what.c_str());
 	}
 	else if(!turnon && mylogindicator)
 	{

@@ -179,7 +179,7 @@ double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0win
 	{
 		case P0FOLD: return -pot; //return utility to player/bot 0
 		case P1FOLD: return pot;
-		case CALLALLIN: if(_bots[P0]->islimit()) REPORT("limit allin!"); return (twoprob0wins-1) * _stacksize;
+		case CALLALLIN: return (twoprob0wins-1) * _stacksize;
 		case GO: break;
 	}
 
@@ -191,7 +191,7 @@ double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0win
 		{
 			case P0FOLD: return -pot;
 			case P1FOLD: return pot;
-			case CALLALLIN: if(_bots[P0]->islimit()) REPORT("limit allin!"); return (twoprob0wins-1) * _stacksize;
+			case CALLALLIN: return (twoprob0wins-1) * _stacksize;
 			case GO: break;
 		}
 	}
@@ -238,7 +238,7 @@ Result Playoff::playoutaround(Player nexttogo, double &pot)
 		_bots[P0]->doaction(nexttogo, act, amount);
 		_bots[P1]->doaction(nexttogo, act, amount);
 		nexttogo = (nexttogo == P0) ? P1 : P0;
-		if(act == BETALLIN) prev_act_was_allin = true;
+		if(act == BETALLIN || fpequal(pot+amount, _stacksize)) prev_act_was_allin = true;
 	}
 }
 

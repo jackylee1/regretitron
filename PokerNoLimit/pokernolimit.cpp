@@ -54,6 +54,8 @@ int main(int argc, char* argv[])
 {
 	fpu_fix_start(NULL);
 
+	turnloggingon(true, "cout");
+
 	cout << "Save file: " << SAVENAME << endl;
 	Solver::initsolver();
 	cout << "starting work..." << endl;

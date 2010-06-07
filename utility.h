@@ -17,7 +17,7 @@ extern MTRand playoff_rand;
 
 // universal logging
 
-extern void turnloggingon(bool turnon, std::string filename = "botlog.txt");
+extern void turnloggingon(bool turnon, std::string what = "botlog.txt");
 extern std::ostream& getlog();
 extern bool isloggingon();
 

@@ -301,11 +301,12 @@ Vertex createtree(BettingTree &tree)
 	prunelimit(0, 0, BB, tree, n0, T0, T1, TSD);
 
 	//at most (4 + 4 + 8 + 8) small bets = 24 bblinds can be spent in a game
-	if(get_property(tree, settings_tag()).stacksize <= 24 * get_property(tree, settings_tag()).bblind)
-		REPORT("Pruned tree has "+tostring(num_vertices(tree)-3)+" nodes, and 3 terminal nodes also. Lost "
-				+tostring(6378+3-num_vertices(tree))+" nodes compared to the full tree.",INFO);
-	else if(num_vertices(tree) != 6378 + 3)
-		REPORT("Pruned tree is not good. NO GOOD! DO NOT USE!!");
+	if(isloggingon())
+		getlog() << "Tree has " << num_vertices(tree)-3 << " nodes, and 3 terminal nodes also. "
+			<< "Lost " << 6378+3-num_vertices(tree) << " nodes compared to a full tree." << endl;
+
+	if(get_property(tree, settings_tag()).stacksize >= 24 * get_property(tree, settings_tag()).bblind && num_vertices(tree) != 6378 + 3)
+		REPORT("Tree is not good. NO GOOD! DO NOT USE!!");
 
 	//return the root
 	return n0;
