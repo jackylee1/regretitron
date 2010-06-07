@@ -35,11 +35,11 @@ struct EdgeProp
 };
 
 //used by the nodes of the tree
-enum NodeType {P0Plays = 0, P1Plays = 1, TerminalP0Wins, TerminalP1Wins, TerminalShowDown, ERROR};
+enum NodeType {P0Plays = 0, P1Plays = 1, TerminalP0Wins, TerminalP1Wins, TerminalShowDown, NodeError};
 
 struct NodeProp
 {
-	NodeProp() : type(ERROR), actioni(-999999999) {}
+	NodeProp() : type(NodeError), actioni(-999999999) {}
 	NodeProp(NodeType t) : type(t), actioni(-999999999) {}
 	NodeType type;
 	int actioni;

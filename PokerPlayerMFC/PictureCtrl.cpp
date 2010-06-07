@@ -146,7 +146,7 @@ BOOL CPictureCtrl::LoadFromCardMask(CardMask mycard)
 	std::ostringstream file;
 	for(i=0; i<52; i++)
 		if (StdDeck_CardMask_CARD_IS_SET(mycard, i)) break;
-	i = 1 + (12-StdDeck_RANK(i))*4 + StdDeck_SUIT(i);
+	i = 1 + (12-StdDeck_RANK(i))*4 + (StdDeck_SUIT(i)+2)%4;
 	file << "cards/" << i << ".png";
 	return LoadFromFile(CString(file.str().c_str()));
 }

@@ -14,10 +14,9 @@ CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	  _mybot(NULL),
 	  cardrandom(),
 	  handsplayed(0),
-	  _sblind(5),
-	  _bblind(10),
-	  stacksizes(2, 1500),
-	  effstacksize(1500),
+	  humanstacksize(1500),
+	  botstacksize(1500),
+	  effstacksize(1500), // = mymin(humanstacksize, botstacksize)
 	  human(P0), 
 	  bot(P1),
 	  totalhumanwon(0)
@@ -133,6 +132,10 @@ BOOL CSimpleGameDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
+	//set logging on/off
+
+	turnloggingon(true);
+
 	//find a strategy/portfolio file and create the bot api
 
 	CFileDialog filechooser(TRUE, "xml", NULL);
@@ -242,7 +245,7 @@ void CSimpleGameDlg::updatepot()
 {
 	//reprint the pot to the screen
 	CString val;
-	val.Format(TEXT("Common Pot: %.2f"), 2*pot);
+	val.Format(TEXT("Common Pot: %.0f"), 2*pot);
 	PotValue.SetWindowText(val);
 }
 void CSimpleGameDlg::updateinvested(Player justacted)
@@ -251,7 +254,7 @@ void CSimpleGameDlg::updateinvested(Player justacted)
 
 	if(fpgreater(invested[human], 0))
 	{
-		val.Format(TEXT("%.2f"), invested[human]);
+		val.Format(TEXT("%.0f"), invested[human]);
 		InvestedHum.SetWindowText(val);
 	}
 	else if(justacted == human)
@@ -261,7 +264,7 @@ void CSimpleGameDlg::updateinvested(Player justacted)
 
 	if(fpgreater(invested[bot], 0))
 	{
-		val.Format(TEXT("%.2f"), invested[bot]);
+		val.Format(TEXT("%.0f"), invested[bot]);
 		InvestedBot.SetWindowText(val);
 	}
 	else if(justacted == bot)
@@ -269,9 +272,9 @@ void CSimpleGameDlg::updateinvested(Player justacted)
 	else
 		InvestedBot.SetWindowText("");
 
-	val.Format(TEXT("You: %.2f"), effstacksize-invested[human]-pot);
+	val.Format(TEXT("You: %.0f"), humanstacksize-invested[human]-pot);
 	HumanStack.SetWindowText(val);
-	val.Format(TEXT("Bot: %.2f"), effstacksize-invested[bot]-pot);
+	val.Format(TEXT("Bot: %.0f"), botstacksize-invested[bot]-pot);
 	BotStack.SetWindowText(val);
 }
 
@@ -281,17 +284,24 @@ void CSimpleGameDlg::updateinvested(Player justacted)
 
 double CSimpleGameDlg::mintotalwager(Player acting)
 {
+	double minwager;
+
 	//calling from the _sblind is a special case of how much we can wager
 	if(_gameround == PREFLOP && fpequal(invested[acting], _sblind))
-		return _bblind;
+		minwager = _bblind;
 	
 	//we're going first and nothing's been bet yet
-	if(_gameround != PREFLOP && acting==P0 && fpequal(invested[1-acting],0))
-		return 0;
+	else if(_gameround != PREFLOP && acting==P0 && fpequal(invested[1-acting],0))
+		minwager = 0;
 
 	//otherwise, this is the standard formula that FullTilt seems to follow
-	double prevwager = invested[1-acting]-invested[acting];
-	return invested[1-acting] + max(_bblind, prevwager);
+	else
+		minwager = invested[1-acting] + max(_bblind, invested[1-acting]-invested[acting]);
+
+	if(pot + minwager > effstacksize) //fp routines unneccessary
+		return effstacksize - pot;
+	else
+		return minwager;
 }
 
 double CSimpleGameDlg::limitbetincrement()
@@ -379,6 +389,12 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 	if(fpgreater(mintotalwager(pl), amount) || fpgreater(amount + pot, effstacksize))
 		REPORT("someone bet an illegal amount.");
 
+	if(fpequal(amount + pot, effstacksize))
+		if(_mybot->islimit())
+			_isallin = true;
+		else
+			REPORT("in no-limit, CSimpleGameDlg::dobet was used to communicate an all-in");
+
 	//inform the bot
 	_mybot->doaction(pl,BET,amount);
 	//set our invested amount
@@ -405,25 +421,26 @@ void CSimpleGameDlg::dogameover(bool fold)
 
 	if (_winner==human)
 	{
-		stacksizes[human] += (pot + invested[bot]);
-		stacksizes[bot] -= (pot + invested[bot]);
+		humanstacksize += (pot + invested[bot]);
+		botstacksize -= (pot + invested[bot]);
 	}
 	else if (_winner==bot)
 	{
-		stacksizes[human] -= (pot + invested[human]);
-		stacksizes[bot] += (pot + invested[human]);
+		humanstacksize -= (pot + invested[human]);
+		botstacksize += (pot + invested[human]);
 	}
+	effstacksize = mymin(humanstacksize, botstacksize);
 
-	if(fpequal(stacksizes[human], 0))
+	if(fpequal(humanstacksize, 0))
 		REPORT("bot won",INFO);
-	if(fpequal(stacksizes[bot], 0))
+	if(fpequal(botstacksize, 0))
 		REPORT("you won",INFO);
 
 	//reprint the stacks to the screen
 	CString val;
-	val.Format(TEXT("You: %.2f"), stacksizes[human]);
+	val.Format(TEXT("You: %.0f"), humanstacksize);
 	HumanStack.SetWindowText(val);
-	val.Format(TEXT("Bot: %.2f"), stacksizes[bot]);
+	val.Format(TEXT("Bot: %.0f"), botstacksize);
 	BotStack.SetWindowText(val);
 
 	//print user friendly hints to invested amounts
@@ -454,7 +471,7 @@ void CSimpleGameDlg::dogameover(bool fold)
 
 	if(AutoNewGame.GetCheck())
 	{
-		Sleep(3000);
+		Sleep(1500);
 		OnBnClickedButton5();
 	}
 	else
@@ -508,7 +525,7 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 		else
 			AllInButton.EnableWindow(TRUE);
 
-		if(fpequal(invested[bot], 0) || (_gameround == PREFLOP && fpequal(invested[bot], _bblind) && fpeual(invested[human], _bblind)))
+		if(fpequal(invested[bot], 0) || (_gameround == PREFLOP && fpequal(invested[bot], _bblind) && fpequal(invested[human], _bblind)))
 		{
 			//set fold/check to check, not grayed
 			FoldCheckButton.SetWindowText(TEXT("Check"));
@@ -572,16 +589,22 @@ void CSimpleGameDlg::OnBnClickedCheck2()
 void CSimpleGameDlg::OnBnClickedButton1()
 {
 	//if this is true, we are checking
-	if(fpequal(invested[bot], invested[human]))
+	if(fpequal(invested[human], 0) && fpequal(invested[bot], 0))
 	{
+		if(_gameround == PREFLOP)
+			REPORT("Invested[human and bot] is zero in preflop");
+
 		//if we are first to act, then this is a "bet" as the gr continues
-		if((_gameround == PREFLOP && human==P1) ||
-			(_gameround !=PREFLOP && human == P0))
+		if(human == P0)
 			dobet(human, 0);
 		//otherwise we are second to act. then we are calling a check and the gr ends.
 		else
 			docall(human);
 	}
+	//it's the preflop, the bet has called from the SB(will never happen), human can check, and is not already all-in
+	else if (_gameround == PREFLOP && human == P0 
+		&& fpequal(invested[bot], _bblind) && fpequal(invested[human], _bblind) && fpgreater(effstacksize, _bblind))
+		docall(human);
 	//there is a difference in invested which we are unwilling to reconcile
 	else if (fpgreater(invested[bot], invested[human]))
 		dofold(human);
@@ -640,12 +663,16 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	HandVal r0, r1;
 
 	//increment games played
+	const double bbets[] = {60, 80, 100, 120, 160, 200, 240, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000, 2400, 3000};
+	if(handsplayed++%18 == 0)
+	{
+		_bblind = bbets[handsplayed/18] / 2;
+		_sblind = bbets[handsplayed/18] / 4;
+		REPORT("Bets are now "+tostring(_bblind)+"/"+tostring(_bblind*2)+".", INFO);
+	}
 	CString text;
-	text.Format("SimpleGame - %d hands played", handsplayed);
+	text.Format("SimpleGame - %d hands played - bet sizes: %.0f/%.0f", handsplayed-1, _bblind, _bblind*2);
 	SetWindowText(text); //titlebar
-	const double bblinds[] = {60, 80, 100, 120, 160, 200, 240, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000, 2400, 3000};
-	_bblind = bblinds[++handsplayed/18];
-	_sblind = _bblind / 2;
 	//change positions & set dealer chip
 	std::swap(human,bot);
 	if(human == P1)
@@ -663,14 +690,13 @@ void CSimpleGameDlg::OnBnClickedButton5()
 
 	//set _gameround
 	_gameround = PREFLOP;
-	//no one is all-in
-	_isallin=false;
 	//reset pot
 	pot = 0;
 	updatepot();
-	//set blinds
-	invested[P0] = _bblind;
-	invested[P1] = _sblind;
+	//set blinds, we may have an auto-all-in shortstacked moment.
+	_isallin = fpgreater(effstacksize, _bblind) ? false : true;
+	invested[P0] = mymin(effstacksize, _bblind);
+	invested[P1] = mymin(effstacksize, _sblind);
 	updateinvested();
 
 	//deal out the cards randomly.
@@ -725,7 +751,10 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	printbotcardbacks();
 
 	//finally set grayness
-	graypostact(P1); //we'll just call the blinds an action as far as the name of that function goes
+	if(fpgreatereq(_sblind, effstacksize))
+		docall(P1); //we have an auto call moment. stack is smaller than or equal to the small blind
+	else
+		graypostact(P1); //we play the game as normal.
 }
 
 //This is the "make bot go" button.

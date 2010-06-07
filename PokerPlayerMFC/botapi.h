@@ -30,18 +30,31 @@ public:
 	~BotAPI();
 
 	//control game progress
+
+	//sblind, bblind - self explanatory
+	//stacksize - smallest for ONE player
 	void setnewgame(Player playernum, CardMask myhand, double sblind, double bblind, double stacksize); //can be called anytime
+
+	//gr - zero offset gameround
+	//newboard - only the NEW card(s) from this round
+	//newpot - this is the pot for just ONE player
 	void setnextround(int gr, CardMask newboard, double newpot); //must be called with gr = FLOP, TURN, or RIVER
+
+	//amount is only used during a call or a bet
+	//amount called - the total amount from ONE player to complete all bets from this round
+	//amount bet - the total amount wagered from ONE player, beyond what the other has put out so far
 	void doaction(Player player, Action a, double amount);
+
+	//amount is the total amount of a wager when betting/raising (relative to the beginning of the round)
+	//          the amount aggreed upon when calling (same as above) or folding (not same as above)
 	Action getbotaction(double &amount);
 
 	//diagnostics
 #ifdef _MFC_VER
 	void setdiagnostics(bool onoff, CWnd* parentwin = NULL); //controls DiagnosticsPage
 #endif
-	double getstacksizemult() const 
-		{ return (double) get_property(mystrats[0]->gettree(), settings_tag()).stacksize / get_property(mystrats[0]->gettree(), settings_tag()).bblind; }
 	bool islimit() const { return get_property(mystrats[0]->gettree(), settings_tag()).limit; }
+	bool isportfolio() const { return mystrats.size() >= 2; }
 
 private:
 	//we do not support copying.
@@ -56,9 +69,7 @@ private:
 	double mintotalwager();
 
 	//logging file
-	ostream &logfile;
 	string myname;
-	bool isloggingon;
 
 	//diagnostics window
 	DiagnosticsPage * MyWindow;

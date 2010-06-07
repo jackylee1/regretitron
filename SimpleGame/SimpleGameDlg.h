@@ -65,9 +65,10 @@ private:
 	BotAPI * _mybot;
 	MTRand cardrandom;
 	int handsplayed;
-	const double _sblind;
-	const double _bblind;
-	vector<double> stacksizes;
+	double _sblind;
+	double _bblind;
+	double humanstacksize;
+	double botstacksize;
 	double effstacksize;
 	Player human, bot;
 	CardMask humancards, botcards, flop, turn, river;

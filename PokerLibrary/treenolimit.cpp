@@ -18,8 +18,8 @@ void killtree(Vertex node, BettingTree &tree)
 		case TerminalP1Wins:
 		case TerminalShowDown:
 			return;
-		case ERROR:
-			REPORT("ERROR");
+		case NodeError:
+			REPORT("NodeError");
 		case P0Plays:
 		case P1Plays:
 			break;
@@ -205,7 +205,7 @@ Vertex addlimit(int gr, BettingTree &tree, const Vertex &T0, const Vertex &T1, c
 //tests to make sure edge ordering is preserved
 void testtree()
 {
-	const int N = 753; //oughta do it
+	const int N = 7; //oughta do it
 	BettingTree t;
 	Vertex root = add_vertex(t);
 	Vertex n[N];

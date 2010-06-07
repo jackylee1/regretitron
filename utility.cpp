@@ -12,6 +12,36 @@ using namespace std;
 MTRand playoff_rand(PLAYOFFDEBUG);
 #endif
 
+// universal logging
+
+bool mylogindicator = false;
+ostream * mylogfile;
+void turnloggingon(bool turnon, string filename)
+{
+	if(turnon && !mylogindicator)
+	{
+		mylogindicator = true;
+		mylogfile = new ofstream(filename.c_str());
+	}
+	else if(!turnon && mylogindicator)
+	{
+		mylogindicator = false;
+		delete mylogfile;
+	}
+}
+ostream& getlog()
+{
+	if(isloggingon())
+		return *mylogfile;
+	else
+		REPORT("check for islogon() before using getlog()");
+	exit(-1);
+}
+bool isloggingon() 
+{ 
+	return mylogindicator; 
+}
+
 // how to get seconds with milliseconds
 
 #ifdef _MSC_VER
@@ -55,6 +85,7 @@ inline void notify(string text) { cout << text << endl; }
 #include <execinfo.h> //needed for backtraces
 #endif
 
+#ifdef __GNUC__
 inline string getbacktracestring()
 {
 	const int maxtraces = 200;
@@ -66,15 +97,24 @@ inline string getbacktracestring()
 		ret += string(strings[i]) + "\n";
 	return ret;
 }
+#endif
 
 void REPORT(string infomsg, report_t killswitch)
 {
 	switch(killswitch)
 	{
-	case KILL: infomsg = "Error: " + infomsg + "\n" + getbacktracestring(); break;
+	case KILL: 
+		infomsg = "Error: " + infomsg + "\n";
+#ifdef __GNUC__
+		infomsg += getbacktracestring();
+#endif
+		break;
 	case WARN: infomsg.insert(0, "Warning: "); break;
 	case INFO: infomsg.insert(0, "It turns out: "); break;
 	}
+
+	if(isloggingon())
+		getlog() << endl << "REPORTED:" << endl << infomsg << endl << endl;
 
     notify(infomsg);
 
@@ -174,7 +214,7 @@ bool file_exists(string filename)
 
 //comparing floating point values
 
-inline bool issmall(double small) { return myabs(small) < 1e-9; }
+inline bool issmall(double number) { return myabs(number) < 1e-9; }
 
 bool fpequal(double x, double y, int maxUlps) //from http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 {

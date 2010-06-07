@@ -44,8 +44,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="../pokereval/include;"
-				PreprocessorDefinitions="WIN32;_WINDOWS;_DEBUG"
+				AdditionalIncludeDirectories="../pokereval/include;&quot;C:\Program Files (x86)\boost\boost_1_42&quot;"
+				PreprocessorDefinitions="_WINDOWS;_DEBUG;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -62,7 +62,7 @@
 				Name="VCResourceCompilerTool"
 				PreprocessorDefinitions="_DEBUG"
 				Culture="1033"
-				AdditionalIncludeDirectories="Z:\pokerbreedinggrounds\PokerPlayerMFC;&quot;$(IntDir)&quot;"
+				AdditionalIncludeDirectories="..\PokerPlayerMFC;&quot;$(IntDir)&quot;"
 			/>
 			<Tool
 				Name="VCPreLinkEventTool"
@@ -131,8 +131,8 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="../pokereval/include;"
-				PreprocessorDefinitions="WIN32;_WINDOWS;NDEBUG"
+				AdditionalIncludeDirectories="../pokereval/include;&quot;C:\Program Files (x86)\boost\boost_1_42&quot;"
+				PreprocessorDefinitions="_WINDOWS;NDEBUG;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="false"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="2"

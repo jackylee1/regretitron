@@ -15,6 +15,12 @@
 extern MTRand playoff_rand;
 #endif
 
+// universal logging
+
+extern void turnloggingon(bool turnon, std::string filename = "botlog.txt");
+extern std::ostream& getlog();
+extern bool isloggingon();
+
 // how to get a 64 bit integer type
 
 #ifdef _MSC_VER
