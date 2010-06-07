@@ -12,6 +12,8 @@ using namespace std;
 const string BINSFOLDER = ""; //current directory
 const floater EPSILON = 1e-12;
 const bool RIVERBUNCHHISTBINS = false;
+const float hand_list_multiplier = 2.5; //to keep it from overflowing (nominally 1.11 for regular bin sizes larger if using 169 PF bins)
+const float chunky_bin_tolerance = hand_list_multiplier*0.95;
 
 
 //------------- R i v e r   E V -------------------
@@ -388,7 +390,7 @@ void determinebins(vector<CompressedHand> &myhands, const int n_bins, const int6
 	const bool print = false;
 	bool chunky = false;
 	float expected = (float)total_hands/n_bins; //expected bins per hand
-	float tolerance = 1.05f;
+	float tolerance = 1 + (hand_list_multiplier-1)/2;
 	ostringstream status;
 	int currentbin=0;
 	int currentbinsize=0;
@@ -607,8 +609,17 @@ void dopflopbins(int n_bins)
 {
 	cout << "generating " << n_bins << " preflop bins... (no status bar)" << endl;
 	PackedBinFile packedbins(n_bins, INDEX2_MAX);
-	const FloaterFile hss("preflopHSS", INDEX2_MAX);
-	calculatebins(0, n_bins, hss, packedbins);
+	if(n_bins == INDEX2_MAX) // that's all of 'em!
+	{
+		REPORT("Bypassing calculatebins, setting preflop bin to it's index...",INFO);
+		for(int i=0; i<INDEX2_MAX; i++)
+			packedbins.store(i, i);
+	}
+	else
+	{
+		const FloaterFile hss("preflopHSS", INDEX2_MAX);
+		calculatebins(0, n_bins, hss, packedbins);
+	}
 	cout << packedbins.save(BINSFOLDER+"preflop"+tostring(n_bins));
 }
 
@@ -621,7 +632,7 @@ void doflophistorybins(int n_pflop, int n_flop)
 	PackedBinFile binfile(n_flop, INDEX23_MAX);
 
 	const float expected = 25989600.0f/n_pflop; //52C2 * 50C3 = 25989600
-	vector<RawHand> hand_list((int64)(1.11f*expected)); 
+	vector<RawHand> hand_list((int64)(hand_list_multiplier*expected)); 
 
 	//iterate through the bins and associated hands and do bins
 	int64 x=0;
@@ -659,7 +670,7 @@ void doflophistorybins(int n_pflop, int n_flop)
 			});
 		});
 
-		if(i < 0.9*expected || i > 1.1*expected)
+		if(i < (1/chunky_bin_tolerance)*expected || i > chunky_bin_tolerance*expected)
 			REPORT("found "+tostring(i)+" hands ("+tostring(100.0*i/expected)
 					+"% of expected) for preflop bin "+tostring(mypflopbin), WARN);
 		if(i-1>=hand_list.size())
@@ -683,7 +694,7 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 	PackedBinFile binfile(n_turn, INDEX231_MAX);
 
 	const float expected = 1221511200.0f/n_pflop/n_flop;
-	vector<RawHand> hand_list((int64)(1.11f*expected));
+	vector<RawHand> hand_list((int64)(hand_list_multiplier*expected));
 
 	//build hand lists and bin
 	int64 x=0;
@@ -730,7 +741,7 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 				});
 			});
 
-			if(i < 0.9*expected || i > 1.1*expected)
+			if(i < (1/chunky_bin_tolerance)*expected || i > chunky_bin_tolerance*expected)
 				REPORT("found "+tostring(i)+" hands ("+tostring(100.0*i/expected)
 						+"% of expected) for preflop/flop bin "+tostring(mypflopbin)
 						+'/'+tostring(myflopbin), WARN);
@@ -757,7 +768,7 @@ void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
 	PackedBinFile binfile(n_river, INDEX2311_MAX);
 
 	const float expected = 56189515200.0f/n_pflop/n_flop/n_turn;
-	vector<RawHand> hand_list((int64)(1.11f*expected));
+	vector<RawHand> hand_list((int64)(hand_list_multiplier*expected));
 
 	//build hand lists and bin
 	int64 x=0;
@@ -803,7 +814,7 @@ void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
 					});
 				});
 			
-				if(i < 0.9*expected || i > 1.1*expected)
+				if(i < (1/chunky_bin_tolerance)*expected || i > chunky_bin_tolerance*expected)
 					REPORT("found "+tostring(i)+" hands ("+tostring(100.0*i/expected)
 							+"% of expected) for preflop/flop/turn bin "+tostring(mypflopbin)
 							+'/'+tostring(myflopbin)+'/'+tostring(myturnbin), WARN);
@@ -885,6 +896,7 @@ int main(int argc, char *argv[])
 	{
 		cout << "Current data type: Using " << FloaterFile::gettypename() << endl;
 		cout << "fpcompare uses " << EPSILON << "." << endl;
+		cout << "hand_list_multiplier will store " << hand_list_multiplier << " times more entries than expected (increases chunky tolerance too)." << endl;
 		cout << "river bunches hands by HSS using fpcompare? " 
 			<< (RIVERBUNCHHISTBINS ? "Yes." : "No.") << endl;
 		cout << "(everything bunches hands by HSS using fpcompare, with possible exception of river.)" << endl;
@@ -978,6 +990,8 @@ int main(int argc, char *argv[])
 		n_pflop = n_flop = n_turn = n_river = atoi(argv[2]);
 		int64 temp, total=0;
 
+		cout << "hand_list_multiplier is " << hand_list_multiplier << endl;
+
 		total += temp = 8*PackedBinFile::numwordsneeded(n_pflop, INDEX2_MAX);
 		cout << "Preflop bins take " << space(temp) << endl;
 
@@ -996,11 +1010,11 @@ int main(int argc, char *argv[])
 		total += temp = sizeof(floater)*INDEX25_MAX; //riverEV
 		cout << "RiverEV takes " << space(temp) << endl;
 
-		int64 rawhandlength = 1.11f*56189515200.0f/n_pflop/n_flop/n_turn;
+		int64 rawhandlength = hand_list_multiplier*56189515200.0f/n_pflop/n_flop/n_turn;
 		total += temp = sizeof(RawHand)*rawhandlength;
 		cout << "RawHand(" << space(sizeof(RawHand)) << ") list takes " << space(temp) << endl;
 
-		total += temp = sizeof(CompressedHand)*(rawhandlength/1.11f/7);
+		total += temp = sizeof(CompressedHand)*(rawhandlength/hand_list_multiplier/7);
 		cout << "CompressedHands(" << space(sizeof(CompressedHand)) << ") takes " << space(temp) << endl;
 
 		total += temp = sizeof(IndexNode)*(INDEX2311_MAX/n_pflop/n_flop/n_turn-500);

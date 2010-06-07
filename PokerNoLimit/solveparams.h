@@ -8,17 +8,23 @@
 #include "../utility.h" // for TOSTRING()
 #include <qd/qd_real.h>
 
+//settings for the settings - metasettings
+#define MYSP_PF_BINS 169
+#define MYSP_FTR_BINS 10
+const int64 mysp_millions_iter = 30;
+//end metasettings
+
 const int64 THOUSAND = 1000;
 const int64 MILLION = 1000000;
 const int64 BILLION = THOUSAND*MILLION;
 
 //main settings
 const int64 TESTING_AMT = 10*THOUSAND; //do this many iterations as a test for speed
-const int64 STARTING_AMT = 100*MILLION;//22300*MILLION/4; //do this many iterations, then...
+const int64 STARTING_AMT = mysp_millions_iter*MILLION; //do this many iterations, then...
 const double MULTIPLIER = 1; //multiply by this amount, do that many, repeat ....
 const int64 SAVEAFTER = 0; // save xml after this amount
 const bool SAVESTRAT = true; //save strategy file when saving xml
-const int64 STOPAFTER = 1*STARTING_AMT; //stop after (at least) this amount of iterations
+const int64 STOPAFTER = STARTING_AMT; //stop after (at least) this amount of iterations
 
 //solver settings
 #define FPSTORE_T double
@@ -26,10 +32,10 @@ const int64 STOPAFTER = 1*STARTING_AMT; //stop after (at least) this amount of i
 #define STORE_DENOM 0
 #define NUM_THREADS 1
 #define USE_HISTORY 1 //affects threading method
-const double AGGRESSION_FACTOR = 0; //0 = "calm old man", 7 = "crazed, cocaine-driven maniac with an ax"
+const double AGGRESSION_FACTOR = 6; //0 = "calm old man", 7 = "crazed, cocaine-driven maniac with an ax"
 const int  N_LOOKAHEAD = 4; //affects threading performance
 const bool SEED_RAND = true;
-const int  SEED_WITH = 3;
+const int  SEED_WITH = 726383;
 const bool THREADLOOPTRACE = false; //prints out debugging
 const bool WALKERDEBUG = false; //debug print
 
@@ -42,7 +48,7 @@ const bool WALKERDEBUG = false; //debug print
 #endif
 #define SS CMD_LINE_VAR
 
-const string SAVENAME = "limit-5bin-newsys-ss" TOSTRING(SS);
+const string SAVENAME = "portfolio-win-ss" TOSTRING(SS);
 
 //add your rake graduations in here if solving for a cash game
 const string RAKE_TYPE = "none"; //added to XML file
@@ -50,11 +56,10 @@ inline int rake(int winningutility) { return winningutility; }
 
 //bin settings
 #if USE_HISTORY // this for my new binning method with history
-#define TEMP 5
-#define PFBIN TEMP
-#define FBIN TEMP
-#define TBIN TEMP
-#define RBIN TEMP
+#define PFBIN MYSP_PF_BINS
+#define FBIN MYSP_FTR_BINS
+#define TBIN MYSP_FTR_BINS
+#define RBIN MYSP_FTR_BINS
 const int PFLOP_CARDSI_MAX = PFBIN; // used by threading method. 
 const cardsettings_t CARDSETTINGS =
 {
@@ -76,7 +81,6 @@ const cardsettings_t CARDSETTINGS =
 	false //use flopalyzer
 };
 
-#undef TEMP
 #else // this one is my old binning method, with no history
 #define FBIN 256
 #define TBIN 90

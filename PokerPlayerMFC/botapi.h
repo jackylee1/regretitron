@@ -53,6 +53,8 @@ public:
 #ifdef _MFC_VER
 	void setdiagnostics(bool onoff, CWnd* parentwin = NULL); //controls DiagnosticsPage
 #endif
+	double getstacksizemult() const 
+		{ return (double) get_property(mystrats[0]->gettree(), settings_tag()).stacksize / get_property(mystrats[0]->gettree(), settings_tag()).bblind; }
 	bool islimit() const { return get_property(mystrats[0]->gettree(), settings_tag()).limit; }
 	bool isportfolio() const { return mystrats.size() >= 2; }
 
