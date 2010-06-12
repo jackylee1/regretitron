@@ -231,6 +231,10 @@
 				RelativePath="..\utility.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\XSleep.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -251,6 +255,10 @@
 			</File>
 			<File
 				RelativePath=".\stdafx.h"
+				>
+			</File>
+			<File
+				RelativePath=".\XSleep.h"
 				>
 			</File>
 		</Filter>

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "SimpleGame.h"
 #include "SimpleGameDlg.h"
+#include "XSleep.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -252,25 +253,25 @@ void CSimpleGameDlg::updateinvested(Player justacted)
 {
 	CString val;
 
-	if(fpgreater(invested[human], 0))
+	if(fpequal(invested[human], invested[bot]))
 	{
-		val.Format(TEXT("%.0f"), invested[human]);
-		InvestedHum.SetWindowText(val);
+		if(fpequal(invested[human], 0))
+			val = TEXT("CHECK");
+		else
+			val = TEXT("CALL");
 	}
-	else if(justacted == human)
-		InvestedHum.SetWindowText("CHECK");
 	else
-		InvestedHum.SetWindowText("");
+		val.Format(TEXT("%.0f"), invested[justacted]);
 
-	if(fpgreater(invested[bot], 0))
-	{
-		val.Format(TEXT("%.0f"), invested[bot]);
-		InvestedBot.SetWindowText(val);
-	}
+	if(justacted == human)
+		InvestedHum.SetWindowText(val);
 	else if(justacted == bot)
-		InvestedBot.SetWindowText("CHECK");
+		InvestedBot.SetWindowText(val);
 	else
-		InvestedBot.SetWindowText("");
+	{
+		InvestedHum.SetWindowText(TEXT(""));
+		InvestedBot.SetWindowText(TEXT(""));
+	}
 
 	val.Format(TEXT("You: %.0f"), humanstacksize-invested[human]-pot);
 	HumanStack.SetWindowText(val);
@@ -320,6 +321,10 @@ void CSimpleGameDlg::docall(Player pl)
 	//inform bot unless game is over
 	if(!_isallin && _gameround != RIVER)
 		_mybot->doaction(pl,CALL,invested[1-pl]);
+	//show call
+	invested[pl] = invested[1-pl];
+	updateinvested(pl);
+	XSleep(650, this);
 	//increase pot
 	pot += invested[1-pl];
 	updatepot();
@@ -335,13 +340,13 @@ void CSimpleGameDlg::docall(Player pl)
 		switch(_gameround) //correct amount of suspense needed.
 		{
 		case PREFLOP:
-			Sleep(1000); 
+			XSleep(1000, this); 
 			printflop();
 		case FLOP:
-			Sleep(1000);
+			XSleep(1000, this);
 			printturn();
 		case TURN:
-			Sleep(1000);
+			XSleep(1000, this);
 			printriver();
 		}
 		_gameround=RIVER;
@@ -410,7 +415,7 @@ void CSimpleGameDlg::doallin(Player pl)
 	_isallin=true;
 	//set our invested amount
 	invested[pl]=effstacksize-pot;
-	updateinvested();
+	updateinvested(pl);
 	//other players turn now
 	graypostact(Player(1-pl));
 }
@@ -471,7 +476,7 @@ void CSimpleGameDlg::dogameover(bool fold)
 
 	if(AutoNewGame.GetCheck())
 	{
-		Sleep(1500);
+		XSleep(2000, this);
 		OnBnClickedButton5();
 	}
 	else
@@ -498,6 +503,7 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 {
 	if(AutoBotPlay.GetCheck() && nexttoact == bot)
 	{
+		XSleep(500, this);
 		OnBnClickedButton6();
 		return;
 	}
@@ -693,11 +699,8 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	//reset pot
 	pot = 0;
 	updatepot();
-	//set blinds, we may have an auto-all-in shortstacked moment.
+	//we may have an auto-all-in shortstacked moment.
 	_isallin = fpgreater(effstacksize, _bblind) ? false : true;
-	invested[P0] = mymin(effstacksize, _bblind);
-	invested[P1] = mymin(effstacksize, _sblind);
-	updateinvested();
 
 	//deal out the cards randomly.
 	MTRand &mersenne = cardrandom; //alias random for macros.
@@ -749,6 +752,18 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	printhumancards();
 	ShowBotCards.SetCheck(BST_UNCHECKED); //uncheck show bot cards, incase accidently left checked by user
 	printbotcardbacks();
+
+	//show blank
+	updateinvested();
+	XSleep(200, this);
+	//show small blind
+	invested[P1] = mymin(effstacksize, _sblind);
+	updateinvested(P1);
+	XSleep(200, this);
+	//show big blind
+	invested[P0] = mymin(effstacksize, _bblind);
+	updateinvested(P0);
+	XSleep(200, this);
 
 	//finally set grayness
 	if(fpgreatereq(_sblind, effstacksize))
