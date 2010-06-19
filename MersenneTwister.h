@@ -129,10 +129,14 @@ protected:
 	uint32 mixBits( const uint32& u, const uint32& v ) const
 		{ return hiBit(u) | loBits(v); }
 	uint32 twist( const uint32& m, const uint32& s0, const uint32& s1 ) const
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable: 4146)
+#endif
 		{ return m ^ (mixBits(s0,s1)>>1) ^ (-loBit(s1) & 0x9908b0dfUL); }
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 	static uint32 hash( time_t t, clock_t c );
 };
 
@@ -273,10 +277,14 @@ inline void MTRand::seed()
 		register int i = N;
 		register bool success = true;
 		while( success && i-- )
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable: 4800)
+#endif
 			success = fread( s++, sizeof(uint32), 1, urandom );
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 		fclose(urandom);
 		if( success ) { seed( bigSeed, N );  return; }
 	}

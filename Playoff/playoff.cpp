@@ -202,7 +202,10 @@ double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0win
 //we update it here to the that value that it takes upon completion of this round
 Result Playoff::playoutaround(Player nexttogo, double &pot)
 {
-	bool prev_act_was_allin = false;
+	//usually false, but an exceptional true case, only in preflop. Don't have to handle case when stacksize is 
+	// equal or less than small blind, as that does not result in a playable game that I can make a bot for,
+	// and this program only plays at stacksizes that at least one of the bots was trained at.
+	bool prev_act_was_allin = fpgreatereq(_bblind, _stacksize);
 	while(1)
 	{
 		//get the bot action
@@ -304,6 +307,7 @@ double getloadavg()
 
 int main(int argc, char **argv)
 {
+	//turnloggingon(true, "cout");
 
 	//two files supplied. play them against each other, repeatedly, unless number is given.
 

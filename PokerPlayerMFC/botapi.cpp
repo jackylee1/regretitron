@@ -333,7 +333,7 @@ Action BotAPI::getbotaction(double &amount)
 
 	//translate to Action type and set amount
 
-	Action myact=BETALLIN; //compiler warnings. could put exit() after each REPORT to fix warnings.
+	Action myact;
 	switch((currstrat->gettree())[*eanswer].type)
 	{
 		case Fold:
@@ -355,7 +355,7 @@ Action BotAPI::getbotaction(double &amount)
 			if(!offtreebetallins) //as it should be
 				myact = CALL;
 			else if(islimit() || out_degree(currentnode, currstrat->gettree()) != 2)
-				REPORT("Limit, or I thought we should be at a 2-membered node now! (fold or call all-in)");
+				{ REPORT("Limit, or I thought we should be at a 2-membered node now! (fold or call all-in)"); exit(0); }
 			else //but sometimes, we treat these nodes as BET all in instead of call.
 				myact = BETALLIN;
 			break;
@@ -370,7 +370,15 @@ Action BotAPI::getbotaction(double &amount)
 
 		case Bet:
 			if(islimit()) //this could be a covert all-in, as the bot has generally more chips than reality
+			{
 				amount = multiplier * mymin(truestacksize - actualpot, (double)(currstrat->gettree()[*eanswer].potcontrib));
+				if(fpgreatereq(get_property(currstrat->gettree(), settings_tag()).bblind, truestacksize)) 
+					//then the stacksize must be between the sblind and the bblind size, the game consists of one choice,
+					//we must have just made it, and it will end the game. It is a call all-in from the small blind.
+					myact = CALL;
+				else
+					myact = BET;
+			}
 			else //all-ins would be handled above
 			{
 				amount = multiplier * ((currstrat->gettree())[*eanswer].potcontrib + actualinv[1-myplayer]-perceivedinv[1-myplayer]);
@@ -381,9 +389,11 @@ Action BotAPI::getbotaction(double &amount)
 					REPORT("bot bet amount was less than multiplier * mintotalwager()", WARN);
 					amount = multiplier * mintotalwager();
 				}
+				myact = BET;
 			}
-			myact = BET;
 			break;
+		default:
+			REPORT("bad action"); exit(0);
 	}
 
 	return myact;
