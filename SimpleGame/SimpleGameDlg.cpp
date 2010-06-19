@@ -623,7 +623,8 @@ void CSimpleGameDlg::OnBnClickedButton2()
 {
 	//if this is preflop and we are calling from the SB, 
 	// then that's actually a "bet" as it doesn't end the gr
-	if(_gameround == PREFLOP && fpequal(invested[human], _sblind))
+	if(_gameround == PREFLOP && fpequal(invested[human], _sblind) 
+		&& fpgreater(effstacksize, _bblind)) //this would end the gave via a call
 		dobet(human, min(_bblind,effstacksize));
 	//all other cases, a call is a call
 	else
@@ -669,6 +670,7 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	HandVal r0, r1;
 
 	//increment games played
+#if 0
 	const double bbets[] = {60, 80, 100, 120, 160, 200, 240, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000, 2400, 3000};
 	if(handsplayed++%18 == 0)
 	{
@@ -676,6 +678,13 @@ void CSimpleGameDlg::OnBnClickedButton5()
 		_sblind = bbets[handsplayed/18] / 4;
 		REPORT("Bets are now "+tostring(_bblind)+"/"+tostring(_bblind*2)+".", INFO);
 	}
+#else
+	humanstacksize = 3000;
+	botstacksize = 3000;
+	effstacksize = 3000;
+	_bblind = 3000;
+	_sblind = 1500;
+#endif
 	CString text;
 	text.Format("SimpleGame - %d hands played - bet sizes: %.0f/%.0f", handsplayed-1, _bblind, _bblind*2);
 	SetWindowText(text); //titlebar
