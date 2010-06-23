@@ -7,6 +7,10 @@
 #include <poker_defs.h>
 #include "MersenneTwister.h"
 
+// the version of my portfolio xml document
+
+const int PORTFOLIO_VERSION = 1;
+
 // this is useful for debugging playoff
 
 #define PLAYOFFDEBUG -1 //if > 0 will seed playoff and use this MTRand
@@ -17,7 +21,8 @@ extern MTRand playoff_rand;
 
 // universal logging
 
-extern void turnloggingon(bool turnon, std::string what = "botlog.txt");
+extern void turnloggingon(std::string what);
+extern void turnloggingoff();
 extern std::ostream& getlog();
 extern bool isloggingon();
 

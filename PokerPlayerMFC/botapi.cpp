@@ -18,7 +18,8 @@ inline bool playerequal(Player player, NodeType nodetype)
 }
 
 BotAPI::BotAPI(string xmlfile, string botname, bool preload)
-   : myname(botname),
+   : myxmlfile(xmlfile),
+     myname(botname),
 	 MyWindow(NULL),
      isdiagnosticson(false),
 #if PLAYOFFDEBUG > 0
@@ -51,9 +52,8 @@ BotAPI::BotAPI(string xmlfile, string botname, bool preload)
 		}
 		else //we actually have a portfolio
 		{
-
 			//check version
-			if(!root->HasAttribute("version") || root->GetAttribute<int>("version") != 0)
+			if(!root->HasAttribute("version") || root->GetAttribute<int>("version") != PORTFOLIO_VERSION)
 				REPORT("Unsupported portfolio XML file (older/newer version).");
 
 			//set working directory to portfolio directory
@@ -66,14 +66,13 @@ BotAPI::BotAPI(string xmlfile, string botname, bool preload)
 			for(child = child.begin(root); child != child.end(); child++)
 				mystrats.push_back(new Strategy(child->GetText(), preload));
 
-			if(mystrats.size() < 2)
+			if(root->GetAttribute<int>("size") != mystrats.size())
 				REPORT("Portfolio only had "+tostring(mystrats.size())+" bots!");
 		}
 	}
 	catch(Exception &ex) //error parsing XML
 	{
 		REPORT(ex.what());
-		exit(-1);
 	}
 
 	//restore directory

@@ -57,6 +57,7 @@ public:
 		{ return (double) get_property(mystrats[0]->gettree(), settings_tag()).stacksize / get_property(mystrats[0]->gettree(), settings_tag()).bblind; }
 	bool islimit() const { return get_property(mystrats[0]->gettree(), settings_tag()).limit; }
 	bool isportfolio() const { return mystrats.size() >= 2; }
+	string getxmlfile() const { return myxmlfile; }
 
 private:
 	//we do not support copying.
@@ -69,6 +70,9 @@ private:
 	void doallin(Player pl);
 	void processmyturn();
 	double mintotalwager();
+
+	//xml file
+	string myxmlfile;
 
 	//logging file
 	string myname;

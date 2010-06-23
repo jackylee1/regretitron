@@ -2,10 +2,30 @@
 #include "SimpleGame.h"
 #include "SimpleGameDlg.h"
 #include "XSleep.h"
+#include "UserInput.h"
+#include <sstream>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+//cool function to get type-safe input from a dialog box!!
+template<typename T> bool getuserinput(string inputtext, T &value)
+{
+	UserInput diagbox(inputtext);
+	if(diagbox.DoModal() == IDCANCEL)
+		return false;
+	else
+	{
+		if(diagbox.inputtext2.GetLength()<1)
+			return false;
+		istringstream i((LPCTSTR)diagbox.inputtext2);
+		i >> value;
+		if(i.fail())
+			return false;
+		return true;
+	}
+}
 
 // --------------------- MFC Class, window stuff ---------------------------
 
@@ -15,12 +35,16 @@ CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	  _mybot(NULL),
 	  cardrandom(),
 	  handsplayed(0),
+	  handsplayedtourney(0),
+	  cashsblind(10),
+	  cashbblind(20),
 	  humanstacksize(1500),
 	  botstacksize(1500),
 	  effstacksize(1500), // = mymin(humanstacksize, botstacksize)
 	  human(P0), 
 	  bot(P1),
-	  totalhumanwon(0)
+	  totalhumanwon(0),
+	  istournament(false)
 {
 	CardMask_RESET(botcm0); //ensures show bot cards produces jokers if done early
 	CardMask_RESET(botcm1);
@@ -75,7 +99,14 @@ BEGIN_MESSAGE_MAP(CSimpleGameDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON3, &CSimpleGameDlg::OnBnClickedButton3)
 	ON_BN_CLICKED(IDC_BUTTON4, &CSimpleGameDlg::OnBnClickedButton4)
 	ON_BN_CLICKED(IDC_CHECK2, &CSimpleGameDlg::OnBnClickedCheck2)
-	ON_BN_CLICKED(IDC_OPENFILE, &CSimpleGameDlg::OnBnClickedOpenfile)
+	ON_COMMAND(ID_MENU_NEWTOURNEY, &CSimpleGameDlg::OnMenuNewTourney)
+	ON_COMMAND(ID_MENU_PLAYCASHGAME, &CSimpleGameDlg::OnMenuPlayCashGame)
+	ON_COMMAND(ID_MENU_SETBOTBANKROLL, &CSimpleGameDlg::OnMenuSetBotBankroll)
+	ON_COMMAND(ID_MENU_SETALLBANKROLL, &CSimpleGameDlg::OnMenuSetAllBankroll)
+	ON_COMMAND(ID_MENU_SETYOURBANKROLL, &CSimpleGameDlg::OnMenuSetYourBankroll)
+	ON_COMMAND(ID_LOADBOTFILE, &CSimpleGameDlg::OnLoadbotfile)
+	ON_COMMAND(ID_SHOWBOTFILE, &CSimpleGameDlg::OnShowbotfile)
+	ON_COMMAND(ID_MENU_EXIT, &CSimpleGameDlg::OnMenuExit)
 END_MESSAGE_MAP()
 
 // CSimpleGameDlg message handlers
@@ -104,6 +135,7 @@ void CSimpleGameDlg::PostNcDestroy()
 void CSimpleGameDlg::OnCancel()
 {
 	_mybot->setdiagnostics(false); //this will DestroyWindow the diagnostics page if it exists.
+	turnloggingoff();
 	DestroyWindow();
 }
 
@@ -135,20 +167,27 @@ BOOL CSimpleGameDlg::OnInitDialog()
 
 	//set logging on/off
 
-	turnloggingon(true);
+	turnloggingon("cout");
+
+	//make a menu!
+	//"Create a CMenu object on the stack frame as a local, then call CMenu's 
+	// member functions to manipulate the new menu as needed. Next, call 
+	// CWnd::SetMenu to set the menu to a window, followed immediately by a 
+	// call to the CMenu object's Detach member function."
+	//(I save the menu to an object here so I can check/uncheck and such)
+	MyMenu.LoadMenu(IDR_MYMENU);
+	SetMenu(&MyMenu);
+	MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_CHECKED);
 
 	//find a strategy/portfolio file and create the bot api
 
-	CFileDialog filechooser(TRUE, "xml", NULL);
-	if(filechooser.DoModal() == IDCANCEL) exit(0);
-	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()));
+	if(!loadbotfile()) 
+		exit(0);
 
 	//initialize the window controls that need it
 
 	TotalWon.SetWindowText(TEXT(""));
 	graygameover();
-	if(_mybot->islimit())
-		BetAmount.EnableWindow(FALSE);
 
 	//set the picture on the File Open Button
 
@@ -249,6 +288,15 @@ void CSimpleGameDlg::updatepot()
 	val.Format(TEXT("Common Pot: %.0f"), 2*pot);
 	PotValue.SetWindowText(val);
 }
+void CSimpleGameDlg::updatess()
+{
+	CString val;
+	val.Format(TEXT("You: %.0f"), humanstacksize-invested[human]-pot);
+	HumanStack.SetWindowText(val);
+	val.Format(TEXT("Bot: %.0f"), botstacksize-invested[bot]-pot);
+	BotStack.SetWindowText(val);
+}
+
 void CSimpleGameDlg::updateinvested(Player justacted)
 {
 	CString val;
@@ -273,12 +321,28 @@ void CSimpleGameDlg::updateinvested(Player justacted)
 		InvestedBot.SetWindowText(TEXT(""));
 	}
 
-	val.Format(TEXT("You: %.0f"), humanstacksize-invested[human]-pot);
-	HumanStack.SetWindowText(val);
-	val.Format(TEXT("Bot: %.0f"), botstacksize-invested[bot]-pot);
-	BotStack.SetWindowText(val);
+	updatess();
 }
 
+bool CSimpleGameDlg::loadbotfile()
+{
+	CFileDialog filechooser(TRUE, "xml", NULL, OFN_NOCHANGEDIR, "Bot Definition XML files (*.xml)|*.xml||");
+	if(filechooser.DoModal() == IDCANCEL) 
+		return false;
+	//load in the new file now.
+	if(_mybot == NULL)
+		delete _mybot; //will kill diag
+	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()));
+	if(ShowDiagnostics.GetCheck())
+		_mybot->setdiagnostics(true, this);
+	totalhumanwon = 0;
+	handsplayed = 0;
+	if(_mybot->islimit())
+		BetAmount.EnableWindow(FALSE);
+	else
+		BetAmount.EnableWindow(TRUE);
+	return true;
+}
 
 
 // ------------------------- Game Logic --------------------------------
@@ -441,12 +505,9 @@ void CSimpleGameDlg::dogameover(bool fold)
 	if(fpequal(botstacksize, 0))
 		REPORT("you won",INFO);
 
-	//reprint the stacks to the screen
-	CString val;
-	val.Format(TEXT("You: %.0f"), humanstacksize);
-	HumanStack.SetWindowText(val);
-	val.Format(TEXT("Bot: %.0f"), botstacksize);
-	BotStack.SetWindowText(val);
+	//reset values to reprint the stacks to the screen
+	pot = invested[bot] = invested[human] = 0;
+	updatess();
 
 	//print user friendly hints to invested amounts
 	if(fold)
@@ -472,11 +533,12 @@ void CSimpleGameDlg::dogameover(bool fold)
 		InvestedBot.SetWindowText(TEXT("TIE"));
 	}
 
-	//Start new game or Set grayness values
+	//if auto, Start new game, else, Set grayness values
 
 	if(AutoNewGame.GetCheck())
 	{
-		XSleep(2000, this);
+		//sleep less when there's folds. more when there's cards to look at!
+		XSleep((fold?2000:4000), this);
 		OnBnClickedButton5();
 	}
 	else
@@ -490,7 +552,10 @@ void CSimpleGameDlg::graygameover()
 {
 	//gray out all but newgame
 	OpenBotButton.EnableWindow(TRUE);
-	NewGameButton.EnableWindow(TRUE);
+	NewGameButton.EnableWindow(TRUE); //only allow new game & bankroll when NOT in a game
+	MyMenu.EnableMenuItem(ID_MENU_SETBOTBANKROLL, MF_ENABLED);
+	MyMenu.EnableMenuItem(ID_MENU_SETYOURBANKROLL, MF_ENABLED);
+	MyMenu.EnableMenuItem(ID_MENU_SETALLBANKROLL, MF_ENABLED);
 	FoldCheckButton.SetWindowText(TEXT("Fold/Check"));
 	FoldCheckButton.EnableWindow(FALSE);
 	CallButton.EnableWindow(FALSE);
@@ -510,7 +575,10 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 
 
 	OpenBotButton.EnableWindow(FALSE);
-	NewGameButton.EnableWindow(FALSE);
+	NewGameButton.EnableWindow(FALSE); //only allow new game & bankroll when NOT in a game
+	MyMenu.EnableMenuItem(ID_MENU_SETBOTBANKROLL, MF_GRAYED);
+	MyMenu.EnableMenuItem(ID_MENU_SETYOURBANKROLL, MF_GRAYED);
+	MyMenu.EnableMenuItem(ID_MENU_SETALLBANKROLL, MF_GRAYED);
 
 	if(nexttoact == bot)
 	{
@@ -666,19 +734,43 @@ void CSimpleGameDlg::OnBnClickedButton4()
 // This is the new game button
 void CSimpleGameDlg::OnBnClickedButton5()
 {
+	if(fpequal(0, mymin(humanstacksize, botstacksize)))
+	{
+		//stop infinite loop
+		AutoNewGame.SetCheck(BST_UNCHECKED);
+		return;
+	}
+	else if(fpgreater(0, mymin(humanstacksize, botstacksize)))
+	{
+		REPORT("stacksize is negative!");
+	}
+
 	CardMask usedcards, fullhuman, fullbot;
 	HandVal r0, r1;
 
 	//increment games played
-	const double bbets[] = {60, 80, 100, 120, 160, 200, 240, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000, 2400, 3000};
-	if(handsplayed++%18 == 0)
+	handsplayed++;
+
+	if(istournament) 
 	{
-		_bblind = bbets[handsplayed/18] / 2;
-		_sblind = bbets[handsplayed/18] / 4;
-		REPORT("Bets are now "+tostring(_bblind)+"/"+tostring(_bblind*2)+".", INFO);
+		//then raise the blinds!
+		const double bbets[] = {60, 80, 100, 120, 160, 200, 240, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000, 2400, 3000};
+		if(handsplayedtourney++%18 == 0)
+		{
+			_bblind = bbets[handsplayedtourney/18] / 2;
+			_sblind = bbets[handsplayedtourney/18] / 4;
+			REPORT("Tourney bets are now "+tostring(_bblind)+"/"+tostring(_bblind*2)+".", INFO);
+		}
 	}
+	else
+	{
+		_bblind = cashbblind;
+		_sblind = cashsblind;
+	}
+
 	CString text;
-	text.Format("SimpleGame - %d hands played - bet sizes: %.0f/%.0f", handsplayed-1, _bblind, _bblind*2);
+	text.Format("SimpleGame - %s - %d hands played - bet sizes: %.0f/%.0f", 
+		(istournament?"Tournament":"Cash Game"), handsplayed-1, _bblind, _bblind*2);
 	SetWindowText(text); //titlebar
 	//change positions & set dealer chip
 	std::swap(human,bot);
@@ -791,19 +883,60 @@ void CSimpleGameDlg::OnBnClickedButton6()
 	}
 }
 
-void CSimpleGameDlg::OnBnClickedOpenfile()
+void CSimpleGameDlg::OnMenuNewTourney()
 {
-	CFileDialog filechooser(TRUE, "xml", NULL);
-	if(filechooser.DoModal() == IDCANCEL) return;
-	delete _mybot; //will kill diag
-	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()));
-	if(ShowDiagnostics.GetCheck())
-		_mybot->setdiagnostics(true, this);
-	totalhumanwon = 0;
-	handsplayed = 0;
-	if(_mybot->islimit())
-		BetAmount.EnableWindow(FALSE);
-	else
-		BetAmount.EnableWindow(TRUE);
-
+	//set starting stacks for a tourney
+	humanstacksize = 1500;
+	botstacksize = 1500;
+	istournament = true;
+	handsplayedtourney = 0;
+	MyMenu.CheckMenuItem(ID_MENU_NEWTOURNEY, MF_CHECKED);
+	MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_UNCHECKED);
+	//message box should pop up notifying of new bet sizes
+	OnBnClickedButton5(); //new game button
 }
+
+void CSimpleGameDlg::OnMenuPlayCashGame()
+{
+	istournament = false;
+	MyMenu.CheckMenuItem(ID_MENU_NEWTOURNEY, MF_UNCHECKED);
+	MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_CHECKED);
+	REPORT("Playing Cash Game: Blinds are set to "+tostring(cashsblind)+", "+tostring(cashbblind), INFO);
+	OnBnClickedButton5();
+}
+
+void CSimpleGameDlg::OnMenuSetBotBankroll()
+{
+	double input;
+	if(!getuserinput("How much for bot?", input) || input < 0)
+		return;
+	botstacksize = input;
+	effstacksize = mymin(botstacksize, humanstacksize);
+	updatess();
+}
+
+void CSimpleGameDlg::OnMenuSetYourBankroll()
+{
+	double input;
+	if(!getuserinput("How much for human?", input) || input < 0)
+		return;
+	humanstacksize = input;
+	effstacksize = mymin(botstacksize, humanstacksize);
+	updatess();
+}
+
+void CSimpleGameDlg::OnMenuSetAllBankroll()
+{
+	double input;
+	if(!getuserinput("How much for everybody?", input) || input < 0)
+		return;
+	botstacksize = humanstacksize = effstacksize = input;
+	updatess();
+}
+
+void CSimpleGameDlg::OnLoadbotfile()
+{ loadbotfile(); /*now start new game*/ OnBnClickedButton5(); } 
+void CSimpleGameDlg::OnShowbotfile()
+{ REPORT(_mybot->getxmlfile(),INFO); } 
+void CSimpleGameDlg::OnMenuExit()
+{ OnCancel(); }

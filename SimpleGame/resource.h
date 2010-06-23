@@ -6,6 +6,8 @@
 #define IDR_MAINFRAME                   128
 #define IDB_OPEN1                       130
 #define IDB_OPEN2                       131
+#define IDR_MYMENU                      133
+#define IDD_USERINPUT                   134
 #define IDC_BUTTON1                     1000
 #define IDC_BUTTON2                     1001
 #define IDC_BUTTON3                     1002
@@ -37,14 +39,27 @@
 #define IDC_OPENFILE                    1029
 #define IDC_BOTDEAL                     1030
 #define IDC_HUMANDEAL                   1031
+#define IDC_INPUTTEXT                   1033
+#define ID_MENU_NEWTOURNEY              32772
+#define ID_MENU_PLAYCASHGAME            32773
+#define ID_MENU_SETBOTBANKROLL          32777
+#define ID_MENU_SETYOURBANKROLL         32778
+#define ID_MENU_SETALLBANKROLL          32779
+#define ID_SHOWBOTFILE                  32780
+#define ID_BOT_LOADBOTFILE              32781
+#define ID_BOT_SHOWCURRENTBOTFILE       32782
+#define ID_LOADBOTFILE                  32783
+#define ID_SHOWCURRENTBOTFILE           32784
+#define ID_BOTFILE_EXIT                 32785
+#define ID_MENU_EXIT                    32786
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        133
-#define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1032
+#define _APS_NEXT_RESOURCE_VALUE        135
+#define _APS_NEXT_COMMAND_VALUE         32787
+#define _APS_NEXT_CONTROL_VALUE         1034
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

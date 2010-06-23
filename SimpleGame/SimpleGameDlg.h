@@ -51,7 +51,9 @@ private:
 	void printriver();
 	void eraseboard();
 	void updatepot();
+	void updatess();
     void updateinvested(Player justacted = (Player)-1);
+	bool loadbotfile();
 	double mintotalwager(Player acting);
 	double limitbetincrement();
 	void dofold(Player pl);
@@ -65,8 +67,11 @@ private:
 	BotAPI * _mybot;
 	MTRand cardrandom;
 	int handsplayed;
+	int handsplayedtourney;
 	double _sblind;
 	double _bblind;
+	double cashsblind;
+	double cashbblind;
 	double humanstacksize;
 	double botstacksize;
 	double effstacksize;
@@ -80,6 +85,7 @@ private:
 	double invested[2];
 	double totalhumanwon;
 	double pot;
+	bool istournament;
 
 	afx_msg void OnBnClickedButton1();
 	afx_msg void OnBnClickedButton3();
@@ -89,7 +95,14 @@ private:
 	afx_msg void OnBnClickedButton6();
 	afx_msg void OnBnClickedButton4();
 	afx_msg void OnBnClickedCheck2();
-	afx_msg void OnBnClickedOpenfile();
+	afx_msg void OnMenuNewTourney();
+	afx_msg void OnMenuPlayCashGame();
+	afx_msg void OnMenuSetBotBankroll();
+	afx_msg void OnMenuSetAllBankroll();
+	afx_msg void OnMenuSetYourBankroll();
+	afx_msg void OnLoadbotfile();
+	afx_msg void OnShowbotfile();
+	afx_msg void OnMenuExit();
 	// card images
 	CPictureCtrl hCard0;
 	CPictureCtrl hCard1;
@@ -120,4 +133,5 @@ private:
 	CStatic PotValue;
 	CPictureCtrl HumanDealerChip;
 	CPictureCtrl BotDealerChip;
+	CMenu MyMenu;
 };

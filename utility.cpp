@@ -4,6 +4,9 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
+#ifdef _MSC_VER
+#include "windows.h"
+#endif
 using namespace std;
 
 // this is useful for debugging playoff
@@ -15,21 +18,43 @@ MTRand playoff_rand(PLAYOFFDEBUG);
 // universal logging
 
 bool mylogindicator = false;
+#ifdef _MSC_VER
+bool killconsole = false;
+#endif
 ostream * mylogfile;
-void turnloggingon(bool turnon, string what)
+void turnloggingon(string what)
 {
-	if(turnon && !mylogindicator)
+	if(!mylogindicator)
 	{
 		mylogindicator = true;
 		if(what == "cout")
+		{
+#ifdef _MSC_VER
+			AllocConsole();
+			killconsole = true;
+			mylogfile = new ofstream("CONOUT$");
+#else
 			mylogfile = &cout;
+#endif
+		}
 		else
 			mylogfile = new ofstream(what.c_str());
 	}
-	else if(!turnon && mylogindicator)
+}
+void turnloggingoff()
+{
+	if(mylogindicator)
 	{
 		mylogindicator = false;
-		delete mylogfile;
+		if(mylogfile != &cout)
+			delete mylogfile;
+#ifdef _MSC_VER
+		if(killconsole)
+		{
+			killconsole = false;
+			FreeConsole();
+		}
+#endif
 	}
 }
 ostream& getlog()

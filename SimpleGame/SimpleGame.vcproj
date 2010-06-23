@@ -228,6 +228,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\UserInput.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\utility.cpp"
 				>
 			</File>
@@ -255,6 +259,10 @@
 			</File>
 			<File
 				RelativePath=".\stdafx.h"
+				>
+			</File>
+			<File
+				RelativePath=".\UserInput.h"
 				>
 			</File>
 			<File
