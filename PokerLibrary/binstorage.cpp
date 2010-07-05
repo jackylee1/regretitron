@@ -187,6 +187,10 @@ string PackedBinFile::save(string filename) const
 //used by all the below functions.
 int PackedBinFile::bitsperbin(int bin_max)
 {
+	//easiest way to allow the special case that requires in fact no bin files by creating bin files  for it
+	if(bin_max == 1)
+		return 1;
+
 	unsigned long bin_max_bits = bin_max-1;
 	int nbits=0;
 	while(bin_max_bits)

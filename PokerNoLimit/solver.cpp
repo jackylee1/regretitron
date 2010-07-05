@@ -33,7 +33,7 @@ bool Solver::datainuse3[RIVER_CARDSI_MAX*2];
 void Solver::initsolver()
 {
 	tree = new BettingTree(TREESETTINGS); //the settings are taken from solveparams.h
-	treeroot = createtree(*tree);
+	treeroot = createtree(*tree, MAX_ACTIONS_SOLVER);
 	cardmachine = new CardMachine(CARDSETTINGS, true, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
 	memory = new MemoryManager(*tree, *cardmachine);
 	inittime = getdoubletime();
@@ -82,7 +82,8 @@ void Solver::save(const string &filename, bool writedata)
 
 	// save the data first to get the filesize
 
-	int64 stratfilesize = writedata ? memory->save(filename, *cardmachine) : 0;
+	int64 stratfilesize = writedata ? memory->save(filename) : 0;
+	memory->readcounts(filename);
 
 	// open up the xml
 
@@ -144,8 +145,9 @@ void Solver::save(const string &filename, bool writedata)
 	//floating point data types
 
 	TiXmlElement * data = new TiXmlElement("data");
-	data->SetAttribute("fpworking_type", FPWORKING_TYPENAME);
-	data->SetAttribute("fpstore_type", FPSTORE_TYPENAME);
+	data->SetAttribute("FWorking_type", FWORKING_TYPENAME);
+	data->SetAttribute("FStore_type", FSTORE_TYPENAME);
+	data->SetAttribute("FRivStore_type", FRIVSTORE_TYPENAME);
 
 	//solve parameters
 
@@ -353,7 +355,7 @@ found_good_data:
 		if(THREADLOOPTRACE)
 			cerr << /*this <<*/ ": Solving " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
 #endif //ALL THREADEDNESS
-		walker(PREFLOP,0,treeroot,1,1);
+		walker<FStore_type>(PREFLOP,0,treeroot,1,1);
 #ifdef DO_THREADS //MULTI THREADED
 		pthread_mutex_lock(&threaddatalock);
 		if(THREADLOOPTRACE && false)
@@ -374,49 +376,52 @@ found_good_data:
 	}
 }
 
-inline pair<fpworking_type, fpworking_type> utilpair(int p0utility)
+inline pair<FWorking_type, FWorking_type> utilpair(int p0utility)
 {
-	const fpworking_type aggression_multiplier = (fpworking_type)1 + (fpworking_type)AGGRESSION_FACTOR/100;
+	const FWorking_type aggression_multiplier = (FWorking_type)1 + (FWorking_type)AGGRESSION_FACTOR/100;
 
 	if(p0utility>0)
-		return make_pair( aggression_multiplier * (fpworking_type)rake(p0utility), -p0utility);
+		return make_pair<FWorking_type,FWorking_type>( aggression_multiplier * (FWorking_type)rake(p0utility), -(FWorking_type)p0utility);
 	else
-		return make_pair( p0utility, aggression_multiplier * (fpworking_type)rake(-p0utility));
+		return make_pair<FWorking_type,FWorking_type>( (FWorking_type)p0utility, aggression_multiplier * (FWorking_type)rake(-p0utility));
 }
 
-
-pair<fpworking_type,fpworking_type> Solver::walker(int gr, int pot, Vertex node, fpworking_type prob0, fpworking_type prob1)
+template<typename FStore>
+pair<FWorking_type,FWorking_type> Solver::walker(int gr, int pot, Vertex node, FWorking_type prob0, FWorking_type prob1)
 {
 	const int numa = out_degree(node, *tree);
 	const int playeri = playerindex((*tree)[node].type);
 
 	//obtain pointers to data for this turn
 
-#if STORE_DENOM
-	fpstore_type * stratn, * regret, * stratd;
-	memory->dataindexing(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], stratn, regret, stratd);
-#else
-	fpstore_type * stratn, * regret;
-	memory->dataindexing(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], stratn, regret);
+	FStore *stratn, *regret;
+
+#if SAME_STORE_TYPES
+	if(gr==3)    //then this decision needs to be done at run time 
+		memory->dataindexingriv(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], stratn, regret);
+	else
+		memory->dataindexing(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], stratn, regret);
+#else //then this needs to be done at compile time by template differentiation
+	memory->dataindexing<FStore>(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], stratn, regret);
 #endif
 	
 	//find total regret
 
-	fpworking_type totalregret=0.0;
+	FWorking_type totalregret=0.0;
 
 	for(int i=0; i<numa; i++)
 		if (regret[i]>0.0) totalregret += regret[i];
 
 	//set strategy proportional to positive regret, or 1/numa if no positive regret
 
-	fpworking_type stratt[MAX_ACTIONS];
+	FWorking_type stratt[MAX_ACTIONS_SOLVER];
 
 	if (totalregret > 0.0)
 		for(int i=0; i<numa; i++)
 			(regret[i]>0.0) ? stratt[i] = regret[i] / totalregret : stratt[i] = 0.0;
 	else
 		for(int i=0; i<numa; i++)
-			stratt[i] = (fpworking_type)1/(fpworking_type)numa;
+			stratt[i] = (FWorking_type)1/(FWorking_type)numa;
 
 	//debug printing
 
@@ -430,8 +435,8 @@ pair<fpworking_type,fpworking_type> Solver::walker(int gr, int pot, Vertex node,
 
 	//recursively find utility of each action
 
-	pair<fpworking_type,fpworking_type> utility[MAX_ACTIONS];
-	pair<fpworking_type,fpworking_type> avgutility(0,0);
+	pair<FWorking_type,FWorking_type> utility[MAX_ACTIONS_SOLVER];
+	pair<FWorking_type,FWorking_type> avgutility(0,0);
 
 	EIter e, elast;
 	int i=0;
@@ -449,12 +454,19 @@ pair<fpworking_type,fpworking_type> Solver::walker(int gr, int pot, Vertex node,
 		case Call:
 			if(gr==RIVER) //showdown
 				utility[i] = utilpair((pot+(*tree)[*e].potcontrib) * (twoprob0wins-1));
-			else //next game round
+			else if (gr==TURN) //moving to next game round, which is river -> change store type
 			{
 				if((*tree)[node].type==P0Plays)
-					utility[i] = walker(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0*stratt[i], prob1);
+					utility[i] = walker<FRivStore_type>(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0*stratt[i], prob1);
 				else
-					utility[i] = walker(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0, prob1*stratt[i]);
+					utility[i] = walker<FRivStore_type>(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0, prob1*stratt[i]);
+			}
+			else //moving to next game round, which is NOT river -> same types as this instance
+			{
+				if((*tree)[node].type==P0Plays)
+					utility[i] = walker<FStore>(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0*stratt[i], prob1);
+				else
+					utility[i] = walker<FStore>(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0, prob1*stratt[i]);
 			}
 			break;
 
@@ -463,11 +475,11 @@ pair<fpworking_type,fpworking_type> Solver::walker(int gr, int pot, Vertex node,
 			break;
 
 		case Bet:
-		case BetAllin:
+		case BetAllin: //NOT moving to new round -> same types as this instance
 			if((*tree)[node].type==P0Plays)
-				utility[i] = walker(gr, pot, target(*e, *tree), prob0*stratt[i], prob1);
+				utility[i] = walker<FStore>(gr, pot, target(*e, *tree), prob0*stratt[i], prob1);
 			else
-				utility[i] = walker(gr, pot, target(*e, *tree), prob0, prob1*stratt[i]);
+				utility[i] = walker<FStore>(gr, pot, target(*e, *tree), prob0, prob1*stratt[i]);
 		}
 
 		avgutility.first += stratt[i]*utility[i].first;
@@ -501,10 +513,9 @@ pair<fpworking_type,fpworking_type> Solver::walker(int gr, int pot, Vertex node,
 		}
 
 		//shortcut
-		if(prob1==0.0) return avgutility;
-
-		for(int a=0; a<numa; a++)
-			regret[a] += prob1 * (utility[a].first - avgutility.first);
+		if(prob1!=0.0)
+			for(int a=0; a<numa; a++)
+				regret[a] += prob1 * (utility[a].first - avgutility.first);
 	}
 	else // P1 playing, so his regret values are negative of P0's regret values.
 	{
@@ -519,10 +530,9 @@ pair<fpworking_type,fpworking_type> Solver::walker(int gr, int pot, Vertex node,
 		}
 
 		//shortcut
-		if(prob0==0.0) return avgutility;
-
-		for(int a=0; a<numa; a++)
-			regret[a] += prob0 * (utility[a].second - avgutility.second);
+		if(prob0!=0.0)
+			for(int a=0; a<numa; a++)
+				regret[a] += prob0 * (utility[a].second - avgutility.second);
 	}
 
 

@@ -86,7 +86,8 @@ typedef graph_traits<BettingTree>::degree_size_type Size;
 
 //functions provided here to manipulate the trees
 
-Vertex createtree(BettingTree &tree); //assumes tree object exists already, with settings inside
+//assumes tree object exists already, with settings inside. checks to make sure you don't have more actions than max actions
+Vertex createtree(BettingTree &tree, const int max_actions); 
 string actionstring(const BettingTree &tree, const Edge &edge, double multiplier);
 inline int playerindex(NodeType nodetype)
 {

@@ -26,6 +26,7 @@ public:
 
 	//access to BettingTree
 	inline const BettingTree& gettree() const { return *tree; }
+	inline int getactmax(int r, int nact) const { return get_property(gettree(), maxorderindex_tag())[r][nact]; }
 	inline const Vertex& gettreeroot() const { return treeroot; }
 
 	//access to CardMachine functions
@@ -33,6 +34,8 @@ public:
 
 	//my own strategy file reading implementation
 	void getprobs(int gr, int actioni, int numa, const vector<CardMask> &cards, vector<double> &probs);
+
+	ifstream& getstratfile() { return strategyfile; }
 
 private:
 	//we do not support copying.

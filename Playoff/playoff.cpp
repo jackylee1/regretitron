@@ -9,6 +9,7 @@
 #include "../PokerLibrary/constants.h"
 #include "../MersenneTwister.h"
 #include "../utility.h"
+#include "analysis.h"
 #include <math.h> //sqrt
 #include <numeric> //accumulate
 #include <algorithm> //sort
@@ -16,10 +17,10 @@
 #include <list>
 using namespace std;
 
-const double LOAD_LIMIT = 3.5; //load average number
+const double LOAD_LIMIT = 3.9; //load average number
 const int LOAD_TO_USE = 1; //1, 2, or 3, for 1 min, 5 min, or 15 min.
-const int SLEEP_ON_THREADSTART = 1; // in minutes
-const int SLEEP_ON_NOWORK = 1; // in minutes
+const int SLEEP_ON_THREADSTART = 60; // in seconds, sleep this much after starting a thread before looking for more work to do
+const int SLEEP_ON_NOWORK = 15; // in seconds, sleep this much after not finding any work to do.
 
 enum Result
 {
@@ -302,16 +303,20 @@ double getloadavg()
 	double loadavg[3];
 	if(getloadavg(loadavg, 3) < LOAD_TO_USE)
 		REPORT("load average getting has failed!");
-	return loadavg[LOAD_TO_USE-1]; //return #2 load average, takes 5 minutes to update
+	return loadavg[LOAD_TO_USE-1];
 }
 
 int main(int argc, char **argv)
 {
 	//turnloggingon(true, "cout");
 
+	//analysis will return true if it parsed the commands into something to do
+	if(doanalysis(argc, argv))
+		return 0;
+
 	//two files supplied. play them against each other, repeatedly, unless number is given.
 
-	if(argc==3 || argc==4)
+	else if(argc==3 || argc==4)
 	{
 		Playoff * myplayoff = new Playoff(argv[1], argv[2]);
 		const int numgames = argc==4 ? atol(argv[3]) : 10000;
@@ -380,13 +385,13 @@ lookforwork:
 						//new therad, using the pthread object in the list, using the newthread ThreadData object above
 						if(pthread_create(mythreads.back(), NULL, ThreadData::threadfunction, newthread))
 							REPORT("error creating thread");
-						sleep(60*SLEEP_ON_THREADSTART); //takes that long for #2 load average to update
+						sleep(SLEEP_ON_THREADSTART); //takes that long for #2 load average to update
 						goto amidone;
 					}
 				}
 			}
 		}
-		sleep(60*SLEEP_ON_NOWORK); //we could not find work to do
+		sleep(SLEEP_ON_NOWORK); //we could not find work to do
 
 		//check to see if we are done, if so, join threads, if not, look for work.
 
@@ -459,12 +464,14 @@ amidone:
 	}
 	else
 	{
-		cout << "Usage: " << argv[0] << " xmlfile1 xmlfile2" << endl;
-		cout << "   prints constantly updating display of results to screen, sweet!" << endl;
-		cout << "Usage: " << argv[0] << " xmlfile1 xmlfile2 numgames" << endl;
-		cout << "   playes numgames and prints the results, done (appropriate for saving output to a file)" << endl;
-		cout << "Usage: " << argv[0] << " numgames xmlfile1 ... xmlfileN" << endl;
-		cout << "   builds a fuckin chart." << endl;
+		cout << "Playoff Usage: " << endl;
+		cout << "  " << argv[0] << " xmlfile1 xmlfile2" << endl;
+		cout << "     prints constantly updating display of results to screen, sweet!" << endl;
+		cout << "  " << argv[0] << " xmlfile1 xmlfile2 numgames" << endl;
+		cout << "     playes numgames and prints the results, done (appropriate for saving output to a file)" << endl;
+		cout << "  " << argv[0] << " numgames xmlfile1 ... xmlfileN" << endl;
+		cout << "     builds a fuckin chart." << endl;
+		printanalysisusage(argv[0]);
 	}
 }
 

@@ -81,7 +81,7 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 		treesettings.pushfold = xmltree->FirstChildElement("meta")->GetAttribute<bool>("pushfold");
 		treesettings.limit = xmltree->FirstChildElement("meta")->GetAttribute<bool>("limit");
 		tree = new BettingTree(treesettings);
-		treeroot = createtree(*tree);
+		treeroot = createtree(*tree, MAX_ACTIONS);
 
 		//set strategy file
 

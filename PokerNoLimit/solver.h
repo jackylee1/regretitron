@@ -34,7 +34,8 @@ private:
 
 	//only these 3 functions can access per thread data, as they are non-static
 	void threadloop(); //master loop function, called first by each thread
-	pair<fpworking_type,fpworking_type> walker(int gr, int pot, Vertex node, fpworking_type prob0, fpworking_type prob1);
+	template<typename FStore>
+	pair<FWorking_type,FWorking_type> walker(int gr, int pot, Vertex node, FWorking_type prob0, FWorking_type prob1);
 
 	struct iteration_data_t
 	{

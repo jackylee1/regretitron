@@ -35,7 +35,8 @@ void killtree(Vertex node, BettingTree &tree)
 	remove_vertex(node, tree);
 }
 
-void prunelimit(int gr, int pot, int prev_potcontrib, BettingTree &tree, const Vertex &node, const Vertex &T0, const Vertex &T1, const Vertex &TSD)
+void prunelimit(int gr, int pot, int prev_potcontrib, BettingTree &tree, const Vertex &node, 
+		const Vertex &T0, const Vertex &T1, const Vertex &TSD, const int maxacts)
 {
 	//make sure this is a player node
 
@@ -121,8 +122,10 @@ void prunelimit(int gr, int pot, int prev_potcontrib, BettingTree &tree, const V
 
 	//okay, now iterate through them like a normal person and get on goin'!
 
-	if(out_degree(node, tree) < 2 || out_degree(node, tree) > 9)
-		REPORT("you have a "+tostring(out_degree(node, tree))+" membered node!");
+	if(maxacts > MAX_ACTIONS)
+		REPORT("You are using more actions than the rest of the code!");
+	if(out_degree(node, tree) < 2 || (int)out_degree(node, tree) > maxacts)
+		REPORT("you have a "+tostring(out_degree(node, tree))+" membered node while max_actions is "+tostring(maxacts)+"!");
 	tree[node].actioni = get_property(tree, maxorderindex_tag())[gr][out_degree(node, tree)]++;
 
 	for(tie(e,elast) = out_edges(node, tree); e!=elast; e++)
@@ -131,11 +134,11 @@ void prunelimit(int gr, int pot, int prev_potcontrib, BettingTree &tree, const V
 		{
 			case Bet:
 			case BetAllin:
-				prunelimit(gr, pot, tree[*e].potcontrib, tree, target(*e, tree), T0, T1, TSD);
+				prunelimit(gr, pot, tree[*e].potcontrib, tree, target(*e, tree), T0, T1, TSD, maxacts);
 				break;
 			case Call:
 				if(gr < 3)
-					prunelimit(gr+1, pot+tree[*e].potcontrib, 0, tree, target(*e, tree), T0, T1, TSD);
+					prunelimit(gr+1, pot+tree[*e].potcontrib, 0, tree, target(*e, tree), T0, T1, TSD, maxacts);
 			default: //this is river Call's, CallAllin's and Fold's
 				break; //they all lead to terminal nodes.
 		}
@@ -234,7 +237,7 @@ void testtree()
 	}
 }
 
-Vertex createtree(BettingTree &tree)
+Vertex createtree(BettingTree &tree, const int max_actions)
 {
 	testtree();
 
@@ -298,7 +301,7 @@ Vertex createtree(BettingTree &tree)
 		REPORT("Tree is not verified. Repeat. Tree is not good.");
 
 	//prune it down to size according to stacksize
-	prunelimit(0, 0, BB, tree, n0, T0, T1, TSD);
+	prunelimit(0, 0, BB, tree, n0, T0, T1, TSD, max_actions);
 
 	//at most (4 + 4 + 8 + 8) small bets = 24 bblinds can be spent in a game
 	if(isloggingon())
