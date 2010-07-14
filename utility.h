@@ -35,12 +35,18 @@ typedef unsigned __int64 uint64;
 #include <stdint.h>
 typedef int64_t int64;
 typedef uint64_t uint64;
+typedef int32_t int32;
+typedef uint32_t uint32;
+typedef int16_t int16;
+typedef uint16_t uint16;
+typedef int8_t int8;
+typedef uint8_t uint8;
 #endif
 
 //functions defined in the cpp file
 
 extern double getdoubletime(); //returns time since some (any) refence in seconds
-enum report_t{ KILL, WARN, INFO };
+enum report_t{ KNOWN, KILL, WARN, INFO };
 extern void REPORT(std::string infomsg, report_t killswitch = KILL);
 extern void checkdataformat(); //performs the magic numbers test
 template <typename T> 

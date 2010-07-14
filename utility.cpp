@@ -18,10 +18,11 @@ MTRand playoff_rand(PLAYOFFDEBUG);
 // universal logging
 
 bool mylogindicator = false;
+ostream * mylogfile = NULL;
 #ifdef _MSC_VER
 bool killconsole = false;
 #endif
-ostream * mylogfile;
+
 void turnloggingon(string what)
 {
 	if(!mylogindicator)
@@ -131,17 +132,22 @@ void REPORT(string infomsg, report_t killswitch)
 {
 	switch(killswitch)
 	{
+	case KNOWN: 
+		infomsg = "Problem: " + infomsg + "\n";
+		break;
+
 	case KILL: 
 		infomsg = "Error: " + infomsg + "\n";
 #ifdef __GNUC__
 		infomsg += getbacktracestring();
 #endif
 		break;
+
 	case WARN: infomsg.insert(0, "Warning: "); break;
 	case INFO: infomsg.insert(0, "It turns out: "); break;
 	}
 
-	if(isloggingon())
+	if(isloggingon() && mylogfile != &cout)
 		getlog() << endl << "REPORTED:" << endl << infomsg << endl << endl;
 
     notify(infomsg);
@@ -150,6 +156,10 @@ void REPORT(string infomsg, report_t killswitch)
 	{
 		dobreakpoint();
 		exit(-1);
+	}
+	else if(killswitch == KNOWN) //e.g. bin file not found, cannot continue, but not a bug
+	{
+		exit(1);
 	}
 }
 
