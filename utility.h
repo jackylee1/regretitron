@@ -5,6 +5,11 @@
 #include <sstream>
 #include <vector>
 #include <poker_defs.h>
+#ifdef _MSC_VER
+#include <windows.h>
+#else
+#error
+#endif
 #include "MersenneTwister.h"
 
 // the version of my portfolio xml document
@@ -116,5 +121,31 @@ inline int64 combine(int64 i3, int64 i2, int64 n2, int64 i1, int64 n1)
 
 inline int64 combine(int64 i4, int64 i3, int64 n3, int64 i2, int64 n2, int64 i1, int64 n1)
 	{ return i4*n3*n2*n1 + i3*n2*n1 + i2*n1 + i1; }
+
+// My own custom file utility...
+
+class InFile
+{
+public:
+	InFile() : opened(false) { }
+	InFile(const std::string &filename, int64 expectedsize) : fname(filename) { Open(filename, expectedsize); }
+	~InFile();
+	void Open(const std::string & filename, int64 expectedsize);
+	template < typename T > T Read();
+	void Seek(int64 position);
+	int64 Tell();
+private:
+	int64 Size();
+	bool opened;
+	std::string fname;
+#ifdef _MSC_VER
+	HANDLE file;
+#else
+#error
+#endif
+};
+
+
+
 
 #endif

@@ -7,7 +7,6 @@
 #include <poker_defs.h> //has CardMask
 #include <string>
 #include <vector>
-#include <fstream>
 using namespace std;
 
 #define COMPILE_FLOPALYZER_TESTCODE 0

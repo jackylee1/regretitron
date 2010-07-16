@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "floaterfile.h"
+#include <fstream>
 using namespace std;
 
 const string FloaterFile::TYPESTR = TOSTRING(FLOATER);
@@ -22,34 +23,27 @@ FloaterFile::FloaterFile(string filename, const int64 n_floaters, const bool pre
 	if(broken) return;
 
 	filename = FOLDER + filename + EXT;
-	filehandle = new ifstream(filename.c_str(),ifstream::binary);
-	if(!filehandle->is_open() || !filehandle->good())
+	
+	if(!file_exists(filename))
 	{
 		broken = true;
-		REPORT(filename + " doesn't exist or could not be opened", WARN);
-		delete filehandle;
-		filehandle = NULL;
+		REPORT(filename + " doesn't exist.", WARN);
 		return;
 	}
-	filehandle->seekg(0, ios::end);
-	if(!filehandle->good() || (uint64)filehandle->tellg()!=n_floaters*sizeof(floater))
-		REPORT(filename + " found but not correct size");
+
+	filehandle = new InFile(filename, n_floaters*sizeof(floater));
 
 	if(preload)
 	{
 		mydata = new vector<floater>(n_floaters, -1);
-		filehandle->seekg(0, ios::beg);
+		filehandle->Seek(0);
 		for(int64 i=0; i<n_floaters; i++)
 		{
-			floater temp;
-			filehandle->read((char *)&temp, sizeof(floater));
+			floater temp = filehandle->Read<floater>();
 			if(temp<0 || temp>1)
 				REPORT(filename + " contained bad data!!");
 			(*mydata)[i] = temp;
 		}
-		if(!filehandle->good() || filehandle->eof() || EOF!=filehandle->peek() || !filehandle->eof())
-			REPORT(filename + " failed us at the last minute, don't know what happened.");
-		filehandle->close();
 		delete filehandle;
 		filehandle = NULL;
 	}
@@ -67,10 +61,8 @@ floater FloaterFile::get(int64 index)
 {
 	if(broken) return 0;
 	if(filehandle == NULL) REPORT("use [] instead, but prolly something worse happened");
-	filehandle->seekg(index*sizeof(floater));
-	floater temp;
-	filehandle->read((char*)&temp, sizeof(floater));
-	if(!filehandle->good()) REPORT("the file failed on us");
+	filehandle->Seek(index*sizeof(floater));
+	floater temp = filehandle->Read<floater>();
 	if(temp < 0 || temp > 1) REPORT("found bad data in floater file");
 	return temp;
 }

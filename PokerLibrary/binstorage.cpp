@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "binstorage.h"
 #include "../utility.h"
+#include <fstream>
 using namespace std;
 
 const string PackedBinFile::EXT = ".bins";
@@ -21,29 +22,16 @@ PackedBinFile::PackedBinFile(string filename, int64 filesize, int bin_max, int64
 		REPORT("wrong file size for "+filename+": you said "+tostring(filesize)
 				+", but should be "+tostring(numwordsneeded(bin_max, index_max)*8));
 
-	_filehandle = new ifstream(filename.c_str(), ifstream::binary);
-
-	if(!_filehandle->good() || !_filehandle->is_open())
-		REPORT("'" + filename + "' bin file not found");
-	_filehandle->seekg(0, ios::end);
-	if(!_filehandle->good() || (int64)_filehandle->tellg()!=filesize)
-		REPORT("'" + filename + "' bin file found but not correct size: should be "+tostring(filesize)
-				+", but found it is "+tostring(_filehandle->tellg()));
+	_filehandle = new InFile(filename, filesize);
 
 	if(preload)
 	{
 		_bindata = new vector<uint64>();
 		_bindata->reserve(filesize/8);
-		_filehandle->seekg(0, ios::beg);
 		for(int i=0; i<filesize/8; i++)
-		{
-			uint64 temp;
-			_filehandle->read((char*)&temp, 8);
-			_bindata->push_back(temp);
-		}
-		if((int64)_bindata->size()!=filesize/8 || !_filehandle->good() || _filehandle->peek()!=EOF)
+			_bindata->push_back(_filehandle->Read<uint64>());
+		if((int64)_bindata->size()!=filesize/8)
 			REPORT("error reading bin file");
-		_filehandle->close();
 		delete _filehandle;
 		_filehandle = NULL;
 	}
@@ -72,10 +60,7 @@ PackedBinFile::~PackedBinFile()
 	if(_bindata!=NULL)
 		delete _bindata;
 	if(_filehandle!=NULL)
-	{
-		_filehandle->close();
 		delete _filehandle;
-	}
 }
 
 int PackedBinFile::retrieve(int64 index) const
@@ -91,10 +76,8 @@ int PackedBinFile::retrieve(int64 index) const
 		word = (*_bindata)[index / binsperword];
 	else
 	{
-		_filehandle->seekg((index / binsperword) * 8);
-		_filehandle->read((char*)&word, 8);
-		if(_filehandle->gcount()!=8 || _filehandle->eof())
-			REPORT("a bin file could not be read");
+		_filehandle->Seek((index / binsperword) * 8);
+		word = _filehandle->Read<uint64>();
 	}
 
 	word>>=nbits*(index%binsperword);

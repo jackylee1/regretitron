@@ -5,7 +5,7 @@
 #include "../PokerLibrary/treenolimit.h"
 #include "../utility.h"
 #include <poker_defs.h>
-#include <fstream>
+
 #include <vector>
 #include <utility>
 #include <string>
@@ -35,7 +35,7 @@ public:
 	//my own strategy file reading implementation
 	void getprobs(int gr, int actioni, int numa, const vector<CardMask> &cards, vector<double> &probs);
 
-	ifstream& getstratfile() { return strategyfile; }
+	InFile& getstratfile() { return strategyfile; }
 
 private:
 	//we do not support copying.
@@ -53,7 +53,7 @@ private:
 	CardMachine * cardmach;
 
 	//the strategy file
-	ifstream strategyfile;
+	InFile strategyfile;
 	vector< vector<int64> > dataoffset;
 };
 

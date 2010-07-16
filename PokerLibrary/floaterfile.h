@@ -4,10 +4,8 @@
 #include "../utility.h"
 #include <string>
 #include <vector>
-#include <fstream>
 using std::string;
 using std::vector;
-using std::ifstream;
 
 #define FLOATER double
 typedef FLOATER floater;
@@ -29,7 +27,7 @@ private:
 
 	static bool broken; //tracks wether the floater files can be found anywhere
 	vector<floater> * mydata;
-	ifstream * filehandle;
+	InFile * filehandle;
 	static const string EXT;
 	static const string FOLDER;
 	static const string TYPESTR;

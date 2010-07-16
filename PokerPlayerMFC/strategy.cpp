@@ -10,6 +10,10 @@
 #endif
 #include "../TinyXML++/ticpp.h"
 
+#ifdef _MSC_VER
+#define system(x) 0
+#endif
+
 //loads a new strategy, reads xml
 Strategy::Strategy(string xmlfilename, bool preload) : 
 	_xmlfilename(xmlfilename),
@@ -36,7 +40,7 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 
 		Element* root = doc.FirstChildElement("strategy");
 		if(!root->HasAttribute("version") || root->GetAttribute<int>("version") != SAVE_FORMAT_VERSION)
-			REPORT("Unsupported XML file (older/newer version).");
+			REPORT("Unsupported XML file (older/newer version).", KNOWN);
 
 		//set CardMachine
 
@@ -88,16 +92,11 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 		Element* strat = doc.FirstChildElement("strategy")->FirstChildElement("solver")->FirstChildElement("savefile");
 		strategyfilesize = strat->GetAttribute<int64>("filesize");
 		if(strategyfilesize == 0)
-			REPORT("the strategy file was not saved for this xml file.");
+			REPORT("the strategy file was not saved for this xml file.", KNOWN);
 		if(preload)
 			if(0!=system(("cat "+strat->GetText()+" > /dev/null").c_str()))
 				REPORT("cat strategy failed");
-		strategyfile.open((strat->GetText()).c_str(), ifstream::binary);
-		if(!strategyfile.good() || !strategyfile.is_open())
-			REPORT("strategy file not found");
-		strategyfile.seekg(0, ios::end);
-		if(!strategyfile.good() || (int64)strategyfile.tellg() != strategyfilesize)
-			REPORT("strategy file found but not correct size");
+		strategyfile.Open(strat->GetText(), strategyfilesize);
 	}
 	catch(Exception &ex)
 	{
@@ -107,28 +106,26 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 
 	//load strategy file offsets
 
-	strategyfile.seekg(0);
+	strategyfile.Seek(0);
 	int64 nextoffset = 4*MAX_NODETYPES*8; //should be start of data
 	for(int gr=0; gr<4; gr++)
 	{
 		for(int n=9; n>=2; n--) //loops must go in same order as done in memorymgr.
 		{
-			int64 thisoffset;
-			strategyfile.read((char*)&thisoffset, 8);
+			int64 thisoffset = strategyfile.Read<int64>();
 			if(thisoffset != nextoffset)
 				REPORT("redundant offset storage has revealed errors in strategy file");
 			dataoffset[gr][n-2] = thisoffset;
 			nextoffset = thisoffset + get_property(gettree(), maxorderindex_tag())[gr][n] * cardmach->getcardsimax(gr) * (n+1);
 		}
 	}
-	if(dataoffset[0][7] != strategyfile.tellg() || strategyfilesize != nextoffset || !strategyfile.good())
+	if(dataoffset[0][7] != strategyfile.Tell() || strategyfilesize != nextoffset)
 		REPORT("Strategy file failed final error checks.");
 	setdirectory(olddirectory);
 }
 
 Strategy::~Strategy()
 {
-	strategyfile.close();
 	delete cardmach;
 	delete tree;
 }
@@ -144,14 +141,11 @@ void Strategy::getprobs(int gr, int actioni, int numa, const vector<CardMask> &c
 	
 	unsigned char charprobs[MAX_ACTIONS];
 	unsigned char checksum;
-	//seekg ( offset + combinedindex * sizeofeachdata )
-	strategyfile.seekg( dataoffset[gr][numa-2] + combine(cardsi, actioni, get_property(gettree(), maxorderindex_tag())[gr][numa]) * (numa+1) );
-	strategyfile.read((char*)charprobs, numa);
-	if(strategyfile.gcount()!=numa || strategyfile.eof())
-		REPORT("strategy file has failed us - reading data.");
-	strategyfile.read((char*)&checksum, 1);
-	if(strategyfile.gcount()!=1 || strategyfile.eof())
-		REPORT("strategy file has failed us - reading checksum.");
+	//seek ( offset + combinedindex * sizeofeachdata )
+	strategyfile.Seek( dataoffset[gr][numa-2] + combine(cardsi, actioni, get_property(gettree(), maxorderindex_tag())[gr][numa]) * (numa+1) );
+	for(int i=0; i<numa; i++)
+		charprobs[i] = strategyfile.Read<unsigned char>();
+	checksum = strategyfile.Read<unsigned char>();
 
 	//convert the numa chars to numa doubles
 

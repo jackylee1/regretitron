@@ -278,21 +278,100 @@ bool fpequal(double x, double y, int maxUlps) //from http://www.cygnus-software.
 	return false;
 }
 
+// Implement my magical InFile class...
+
+void InFile::Open(const std::string &filename, int64 expectedsize)
+{
+	opened = true;
+#ifdef _MSC_VER
+	file = CreateFile(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	if(file == INVALID_HANDLE_VALUE)
+	{
+		if(GetLastError() == ERROR_FILE_NOT_FOUND)
+			REPORT("File "+filename+" was not found...", KNOWN);
+		else
+			REPORT("Problem opening "+filename);
+	}
+#else
+#error
+#endif
+	if(expectedsize != Size())
+		REPORT(filename+" was opened but was the wrong size (file:"+tostring(Size())+" expected:"+tostring(expectedsize)+")");
+}
+
+InFile::~InFile()
+{
+#ifdef _MSC_VER
+	if(opened) CloseHandle(file);
+#else
+#error
+#endif
+}
+
+template < typename T >
+T InFile::Read()
+{
+	if(!opened) REPORT("not opened..");
+	T val;
+#ifdef _MSC_VER
+	DWORD bytesread;
+	if(ReadFile(file, (LPVOID)&val, sizeof(T), &bytesread, NULL) == 0 || bytesread != sizeof(T))
+		REPORT("Problem reading "+fname);
+#else
+#error
+#endif
+	return val;
+}
+
+void InFile::Seek(int64 position)
+{
+	if(!opened) REPORT("not opened..");
+#ifdef _MSC_VER
+	LARGE_INTEGER myposition;
+	myposition.QuadPart = position;
+	LARGE_INTEGER newpos;
+	if(SetFilePointerEx(file, myposition, &newpos, FILE_BEGIN) == 0 || newpos.QuadPart != position)
+		REPORT("Problem seeking "+fname+" to "+tostring(position));
+#else
+#error
+#endif
+}
+
+int64 InFile::Tell()
+{
+#ifdef _MSC_VER
+	LARGE_INTEGER zero, pos;
+	zero.QuadPart = 0;
+	if(SetFilePointerEx(file, zero, &pos, FILE_CURRENT) == 0)
+		REPORT("Problem getting "+fname+" to seek zero.");
+	return pos.QuadPart;
+#else
+#error
+#endif
+}
+
+int64 InFile::Size()
+{
+	if(!opened) REPORT("not opened..");
+#ifdef _MSC_VER
+	LARGE_INTEGER size;
+	if(GetFileSizeEx(file, &size) == 0)
+		REPORT("Problem getting size of "+fname);
+	return size.QuadPart;
+#else
+#error
+#endif
+}
+
 // perform the magic numbers test, validates data integrity on multiple systems
 
 template <typename T> //only used below
-inline void testdata(ifstream &file, T correct1, T correct2)
+inline void testdata(InFile &file, T correct1, T correct2)
 {
-	T mydata;
-	file.read((char*)&mydata, sizeof(T));
+	T mydata = file.Read<T>();
 	if(mydata != correct1) REPORT("Your system has failed the magic numbers test. You cannot play poker.");
-	file.read((char*)&mydata, sizeof(T));
+	mydata = file.Read<T>();
 	if(mydata != correct2) REPORT("Your system has failed the magic numbers test. You cannot play poker.");
-	T myarray[2];
-	file.seekg(-2*(int)sizeof(T), ios_base::cur);
-	file.read((char*)myarray, 2*sizeof(T));
-	if(myarray[0] != correct1 || myarray[1] != correct2) 
-		REPORT("Your system has failed the magic numbers test. You cannot play poker.");
 }
 
 void checkdataformat()
@@ -311,19 +390,18 @@ void checkdataformat()
 		testfile1.write(&mychar, 1);
 	}
 	testfile1.close();
-	ifstream testfile2(".test.magic.numbers", ios::binary);
-	testdata<char>(testfile2, 37, -21);
-	testdata<unsigned char>(testfile2, 140, 72);
-	testdata<signed char>(testfile2, -1, -119);
-	testdata<int>(testfile2, -1068530229, 1204584848);
-	testdata<int64>(testfile2, 7349334397080239341LL, -8170201615906909038LL);
-	testdata<uint64>(testfile2, 16066576182318416946ULL, 4413254448756643424ULL);
-	testdata<double>(testfile2, -1.2223157088418555e+116, 3.9958761729009844e+34);
-	testdata<float>(testfile2, 4.35903890e-09, 5.06680665e-24);
-	testdata<short>(testfile2, 11249, 6732);
-	if((int)testfile2.tellg() != 74)
-		REPORT("Your system has passed the magic numbers test, but it didn't read enough bytes. You lose.");
-	testfile2.close();
+	{
+		InFile testfile2(".test.magic.numbers", 256);
+		testdata<char>(testfile2, 37, -21);
+		testdata<unsigned char>(testfile2, 140, 72);
+		testdata<signed char>(testfile2, -1, -119);
+		testdata<int>(testfile2, -1068530229, 1204584848);
+		testdata<int64>(testfile2, 7349334397080239341LL, -8170201615906909038LL);
+		testdata<uint64>(testfile2, 16066576182318416946ULL, 4413254448756643424ULL);
+		testdata<double>(testfile2, -1.2223157088418555e+116, 3.9958761729009844e+34);
+		testdata<float>(testfile2, 4.35903890e-09, 5.06680665e-24);
+		testdata<short>(testfile2, 11249, 6732);
+	}
 	if(remove(".test.magic.numbers")!=0) REPORT("failure to delete!");
 	//REPORT("You passed the magic numbers test!", INFO);
 }

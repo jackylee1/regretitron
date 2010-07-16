@@ -3,8 +3,6 @@
 
 #include <string>
 using std::string;
-#include <fstream>
-using std::ifstream;
 #include <vector>
 using std::vector;
 #include "../utility.h"
@@ -36,7 +34,7 @@ private:
 
 	vector<uint64> * _bindata;
 	vector<unsigned char> * _haveseen;
-	ifstream * _filehandle;
+	InFile * _filehandle;
 	const int64 _index_max;
 	const int _bin_max;
 	const bool _preloaded;

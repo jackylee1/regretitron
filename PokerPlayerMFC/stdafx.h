@@ -36,7 +36,6 @@
 #include <afxext.h>         // MFC extensions
 #endif //_WIN32
 
-#include <fstream>
 #include <algorithm> //has min_element
 #include <limits> //has infinity
 #include <utility> //has pair
