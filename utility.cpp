@@ -4,8 +4,8 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
-#ifdef _MSC_VER
-#include "windows.h"
+#ifndef _MSC_VER
+#include <fcntl.h>
 #endif
 using namespace std;
 
@@ -293,7 +293,14 @@ void InFile::Open(const std::string &filename, int64 expectedsize)
 			REPORT("Problem opening "+filename);
 	}
 #else
-#error
+	file = open(filename.c_str(), O_RDONLY);
+	if(file == -1)
+	{
+		if(errno == ENOENT)
+			REPORT("File "+filename+" was not found...", KNOWN);
+		else
+			REPORT("Problem opening "+filename);
+	}
 #endif
 	if(expectedsize != Size())
 		REPORT(filename+" was opened but was the wrong size (file:"+tostring(Size())+" expected:"+tostring(expectedsize)+")");
@@ -304,7 +311,7 @@ InFile::~InFile()
 #ifdef _MSC_VER
 	if(opened) CloseHandle(file);
 #else
-#error
+	if(opened) close(file);
 #endif
 }
 
@@ -318,7 +325,8 @@ T InFile::Read()
 	if(ReadFile(file, (LPVOID)&val, sizeof(T), &bytesread, NULL) == 0 || bytesread != sizeof(T))
 		REPORT("Problem reading "+fname);
 #else
-#error
+	if(read(file, (void*)&val, sizeof(T)) != sizeof(T))
+		REPORT("Problem reading "+fname);
 #endif
 	return val;
 }
@@ -333,7 +341,8 @@ void InFile::Seek(int64 position)
 	if(SetFilePointerEx(file, myposition, &newpos, FILE_BEGIN) == 0 || newpos.QuadPart != position)
 		REPORT("Problem seeking "+fname+" to "+tostring(position));
 #else
-#error
+	if(lseek64(file, position, SEEK_SET) != position)
+		REPORT("Problem seeking "+fname+" to "+tostring(position));
 #endif
 }
 
@@ -346,7 +355,10 @@ int64 InFile::Tell()
 		REPORT("Problem getting "+fname+" to seek zero.");
 	return pos.QuadPart;
 #else
-#error
+	off64_t position = lseek64(file, 0, SEEK_CUR);
+	if(position == (off64_t)-1)
+		REPORT("Problem getting "+fname+" to seek zero.");
+	return position;
 #endif
 }
 
@@ -359,7 +371,10 @@ int64 InFile::Size()
 		REPORT("Problem getting size of "+fname);
 	return size.QuadPart;
 #else
-#error
+	struct stat statstruct;
+	if(fstat(file, &statstruct) != 0)
+		REPORT("Problem getting size of "+fname);
+	return statstruct.st_size;
 #endif
 }
 

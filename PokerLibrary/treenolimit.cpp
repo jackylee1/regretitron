@@ -4,6 +4,7 @@
 #include "../utility.h"
 #include <sstream>
 #include <iomanip>
+using namespace boost;
 
 
 //

@@ -66,7 +66,7 @@ BotAPI::BotAPI(string xmlfile, string botname, bool preload)
 			for(child = child.begin(root); child != child.end(); child++)
 				mystrats.push_back(new Strategy(child->GetText(), preload));
 
-			if(root->GetAttribute<int>("size") != mystrats.size())
+			if(root->GetAttribute<unsigned>("size") != mystrats.size())
 				REPORT("Portfolio only had "+tostring(mystrats.size())+" bots!");
 		}
 	}

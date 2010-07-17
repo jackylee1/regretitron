@@ -8,19 +8,17 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
-#include <fstream>
 using namespace std;
 
 //reads the offset table from a strategy file into a vector
 vector<vector<int64> > getosets(Strategy &s)
 {
-	ifstream &f(s.getstratfile());
-	if(!f.is_open()) throw string("bad file");
-	f.seekg(0); //reset to beginning, where offsets table is
+	InFile &f(s.getstratfile());
+	f.Seek(0); //reset to beginning, where offsets table is
 	vector<vector<int64> > offsets(4, vector<int64>(8,0));
 	for(int r=0; r<4; r++) for(int n=7; n>=0; n--)
 	{
-		f.read((char*)&offsets[r][n], 8);
+		offsets[r][n] = f.Read<int64>();
 	}
 	return offsets;
 }
@@ -28,11 +26,9 @@ vector<vector<int64> > getosets(Strategy &s)
 //does a double pass on the header to get the location and size of each strategy region for this file
 void handleosets(Strategy &s, void(*func)(int, int, int64, int64, Strategy&))
 {
-	//should not touch file after this as func will receive same file pointer and move the seekg on me
-	ifstream &f(s.getstratfile());
-	if(!f.is_open()) throw string("bad file");
-	f.seekg(0, ios::end);
-	int64 fileend = f.tellg();
+	//should not touch file after this as func will receive same file pointer and move the Seek on me
+	InFile &f(s.getstratfile());
+	int64 fileend = f.Size();
 
 	vector<vector<int64> > offsets(getosets(s));
 	int lastr = -1, lastn = -1;
@@ -61,7 +57,7 @@ void printheaderline(int r, int n, int64 loc, int64 size, Strategy &s)
 {
 	vector<string> a;
 	ostringstream o;
-	o << "0x" << hex << setfill('0') << setw(8) << loc << ": ";
+	o << "0x" << hex << setfill('0') << setw(10) << loc << ": ";
 	a.push_back(o.str());
 	a.push_back(tostring(r));
 	a.push_back(tostring(n+2));
@@ -180,10 +176,9 @@ vector<vector<bool> > groupingvector(4);
 //callback for a strategy file region that counts up the info I need
 void printcountline(int r, int n, int64 loc, int64 size, Strategy &s)
 {
-	ifstream &f(s.getstratfile());
-	if(!f.is_open()) throw string("bad file");
+	InFile &f(s.getstratfile());
 	if(size%(n+3)!=0) throw string("broken size!");
-	f.seekg(loc);
+	f.Seek(loc);
 	int64 zeros=0, ones=0;
 
 	for(int i=0; i<size/(n+3); i++)
@@ -194,18 +189,18 @@ void printcountline(int r, int n, int64 loc, int64 size, Strategy &s)
 		unsigned char checksum=0;
 		for(int j=0; j<n+2; j++)
 		{
-			f.read((char*)&data,1);
+			data = f.Read<unsigned char>();
 			if(data!=0x01)
 				couldbezerouse=false;
 			if(data!=0xFF)
 				couldbeoneuse=false;
 			checksum+=data;
 		}
-		f.read((char*)&data,1);
+		data = f.Read<unsigned char>();
 		if(s.getcardmach().getcardsimax(r) * s.getactmax(r,n+2) * (n+3) != size)
 			throw string("size of this strategy region is not consistent with actionmax and cardsimax");
 		if(data!=checksum) 
-			throw string("bad checksum during count at "+tostring(f.tellg()));
+			throw string("bad checksum during count at "+tostring(f.Tell()));
 		if(couldbezerouse && couldbeoneuse)
 			throw string("can't be both...");
 		if(!couldbezerouse) //groups are assumed untouched (i.e. zero use) until we find a group member that is not

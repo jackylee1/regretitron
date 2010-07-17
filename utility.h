@@ -8,7 +8,13 @@
 #ifdef _MSC_VER
 #include <windows.h>
 #else
-#error
+#ifndef _LARGEFILE64_SOURCE
+#define _LARGEFILE64_SOURCE
+#endif
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 #include "MersenneTwister.h"
 
@@ -134,14 +140,14 @@ public:
 	template < typename T > T Read();
 	void Seek(int64 position);
 	int64 Tell();
-private:
 	int64 Size();
+private:
 	bool opened;
 	std::string fname;
 #ifdef _MSC_VER
 	HANDLE file;
 #else
-#error
+	int file;
 #endif
 };
 

@@ -7,11 +7,10 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/multi_array.hpp>
 using namespace std;
-using namespace boost;
 
 //define new names for the data my graph will hold. see http://www.boost.org/doc/libs/1_43_0/libs/graph/doc/using_adjacency_list.html#sec:custom-edge-properties
-struct settings_tag { typedef graph_property_tag kind; };
-struct maxorderindex_tag { typedef graph_property_tag kind; };
+struct settings_tag { typedef boost::graph_property_tag kind; };
+struct maxorderindex_tag { typedef boost::graph_property_tag kind; };
 
 //used to set the betting values, and hence the entire tree shape
 struct treesettings_t
@@ -75,13 +74,13 @@ Vertex Selector                                                    Invalidates
 
 ===> CHOOSE listS for everything until space and time are a PROVEN ISSUE!
    */
-typedef adjacency_list<listS, listS, directedS, NodeProp, EdgeProp, 
-		property<settings_tag, treesettings_t, 
-		property<maxorderindex_tag, multi_array<int,2> > > > BettingTree;
-typedef graph_traits<BettingTree>::vertex_descriptor Vertex;
-typedef graph_traits<BettingTree>::edge_descriptor Edge;
-typedef graph_traits<BettingTree>::out_edge_iterator EIter;
-typedef graph_traits<BettingTree>::degree_size_type Size;
+typedef boost::adjacency_list<boost::listS, boost::listS, boost::directedS, NodeProp, EdgeProp, 
+		boost::property<settings_tag, treesettings_t, 
+		boost::property<maxorderindex_tag, boost::multi_array<int,2> > > > BettingTree;
+typedef boost::graph_traits<BettingTree>::vertex_descriptor Vertex;
+typedef boost::graph_traits<BettingTree>::edge_descriptor Edge;
+typedef boost::graph_traits<BettingTree>::out_edge_iterator EIter;
+typedef boost::graph_traits<BettingTree>::degree_size_type Size;
 
 
 //functions provided here to manipulate the trees
