@@ -89,7 +89,9 @@ double getdoubletime()
 {
 	timeval mytv;
 	gettimeofday(&mytv, NULL);
-	return mytv.tv_sec + (double)mytv.tv_usec / 1000000.0;
+	//subtract off the bulk of the seconds, so that we get more precision from teh double
+	//we gain 30M seconds per year, so this is an improvement for the next few decades or so
+	return (mytv.tv_sec-1279394891) + (double)mytv.tv_usec / 1000000.0;
 }
 #else
 #error unsupported compiler type?

@@ -7,7 +7,9 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <boost/tuple/tuple.hpp>
 using namespace std;
+using boost::tuple;
 
 string iterstring(int64 iter)
 {
@@ -36,18 +38,38 @@ string timestring(time_t mytime)
 	return string(mytimestr);
 }
 
+string timeival(double seconds)
+{
+	ostringstream o;
+	o << setprecision(3);
+	if(seconds < 0.5)
+		o << seconds*1000 << "msec";
+	else if(seconds < 90)
+		o << seconds << "sec";
+	else if(seconds < 7200)
+		o << seconds/60 << "min";
+	else
+		o << seconds/3600 << "hr";
+	return o.str();
+}
+
 void simulate(int64 iter)
 {
 	static double prevrate=-1;
-	cout << endl << "starting on " << timestring(time(NULL)) << ":" << endl;
-	cout << "doing " << iterstring(iter) << " iterations..." << endl;
-	if(prevrate > 0)
-		cout << "Expect to finish on " << timestring(time(NULL)+iter/prevrate) << endl;
+	cout << endl << "At " << timestring(time(NULL)) << ": doing " << iterstring(iter) << " iterations to make total of "
+	   << Solver::gettotal() + iter << " ... ";
+	if(prevrate > 0) cout << "expect to finish at " << timestring(time(NULL)+iter/prevrate) << " ... ";
 
-	double timetaken = Solver::solve(iter);
-
+	double timetaken, compactthistime, compacttotal; //seconds
+	int64 ncompactings, spaceused, spacetotal; //bytes, number
+	boost::tie(timetaken, compactthistime, compacttotal, ncompactings, spaceused, spacetotal) = Solver::solve(iter);
 	prevrate = iter / timetaken;
-	cout << "...took " << timetaken << " seconds. (" << prevrate << " per second)." << endl;
+
+	cout << "Took " << timeival(timetaken) << " (" << setprecision(4) << prevrate << " per second)" << endl
+		<< "Spent " << timeival(compactthistime) << " (" << 100.0*compactthistime/timetaken << "%) compacting " 
+		<< ncompactings << " times, using " << space(spaceused) << " of total " << space(spacetotal) << " allocated ("
+		<< 100.0*spaceused/spacetotal << "%), have spent total of " << timeival(compacttotal) << " ("
+		<< 100.0*compacttotal/Solver::gettotaltime() << "%) compacting." << endl;
 }
 
 int main(int argc, char* argv[])

@@ -9,16 +9,16 @@
 #include <qd/qd_real.h>
 
 //variable defined from the commandline
+
 #ifndef CMD_LINE_VAR
-#warning CMD_LINE_VAR is used but not set
-#define CMD_LINE_VAR -1
+#define CMD_LINE_VAR 3 /*N_LOOKAHEAD*/
 #endif
 
 //settings for the settings - metasettings
-const int PFBIN = 1;
-const int FBIN = 1;
-const int TBIN = 1;
-const int RBIN = 1;
+const int PFBIN = 5;
+const int FBIN = 5;
+const int TBIN = 5;
+const int RBIN = 5;
 const bool USE_FLOPALYZER = false;
 const int64 mysp_millions_iter = 22000;
 //end metasettings
@@ -28,21 +28,18 @@ const int64 MILLION = 1000000;
 const int64 BILLION = THOUSAND*MILLION;
 
 //main settings
-const int64 TESTING_AMT = 5;//10*THOUSAND; //do this many iterations as a test for speed
-const int64 STARTING_AMT = 1*MILLION;//2*BILLION; //do this many iterations, then...
+const int64 TESTING_AMT = 10*THOUSAND; //do this many iterations as a test for speed
+const int64 STARTING_AMT = 5*MILLION;//2*BILLION; //do this many iterations, then...
 const double MULTIPLIER = 1; //multiply by this amount, do that many, repeat ....
-const int64 SAVEAFTER = 0;//15*BILLION; // save xml after this amount
-const bool SAVESTRAT = false; //save strategy file when saving xml
-const int64 STOPAFTER = 1*MILLION;//mysp_millions_iter*MILLION; //stop after (at least) this amount of iterations
+const int64 SAVEAFTER = 0;//50*MILLION; // save xml after this amount
+const bool SAVESTRAT = true; //save strategy file when saving xml
+const int64 STOPAFTER = 100*MILLION;//mysp_millions_iter*MILLION; //stop after (at least) this amount of iterations
 
 //solver settings
 #define FWORKING_T double
 #define FSTORE_T double
-#define FRIVSTORE_T double
-#define SAME_STORE_TYPES 1
 #define STORE_DENOM 0
 #define NUM_THREADS 1
-#define USE_HISTORY 1 //affects threading method
 const double AGGRESSION_FACTOR = 0; //0 = "calm old man", 7 = "crazed, cocaine-driven maniac with an ax"
 const int  N_LOOKAHEAD = CMD_LINE_VAR; //affects threading performance
 const bool SEED_RAND = true;
@@ -51,7 +48,7 @@ const bool THREADLOOPTRACE = false; //prints out debugging
 const bool WALKERDEBUG = false; //debug print
 //const string SAVENAME = "169bin-" + tostring(NUM_THREADS) + "threads-" + tostring(N_LOOKAHEAD) + "lookahead";
 //const string SAVENAME = "1bin0-" TOSTRING(FSTORE_T) "-" TOSTRING(FRIVSTORE_T) "-" TOSTRING(FWORKING_T);
-const string SAVENAME = "1bin-countsaver";
+const string SAVENAME = "5bin-supermem";
 
 //tree settings
 #define SB 1
@@ -63,8 +60,10 @@ const string RAKE_TYPE = "none"; //added to XML file
 inline int rake(int winningutility) { return winningutility; }
 
 //bin settings
-#if USE_HISTORY // this for my new binning method with history
+#define IMPERFECT_RECALL 0
+#if !IMPERFECT_RECALL /*PERFECT RECALL*/
 const int PFLOP_CARDSI_MAX = PFBIN; // used by threading method. 
+const int RIVER_CARDSI_MAX = PFBIN*FBIN*TBIN*RBIN; // used by threading method. 
 const cardsettings_t CARDSETTINGS =
 {
 
@@ -85,7 +84,7 @@ const cardsettings_t CARDSETTINGS =
 	USE_FLOPALYZER //use flopalyzer
 };
 
-#else // this one is my old binning method, with no history
+#else /*IMPERFECT_RECALL*/
 #define FBIN 256
 #define TBIN 90
 #define RBIN 90
@@ -239,13 +238,10 @@ const int MAX_ACTIONS_SOLVER = MAX_ACTIONS; //defined in PokerLibrary/constants.
 //typedef the data types and store as strings for logging
 typedef FWORKING_T FWorking_type;
 typedef FSTORE_T FStore_type;
-typedef FRIVSTORE_T FRivStore_type;
 const char * const FWORKING_TYPENAME = TOSTRING(FWORKING_T);
 const char * const FSTORE_TYPENAME = TOSTRING(FSTORE_T);
-const char * const FRIVSTORE_TYPENAME = TOSTRING(FRIVSTORE_T);
 #undef FWORKING_T
 #undef FSTORE_T
-#undef FRIVSTORE_T
 #undef PFBIN
 #undef FBIN
 #undef TBIN

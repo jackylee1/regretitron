@@ -6,32 +6,50 @@
 #include <algorithm> //sort
 #include <numeric> //accumulate
 #include "../TinyXML++/tinyxml.h"
+#include <boost/static_assert.hpp>
+#include <signal.h>
 using namespace std;
+using boost::tuple;
 
 //static data members
 int64 Solver::iterations; //number of iterations remaining
 int64 Solver::total = 0; //number of iterations done total
 double Solver::inittime;
+double Solver::secondscompacting = 0;
+int64 Solver::numbercompactings = 0;
 CardMachine * Solver::cardmachine = NULL;
 BettingTree * Solver::tree = NULL;
 Vertex Solver::treeroot;
 MemoryManager * Solver::memory = NULL;
 #ifdef DO_THREADS
 pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t Solver::signaler;
+pthread_cond_t Solver::signaler = PTHREAD_COND_INITIALIZER;
 list<Solver::iteration_data_t> Solver::dataqueue(N_LOOKAHEAD);
-bool Solver::datainuse0[PFLOP_CARDSI_MAX*2];
-#if !USE_HISTORY //then we need to account for all data in use, not just first round
-#error hello
-bool Solver::datainuse1[FLOP_CARDSI_MAX*2];
-bool Solver::datainuse2[TURN_CARDSI_MAX*2];
-bool Solver::datainuse3[RIVER_CARDSI_MAX*2];
+bitset<PFLOP_CARDSI_MAX> Solver::dataguardpflopp0; //default constructor sets these to all false
+bitset<PFLOP_CARDSI_MAX> Solver::dataguardpflopp1;
+bitset<RIVER_CARDSI_MAX> Solver::dataguardriver; //needed for memory contention in HugeBuffer, works for imperfect recall too
+#if IMPERFECT_RECALL /*then we need to account for all data in use, not just first round*/
+bitset<FLOP_CARDSI_MAX> Solver::dataguardflopp0;
+bitset<FLOP_CARDSI_MAX> Solver::dataguardflopp1;
+bitset<TURN_CARDSI_MAX> Solver::dataguardturnp0;
+bitset<TURN_CARDSI_MAX> Solver::dataguardturnp1;
 #endif
 #endif
 
+void Solver::control_c(int sig)
+{
+	cout << "\033[2D"; // back up 2 chars to erase the ^C
+	if(memory!=NULL)
+	{
+		cout << "User requested compact.." << endl;
+		memory->SetMasterCompactFlag();
+	}
+}
 
 void Solver::initsolver()
 {
+	signal(SIGINT, control_c); // Register the signal handler for the SIGINT signal (Ctrl+C)
+
 	tree = new BettingTree(TREESETTINGS); //the settings are taken from solveparams.h
 	treeroot = createtree(*tree, MAX_ACTIONS_SOLVER);
 	cardmachine = new CardMachine(CARDSETTINGS, true, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
@@ -39,18 +57,6 @@ void Solver::initsolver()
 	inittime = getdoubletime();
 
 #ifdef DO_THREADS
-	pthread_cond_init(&signaler, NULL);
-
-	for(int i=0; i<PFLOP_CARDSI_MAX*2; i++)
-		datainuse0[i] = false;
-#if !USE_HISTORY 
-	for(int i=0; i<FLOP_CARDSI_MAX*2; i++)
-		datainuse1[i] = false;
-	for(int i=0; i<TURN_CARDSI_MAX*2; i++)
-		datainuse2[i] = false;
-	for(int i=0; i<RIVER_CARDSI_MAX*2; i++)
-		datainuse3[i] = false;
-#endif
 	for(list<iteration_data_t>::iterator data = dataqueue.begin(); data!=dataqueue.end(); data++)
 		cardmachine->getnewgame(data->cardsi, data->twoprob0wins); //get new data
 #endif
@@ -58,18 +64,13 @@ void Solver::initsolver()
 
 void Solver::destructsolver()
 {
+#ifdef DO_THREADS
+	pthread_mutex_destroy(&threaddatalock);
+	pthread_cond_destroy(&signaler);
+#endif
+	delete memory;
 	delete cardmachine;
 	delete tree;
-	delete memory;
-}
-
-//function called by main()
-//returns seconds taken to do this many iter
-double Solver::solve(int64 iter)  
-{ 
-	double starttime = getdoubletime();
-	doiter(iter);
-	return getdoubletime() - starttime;
 }
 
 #ifdef __GNUC__ //needed to print __float128 on linux
@@ -83,7 +84,6 @@ void Solver::save(const string &filename, bool writedata)
 	// save the data first to get the filesize
 
 	int64 stratfilesize = writedata ? memory->save(filename) : 0;
-	memory->readcounts(filename);
 
 	// open up the xml
 
@@ -97,7 +97,7 @@ void Solver::save(const string &filename, bool writedata)
 	//strategy file, if saved
 
 	TiXmlElement * file = new TiXmlElement("savefile");
-	file->SetAttribute("filesize", stratfilesize);
+	file->SetAttribute("filesize", tostring(stratfilesize)); //TiXML borks at the 64-bit int
 	TiXmlText * filenametext = 
 		new TiXmlText(writedata ? "strategy/"+filename+".strat" : "");
 	file->LinkEndChild(filenametext);
@@ -147,7 +147,6 @@ void Solver::save(const string &filename, bool writedata)
 	TiXmlElement * data = new TiXmlElement("data");
 	data->SetAttribute("FWorking_type", FWORKING_TYPENAME);
 	data->SetAttribute("FStore_type", FSTORE_TYPENAME);
-	data->SetAttribute("FRivStore_type", FRIVSTORE_TYPENAME);
 
 	//solve parameters
 
@@ -224,12 +223,26 @@ void Solver::save(const string &filename, bool writedata)
 	doc.SaveFile((filename+".xml").c_str());
 }
 
-void Solver::doiter(int64 iter) 
+Solver solvers[NUM_THREADS]; //global so threadlooptrace can work
+
+//function called by main()
+tuple<
+	double, //time taken
+	double, //cumulative seconds compacting
+	double, //seconds compacting this cycle
+	int64, //number of compactings this cycle
+	int64, //bytes used
+	int64 //total bytes available
+>
+Solver::solve(int64 iter) 
 { 
+	double starttime = getdoubletime();
+	double secondscompactingstarted = secondscompacting;
+	int64 ncompactingsstarted = numbercompactings;
 	total += iter; 
 	iterations = iter - N_LOOKAHEAD;
 
-	Solver solvers[NUM_THREADS];
+	//Solver solvers[NUM_THREADS];
 #ifdef DO_THREADS
 	pthread_t threads[NUM_THREADS-1];
 	for(int i=0; i<NUM_THREADS-1; i++)
@@ -248,6 +261,16 @@ void Solver::doiter(int64 iter)
 	//do the last few unthreaded for consistency (to clear the queue)
 	iterations = N_LOOKAHEAD;
 	solvers[0].threadloop();
+
+	//return much useful data
+	return boost::make_tuple(
+			getdoubletime() - starttime,
+			secondscompacting,
+			secondscompacting - secondscompactingstarted,
+			numbercompactings - ncompactingsstarted,
+			memory->CompactMemory(),
+			memory->GetHugeBufferSize()
+			);
 }
 
 
@@ -259,169 +282,221 @@ void* Solver::callthreadloop(void* mysolver)
 	return NULL;
 }
 
-inline bool check(int a1, int a2, int b1, int b2)
+inline void Solver::docompact()
 {
-	return a1 != b1 && a1 != b2 && a2 != b1 && a2 != b2;
+	double timestart = getdoubletime();
+	memory->CompactMemory();
+	memory->ClearMasterCompactFlag();
+	numbercompactings++;
+	secondscompacting += (getdoubletime() - timestart);
+}
+
+#ifdef DO_THREADS /*covers next few functions*/
+
+inline bool Solver::getreadydata(list<iteration_data_t>::iterator & newdata)
+{
+	for(newdata = dataqueue.begin(); newdata!=dataqueue.end(); newdata++)
+	{
+		if(!dataguardpflopp0[newdata->cardsi[PREFLOP][P0]] && !dataguardpflopp1[newdata->cardsi[PREFLOP][P1]]
+		&& !dataguardriver[newdata->cardsi[RIVER][P0]] && !dataguardriver[newdata->cardsi[RIVER][P1]]
+#if PERFECT_RECALL
+		&& !dataguardflopp0[newdata->cardsi[FLOP][P0]] && !dataguardflopp1[newdata->cardsi[FLOP][P1]]
+		&& !dataguardturnp0[newdata->cardsi[TURN][P0]] && !dataguardturnp1[newdata->cardsi[TURN][P1]]
+#endif
+		  )
+		{
+			for(list<iteration_data_t>::iterator to_be_skipped=dataqueue.begin(); to_be_skipped != newdata; to_be_skipped++)
+			{
+				if(newdata->cardsi[PREFLOP][P0] == to_be_skipped->cardsi[PREFLOP][P0] 
+				|| newdata->cardsi[PREFLOP][P1] == to_be_skipped->cardsi[PREFLOP][P1]
+#if PERFECT_RECALL
+				|| newdata->cardsi[FLOP][P0] == to_be_skipped->cardsi[FLOP][P0]
+				|| newdata->cardsi[FLOP][P1] == to_be_skipped->cardsi[FLOP][P1]
+				|| newdata->cardsi[TURN][P0] == to_be_skipped->cardsi[TURN][P0]
+				|| newdata->cardsi[TURN][P1] == to_be_skipped->cardsi[TURN][P1]
+				|| newdata->cardsi[RIVER][P0] == to_be_skipped->cardsi[RIVER][P0] //I don't care about the order here as far as memory contention goes
+				|| newdata->cardsi[RIVER][P1] == to_be_skipped->cardsi[RIVER][P1] //I don't care about the order here as far as memory contention goes
+#endif
+				  )
+				{
+					goto cannot_skip; //continue from outer for-loop
+				}
+			}
+			return true; //found a new data that does not conflict!
+		}
+cannot_skip:
+		continue; //a statement for the label to work, attached to outer for-loop
+	}
+	return false; //we have dropped through the outer loop without finding any good data
+}
+
+bool Solver::isalldataclear()
+{
+	//if the preflop is clear then everything should be clear
+	return (dataguardpflopp0.none() && dataguardpflopp1.none());
+}
+
+/***********
+  For reference: here is my threading algorithm:
+
+	void threadloop()
+	{
+		lock;
+
+		while(iterations != 0)
+		{
+			if(needtocompact && all flags are clear)
+			{
+				//no point in: setting all flags, unlocking, signalling, locking, clearing flags -- but we could.
+				compact;
+				clear compact flag;
+			}
+			else if(!needtocompact && any flags are clear)
+			{
+				set data's flag;
+				unlock;
+				signal conditional variable;
+				work on data;
+				lock;
+				clear data's flag;
+			}
+			else
+				sleep on conditional variable;
+		}
+
+		unlock;
+	}
+
+***********/
+
+inline void Solver::ThreadDebug(string debugstring)
+{
+	if(THREADLOOPTRACE)
+	{
+		const int myindex = (this - solvers);
+		string star = "                 ";
+		star[myindex] = '*';
+		cout << "Thread " << myindex+1 << " <" << star.substr(0, NUM_THREADS) << "> : " << debugstring << endl;
+	}
 }
 
 void Solver::threadloop()
 {
 	fpu_fix_start(NULL);
 
-#ifdef DO_THREADS //MULTI THREADED
+	list<iteration_data_t>::iterator my_data_it; //iterator pointing to my data I want to use
+
 	pthread_mutex_lock(&threaddatalock);
-#endif //ALL THEADEDNESS
 
-	while(1) //each loop does one iteration
+	ThreadDebug("starting while loop....");
+
+	while(iterations!=0) //each loop does one iteration or compacts or sleeps
 	{
-#ifdef DO_THREADS //MULTI THREADED
-		list<iteration_data_t>::iterator my_data_it; //iterator pointing to my data I want to use
-		while(1) //each loop checks for available data
+		if(memory->GetMasterCompactFlag() && isalldataclear())
 		{
-			if(iterations==0) //check if we're all done.
-			{
-				pthread_cond_broadcast(&signaler); // wake up any sleeping threads
-				pthread_mutex_unlock(&threaddatalock);
-				return;
-			}
-
-			for(my_data_it = dataqueue.begin(); my_data_it!=dataqueue.end(); my_data_it++)
-			{
-				if(!datainuse0[2*my_data_it->cardsi[PREFLOP][P0]] && !datainuse0[2*my_data_it->cardsi[PREFLOP][P1]+1]
-#if !USE_HISTORY
-					&& !datainuse1[2*my_data_it->cardsi[FLOP][P0]] && !datainuse1[2*my_data_it->cardsi[FLOP][P1]+1]
-					&& !datainuse2[2*my_data_it->cardsi[TURN][P0]] && !datainuse2[2*my_data_it->cardsi[TURN][P1]+1]
-					&& !datainuse3[2*my_data_it->cardsi[RIVER][P0]] && !datainuse3[2*my_data_it->cardsi[RIVER][P1]+1]
-#endif
-				)
-				{
-					for(list<iteration_data_t>::iterator to_be_skipped=dataqueue.begin(); to_be_skipped != my_data_it; to_be_skipped++)
-					{
-						if(my_data_it->cardsi[PREFLOP][P0] == to_be_skipped->cardsi[PREFLOP][P0] 
-							|| my_data_it->cardsi[PREFLOP][P1] == to_be_skipped->cardsi[PREFLOP][P1]
-#if !USE_HISTORY
-							|| my_data_it->cardsi[FLOP][P0] == to_be_skipped->cardsi[FLOP][P0]
-							|| my_data_it->cardsi[FLOP][P1] == to_be_skipped->cardsi[FLOP][P1]
-							|| my_data_it->cardsi[TURN][P0] == to_be_skipped->cardsi[TURN][P0]
-							|| my_data_it->cardsi[TURN][P1] == to_be_skipped->cardsi[TURN][P1]
-							|| my_data_it->cardsi[RIVER][P0] == to_be_skipped->cardsi[RIVER][P0]
-							|| my_data_it->cardsi[RIVER][P1] == to_be_skipped->cardsi[RIVER][P1]
-#endif
-						)
-						{
-							goto cannot_skip;
-						}
-					}
-					goto found_good_data;
-				}
-cannot_skip:
-				continue; // just has to be here as a statement for the cannot_skip label
-			}
-			pthread_cond_wait(&signaler, &threaddatalock);
+			ThreadDebug("....COMPACTING MEMORY....");
+			docompact();
+			ThreadDebug("....DONE COMPACTING MEMORY....");
 		}
-found_good_data:
-
-		if(THREADLOOPTRACE && false)
+		else if(!memory->GetMasterCompactFlag() && getreadydata(my_data_it))
 		{
-			int j=0;
-			for(list<iteration_data_t>::iterator i=dataqueue.begin(); i != my_data_it; i++)
-				j++;
-			if(j>0)
-				cerr << this << ": ..skipped " << j << "data.." << endl;
-		}
-		memcpy(cardsi, my_data_it->cardsi, sizeof(cardsi)); //copy that data into our non-static variables
-		twoprob0wins = my_data_it->twoprob0wins;
 
-		datainuse0[2*cardsi[PREFLOP][P0]] = true;
-		datainuse0[2*cardsi[PREFLOP][P1]+1] = true;
-#if !USE_HISTORY
-		datainuse1[2*cardsi[FLOP][P0]] = true;
-		datainuse1[2*cardsi[FLOP][P1]+1] = true;
-		datainuse2[2*cardsi[TURN][P0]] = true;
-		datainuse2[2*cardsi[TURN][P1]+1] = true;
-		datainuse3[2*cardsi[RIVER][P0]] = true;
-		datainuse3[2*cardsi[RIVER][P1]+1] = true;
+			memcpy(cardsi, my_data_it->cardsi, sizeof(cardsi)); //copy that data into our non-static variables
+			twoprob0wins = my_data_it->twoprob0wins;
+
+			dataguardpflopp0[cardsi[PREFLOP][P0]] = true;
+			dataguardpflopp1[cardsi[PREFLOP][P1]] = true;
+			dataguardriver[cardsi[RIVER][P0]] = true; //could be same bin as
+			dataguardriver[cardsi[RIVER][P1]] = true; //this one
+#if IMPERFECT_RECALL
+			dataguardflopp0[cardsi[FLOP][P0]] = true;
+			dataguardflopp1[cardsi[FLOP][P1]] = true;
+			dataguardturnp0[cardsi[TURN][P0]] = true;
+			dataguardturnp1[cardsi[TURN][P1]] = true;
 #endif
-		cardmachine->getnewgame(my_data_it->cardsi, my_data_it->twoprob0wins); //get new data
-		dataqueue.splice(dataqueue.end(), dataqueue, my_data_it); //move that node to the end of the list
-		iterations--;
-		if(THREADLOOPTRACE)
-			cerr << /*this <<*/ ": Solving " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
-		pthread_mutex_unlock(&threaddatalock);
-#else //SINGLE THREADED
-		if(iterations-- == 0)
-			break;
-		cardmachine->getnewgame(cardsi, twoprob0wins);
-		if(THREADLOOPTRACE)
-			cerr << /*this <<*/ ": Solving " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
-#endif //ALL THREADEDNESS
-		walker<FStore_type>(PREFLOP,0,treeroot,1,1);
-#ifdef DO_THREADS //MULTI THREADED
-		pthread_mutex_lock(&threaddatalock);
-		if(THREADLOOPTRACE && false)
-			cerr << this << ": Done with " << cardsi[PREFLOP][P0] << " - " << cardsi[PREFLOP][P1] << endl;
-		//set datainuse of whatever we were doing to false
-		datainuse0[2*cardsi[PREFLOP][P0]] = false;
-		datainuse0[2*cardsi[PREFLOP][P1]+1] = false;
-#if !USE_HISTORY
-		datainuse1[2*cardsi[FLOP][P0]] = false;
-		datainuse1[2*cardsi[FLOP][P1]+1] = false;
-		datainuse2[2*cardsi[TURN][P0]] = false;
-		datainuse2[2*cardsi[TURN][P1]+1] = false;
-		datainuse3[2*cardsi[RIVER][P0]] = false;
-		datainuse3[2*cardsi[RIVER][P1]+1] = false;
+			cardmachine->getnewgame(my_data_it->cardsi, my_data_it->twoprob0wins); //replace the data we used
+			dataqueue.splice(dataqueue.end(), dataqueue, my_data_it); //move that node to the end of the list
+
+			iterations--;
+
+			ThreadDebug("....doing iteration cardsi "+tostring(cardsi[0][0])+"/"+tostring(cardsi[0][1]));
+			pthread_mutex_unlock(&threaddatalock);
+			pthread_cond_signal(&signaler); //I found data, maybe you can too!
+
+			walker(PREFLOP,0,treeroot,1,1);
+
+			pthread_mutex_lock(&threaddatalock);
+			ThreadDebug("finished iteration cardsi "+tostring(cardsi[0][0])+"/"+tostring(cardsi[0][1])+"....");
+			//set datainuse of whatever we were doing to false
+			dataguardpflopp0[cardsi[PREFLOP][P0]] = false;
+			dataguardpflopp1[cardsi[PREFLOP][P1]] = false;
+			dataguardriver[cardsi[RIVER][P0]] = false; //could be same bin as 
+			dataguardriver[cardsi[RIVER][P1]] = false; //this one
+#if IMPERFECT_RECALL
+			dataguardflopp0[cardsi[FLOP][P0]] = false;
+			dataguardflopp1[cardsi[FLOP][P1]] = false;
+			dataguardturnp0[cardsi[TURN][P0]] = false;
+			dataguardturnp1[cardsi[TURN][P1]] = false;
 #endif
-		pthread_cond_signal(&signaler); //new data is availble to be touched, so signal
-#endif
+		}
+		else
+		{
+			if(memory->GetMasterCompactFlag()) 
+				ThreadDebug("....sleeping (waiting for compact)");
+			else if(!memory->GetMasterCompactFlag()) 
+				ThreadDebug("....sleeping (waiting for iteration data)");
+			pthread_cond_wait(&signaler, &threaddatalock); //sleep with lock, wake up with lock
+			ThreadDebug("waking up! ....");
+		}
+	} //while loop
+
+	pthread_mutex_unlock(&threaddatalock);
+	pthread_cond_broadcast(&signaler); // wake up any sleeping threads
+
+}
+
+#else /*DO_THREADS*/
+
+void Solver::threadloop()
+{
+	fpu_fix_start(NULL);
+
+	while(iterations!=0) //each loop does one iteration or compacts or sleeps
+	{
+		if(memory->GetMasterCompactFlag())
+		{
+			docompact();
+		}
+		else
+		{
+			cardmachine->getnewgame(cardsi, twoprob0wins);
+			iterations--;
+			walker(PREFLOP,0,treeroot,1,1);
+		}
 	}
 }
 
-inline pair<FWorking_type, FWorking_type> utilpair(int p0utility)
+#endif  /*DO_THREADS*/
+
+inline tuple<FWorking_type, FWorking_type> utiltuple(int p0utility)
 {
 	const FWorking_type aggression_multiplier = (FWorking_type)1 + (FWorking_type)AGGRESSION_FACTOR/100;
 
 	if(p0utility>0)
-		return make_pair<FWorking_type,FWorking_type>( aggression_multiplier * (FWorking_type)rake(p0utility), -(FWorking_type)p0utility);
+		return tuple<FWorking_type,FWorking_type>( aggression_multiplier * (FWorking_type)rake(p0utility), -(FWorking_type)p0utility);
 	else
-		return make_pair<FWorking_type,FWorking_type>( (FWorking_type)p0utility, aggression_multiplier * (FWorking_type)rake(-p0utility));
+		return tuple<FWorking_type,FWorking_type>( (FWorking_type)p0utility, aggression_multiplier * (FWorking_type)rake(-p0utility));
 }
 
-template<typename FStore>
-pair<FWorking_type,FWorking_type> Solver::walker(int gr, int pot, Vertex node, FWorking_type prob0, FWorking_type prob1)
+tuple<FWorking_type,FWorking_type> Solver::walker(const int gr, const int pot, const Vertex node, const FWorking_type prob0, const FWorking_type prob1)
 {
 	const int numa = out_degree(node, *tree);
 	const int playeri = playerindex((*tree)[node].type);
 
-	//obtain pointers to data for this turn
-
-	FStore *stratn, *regret;
-
-#if SAME_STORE_TYPES
-	if(gr==3)    //then this decision needs to be done at run time 
-		memory->dataindexingriv(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], stratn, regret);
-	else
-		memory->dataindexing(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], stratn, regret);
-#else //then this needs to be done at compile time by template differentiation
-	memory->dataindexing<FStore>(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], stratn, regret);
-#endif
-	
-	//find total regret
-
-	FWorking_type totalregret=0.0;
-
-	for(int i=0; i<numa; i++)
-		if (regret[i]>0.0) totalregret += regret[i];
-
-	//set strategy proportional to positive regret, or 1/numa if no positive regret
+	//read stratt from the data store. 
 
 	FWorking_type stratt[MAX_ACTIONS_SOLVER];
-
-	if (totalregret > 0.0)
-		for(int i=0; i<numa; i++)
-			(regret[i]>0.0) ? stratt[i] = regret[i] / totalregret : stratt[i] = 0.0;
-	else
-		for(int i=0; i<numa; i++)
-			stratt[i] = (FWorking_type)1/(FWorking_type)numa;
+	memory->readstratt( stratt, gr, numa, (*tree)[node].actioni, cardsi[gr][playeri] );
 
 	//debug printing
 
@@ -435,8 +510,8 @@ pair<FWorking_type,FWorking_type> Solver::walker(int gr, int pot, Vertex node, F
 
 	//recursively find utility of each action
 
-	pair<FWorking_type,FWorking_type> utility[MAX_ACTIONS_SOLVER];
-	pair<FWorking_type,FWorking_type> avgutility(0,0);
+	tuple<FWorking_type,FWorking_type> utility[MAX_ACTIONS_SOLVER];
+	tuple<FWorking_type,FWorking_type> avgutility(0,0);
 
 	EIter e, elast;
 	int i=0;
@@ -448,42 +523,35 @@ pair<FWorking_type,FWorking_type> Solver::walker(int gr, int pot, Vertex node, F
 		switch((*tree)[*e].type)
 		{
 		case CallAllin: //showdown
-			utility[i] = utilpair(get_property(*tree, settings_tag()).stacksize * (twoprob0wins-1));
+			utility[i] = utiltuple(get_property(*tree, settings_tag()).stacksize * (twoprob0wins-1));
 			break;
 
 		case Call:
 			if(gr==RIVER) //showdown
-				utility[i] = utilpair((pot+(*tree)[*e].potcontrib) * (twoprob0wins-1));
-			else if (gr==TURN) //moving to next game round, which is river -> change store type
+				utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (twoprob0wins-1));
+			else //moving to next game round
 			{
 				if((*tree)[node].type==P0Plays)
-					utility[i] = walker<FRivStore_type>(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0*stratt[i], prob1);
+					utility[i] = walker(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0*stratt[i], prob1);
 				else
-					utility[i] = walker<FRivStore_type>(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0, prob1*stratt[i]);
-			}
-			else //moving to next game round, which is NOT river -> same types as this instance
-			{
-				if((*tree)[node].type==P0Plays)
-					utility[i] = walker<FStore>(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0*stratt[i], prob1);
-				else
-					utility[i] = walker<FStore>(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0, prob1*stratt[i]);
+					utility[i] = walker(gr+1, pot + (*tree)[*e].potcontrib, target(*e, *tree), prob0, prob1*stratt[i]);
 			}
 			break;
 
 		case Fold:
-			utility[i] = utilpair((pot+(*tree)[*e].potcontrib) * (2*playeri - 1)); //acting player is loser, utility is integer
+			utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (2*playeri - 1)); //acting player is loser, utility is integer
 			break;
 
 		case Bet:
 		case BetAllin: //NOT moving to new round -> same types as this instance
 			if((*tree)[node].type==P0Plays)
-				utility[i] = walker<FStore>(gr, pot, target(*e, *tree), prob0*stratt[i], prob1);
+				utility[i] = walker(gr, pot, target(*e, *tree), prob0*stratt[i], prob1);
 			else
-				utility[i] = walker<FStore>(gr, pot, target(*e, *tree), prob0, prob1*stratt[i]);
+				utility[i] = walker(gr, pot, target(*e, *tree), prob0, prob1*stratt[i]);
 		}
 
-		avgutility.first += stratt[i]*utility[i].first;
-		avgutility.second += stratt[i]*utility[i].second;
+		avgutility.get<0>() += stratt[i]*utility[i].get<0>();
+		avgutility.get<1>() += stratt[i]*utility[i].get<1>();
 	}
 
 	//debug printing
@@ -491,10 +559,10 @@ pair<FWorking_type,FWorking_type> Solver::walker(int gr, int pot, Vertex node, F
 	if(WALKERDEBUG)
 	{
 		cout << "Ending Gameround: " << gr << /*" Pot: " << pot <<*/ " Actioni: " << (*tree)[node].actioni << " Cardsi: " << cardsi[gr][playeri] << endl;
-		cout << "Utility[].first: { ";
-		for(int i=0; i<numa; i++) cout << utility[i].first << " ";
-		cout << "} Utility[].second: { ";
-		for(int i=0; i<numa; i++) cout << utility[i].second << " ";
+		cout << "Utility[].get<0>(): { ";
+		for(int i=0; i<numa; i++) cout << utility[i].get<0>() << " ";
+		cout << "} Utility[].get<1>(): { ";
+		for(int i=0; i<numa; i++) cout << utility[i].get<1>() << " ";
 		cout << "}" << endl << endl;
 	}
 
@@ -502,37 +570,19 @@ pair<FWorking_type,FWorking_type> Solver::walker(int gr, int pot, Vertex node, F
 
 	if ((*tree)[node].type==P0Plays) //P0 playing, use prob1, proability of player 1 getting here.
 	{
-		//shortcut, along with the related one below, speeds up by 10% or so.
-		if(prob0!=0.0)
-		{
-			for(int a=0; a<numa; a++)
-				stratn[a] += prob0 * stratt[a];
-#if STORE_DENOM
-			*stratd += prob0;
-#endif
-		}
+		if(prob0 != 0)
+			memory->writestratn( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob0, stratt );
 
-		//shortcut
-		if(prob1!=0.0)
-			for(int a=0; a<numa; a++)
-				regret[a] += prob1 * (utility[a].first - avgutility.first);
+		if(prob1 != 0)
+			memory->writeregret0( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob1, avgutility.get<0>(), utility );
 	}
 	else // P1 playing, so his regret values are negative of P0's regret values.
 	{
-		//shortcut
-		if(prob1!=0.0)
-		{
-			for(int a=0; a<numa; a++)
-				stratn[a] += prob1 * stratt[a];
-#if STORE_DENOM
-			*stratd += prob1;
-#endif
-		}
+		if(prob1 != 0)
+			memory->writestratn( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob1, stratt );
 
-		//shortcut
-		if(prob0!=0.0)
-			for(int a=0; a<numa; a++)
-				regret[a] += prob0 * (utility[a].second - avgutility.second);
+		if(prob0 != 0)
+			memory->writeregret1( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob0, avgutility.get<1>(), utility );
 	}
 
 
