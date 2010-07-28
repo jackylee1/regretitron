@@ -263,7 +263,7 @@ bool fpequal(double x, double y, int maxUlps) //from http://www.cygnus-software.
 
 	// Make sure maxUlps is non-negative and small enough that the
 	// default NAN won't compare as equal to anything.
-	if(!(maxUlps > 0 && maxUlps < 4 * 1024 * 1024)) REPORT("bad ulps");
+	if(!(maxUlps > 0)) REPORT("bad ulps");
 
 	//voodoo!
 	union { int64 asint; double asdouble; } xInt, yInt;

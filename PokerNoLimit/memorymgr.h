@@ -18,12 +18,12 @@ using boost::tuple;
 class CardMachine;
 
 //used on pflop, flop, and turn
-template <typename FStore>
+template <typename T>
 class DataContainer
 {
 public:
 	DataContainer(int nactions, int ndatanodes) 
-		: datastore(ndatanodes == 0 ? NULL : new FStore[nactions*2*ndatanodes]), nacts(nactions), ndata(ndatanodes)	  
+		: datastore(ndatanodes == 0 ? NULL : new T[nactions*2*ndatanodes]), nacts(nactions), ndata(ndatanodes)
 	{ 
 		if(nactions < 2) REPORT("invalid nactions");
 		if(ndatanodes < 0) REPORT("invalid ndatanodes");
@@ -38,28 +38,28 @@ public:
 			delete[] datastore; 
 	}
 
-	inline void getstratn(int index, FStore* &stratn, int checknacts)
+	inline void getstratn(int index, T* &stratn, int checknacts)
 	{
 		if(checknacts != nacts) REPORT("invalid acts");
 		if(index < 0 || index >= ndata) REPORT("invalid index");
 		stratn = &datastore[ index * 2*nacts ];
 	}
 
-	inline void getregret(int index, FStore* &regret, int checknacts)
+	inline void getregret(int index, T* &regret, int checknacts)
 	{
 		if(checknacts != nacts) REPORT("invalid acts");
 		if(index < 0 || index >= ndata) REPORT("invalid index");
 		regret = &datastore[ index * 2*nacts + nacts ];
 	}
 
-	int getnodesize() const { return 2*nacts*sizeof(FStore); } //in bytes
+	int getnodesize() const { return 2*nacts*sizeof(T); } //in bytes
 
 	int getnacts() const { return nacts; }
 
 	int size() const { return ndata; }
 
 private:
-	FStore * datastore;
+	T * datastore;
 	int nacts;
 	int ndata;
 
@@ -77,13 +77,13 @@ public:
 	MemoryManager(const BettingTree &tree, const CardMachine &cardmach); //allocates memory
 	~MemoryManager(); //deallocates memory
 
-	void readstratt( FWorking_type * stratt, int gr, int numa, int actioni, int cardsi );
+	void readstratt( Working_type * stratt, int gr, int numa, int actioni, int cardsi );
 	void readstratn( unsigned char * buffer, unsigned char & checksum, int gr, int numa, int actioni, int cardsi );
-	void writestratn( int gr, int numa, int actioni, int cardsi, FWorking_type prob, FWorking_type * stratt );
+	void writestratn( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type * stratt );
 	template < int P >
-	inline void writeregret( int gr, int numa, int actioni, int cardsi, FWorking_type prob, FWorking_type avgutility, tuple<FWorking_type,FWorking_type> * utility );
-	void writeregret0( int gr, int numa, int actioni, int cardsi, FWorking_type prob, FWorking_type avgutility, tuple<FWorking_type,FWorking_type> * utility );
-	void writeregret1( int gr, int numa, int actioni, int cardsi, FWorking_type prob, FWorking_type avgutility, tuple<FWorking_type,FWorking_type> * utility );
+	inline void writeregret( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
+	void writeregret0( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
+	void writeregret1( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
 
 	void savecounts(const string & filename);
 	int64 save(const string &filename); //returns length of file written
@@ -95,7 +95,7 @@ public:
 
 	inline void SetMasterCompactFlag() { mastercompactflag = true; }
 	inline void ClearMasterCompactFlag() { mastercompactflag = false; }
-	inline bool GetMasterCompactFlag() { return mastercompactflag; }
+	inline bool GetMasterCompactFlag() { return mastercompactflag && MEMORY_OVER_SPEED; }
 	int64 CompactMemory(); //returns space used in hugebuffer
 	int64 GetHugeBufferSize(); //returns space available in hugebuffer
 private:
@@ -110,9 +110,11 @@ private:
 
 	//each is a pointer to a large array allocated on the heap
 	//one such array per gameround per type of node.
-	//used as 2-dimensional arrays
-	boost::multi_array<DataContainer<FStore_type>*,2> data;
-	CardsiContainer* riverdata;
+	boost::multi_array<DataContainer<PFlopStore_type>*,1> pflopdata;
+	boost::multi_array<DataContainer<FlopStore_type>*,1> flopdata;
+	boost::multi_array<DataContainer<TurnStore_type>*,1> turndata;
+	boost::multi_array<DataContainer<RiverRegret_type>*,1> riverdata_oldmethod;
+	CardsiContainer* riverdata; //new method, slower, but less memory
 	volatile bool mastercompactflag;
 };
 

@@ -25,8 +25,8 @@ public:
 	static void destructsolver();
 	static boost::tuple<
 		double, //time taken
-		double, //cumulative seconds compacting
 		double, //seconds compacting this cycle
+		double, //cumulative seconds compacting
 		int64, //times compacted this cycle
 		int64, //bytes used
 		int64 //total bytes available
@@ -55,7 +55,7 @@ private:
 	inline void ThreadDebug(string debugstring);
 	inline static void docompact();
 	void threadloop(); //master loop function, called first by each thread
-	tuple<FWorking_type,FWorking_type> walker(const int gr, const int pot, const Vertex node, const FWorking_type prob0, const FWorking_type prob1);
+	tuple<Working_type,Working_type> walker(const int gr, const int pot, const Vertex node, const Working_type prob0, const Working_type prob1);
 
 	//this is the per thread data
 	int cardsi[4][2]; // 4 gamerounds, 2 players.

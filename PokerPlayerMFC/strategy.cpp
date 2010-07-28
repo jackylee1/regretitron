@@ -100,7 +100,7 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 	}
 	catch(Exception &ex)
 	{
-		REPORT(ex.what());
+		REPORT(ex.what(),KNOWN);
 		exit(-1);
 	}
 
@@ -136,6 +136,12 @@ void Strategy::getprobs(int gr, int actioni, int numa, const vector<CardMask> &c
 	//get the cardi 
 
 	int cardsi = cardmach->getcardsi(gr, cards);
+
+	getprobs(gr, actioni, numa, cardsi, probs);
+}
+
+void Strategy::getprobs(int gr, int actioni, int numa, int cardsi, vector<double> &probs)
+{
 
 	//read the char probabilities, matching the offset to the memorymgr code.
 	

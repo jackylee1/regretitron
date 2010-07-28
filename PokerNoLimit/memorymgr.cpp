@@ -10,6 +10,8 @@
 #include <boost/static_assert.hpp>
 #include <cstring> //for memcpy
 #include <pthread.h>
+#include <boost/math/common_factor_rt.hpp>
+#include <cassert>
 using namespace std;
 
 BOOST_STATIC_ASSERT(MAX_ACTIONS_SOLVER == 3);
@@ -24,6 +26,8 @@ const int BYTES_ALLOWED_SLACK_IN_POOLEDARRAY = 100; //...if a PooledArray has at
 const int BYTES_TO_COMPACT_TO_IN_POOLEDARRAY = 50; //...adjust so that it has only this much slack at the end of it.
 //when overflowinga pooledarray
 const int BYTES_TO_GROW_POOLEDARRAY_WHEN_FULL = 1500; //it would get compacted later on anyway
+const uint16 ALIGN_TO = 8; // ensure the start of arrays are on 8-byte boundaries (setting to 16 doesn't work due to 8-byte headers). 
+//For the same reason only divisors of 8 work too, so your choices are 1, 2, 4, 8.
 
 //forward declarations
 template <int FLAGBITS> class IndexDataBits;
@@ -68,11 +72,11 @@ public:
 	inline bool operator!=(const PagePtr &other) const { return ptr != other.ptr; }
 	inline int64 operator-(const PagePtr &other) const { return (byte*)ptr - (byte*)other.ptr; }
 	inline int64 operator-(const void* &rhs) const { return (byte*)ptr - (byte*)rhs; }
-	inline void* GetAddressAt( int64 offset ) { if(IsFree() || offset<0 || offset%2!=0) REPORT("getaddrat err: "+tostring(offset)); return (byte*)ptr + offset; }
+	inline void* GetAddressAt( int64 offset ) { assert(!IsFree() && offset>=0 && offset%2==0); return (byte*)ptr + offset; }
 	inline void SetHeaderAddress(void* addr) { ptr = (void*)((PooledArray**)addr + 1); }
 	inline void SetPageAddress(void* addr) { ptr = addr; }
 	inline bool IsFree() { return (HeaderRef() == NULL); }
-	inline PooledArray* & HeaderRef() { if(ptr==NULL) REPORT("nullptr"); return *((PooledArray**)ptr - 1); } //the header is 8 bytes before the beginning of a page
+	inline PooledArray* & HeaderRef() { assert(ptr!=NULL); return *((PooledArray**)ptr - 1); } //the header is 8 bytes before beginning of a page
 	inline int64 & SizeRef() { if(!IsFree()) REPORT("page not free"); return *((int64*)ptr); } //the page stores its own size, if it's free.
 	void JumpToNextPage(); // uses SizeRef for size if free, uses HeaderRef->GetBytes() if not free.
 	void JumpToNextPage( int64 nbytes ); // for when HeaderRef->GetBytes() should not be used
@@ -122,28 +126,33 @@ private:
 class PooledArray // 1 per cardsi per arraytype
 {
 public:
-	inline int64 GetBytes() { return maxlength * blocksize; }
+	inline int64 GetBytes() { return maxnblocks * blocksize; }
 
 protected: //not meant to be used directly
 	PooledArray(int blocksizebytes, int nblocks, uint16 flagsmask) 
-		: location(hugebuffer->AllocLocation(blocksizebytes*nblocks, this, flagsmask==0/*compacted if flagsmask indicates nodes can't be removed*/)), 
-		  flagmask(flagsmask), numofcounts(0), blocksize(blocksizebytes), maxlength(nblocks), nextfree(0) { }
+		: flagmask(flagsmask), numofcounts(0), blocksize(blocksizebytes), nextfreeblock(0)
+	{
+		maxnblocks = NextLargestLegalNBlocks(nblocks);
+		location = hugebuffer->AllocLocation(blocksizebytes*maxnblocks, this, flagsmask==0/*compacted if flagsmask indicates nodes can't be removed*/);
+	}
 
 	uint16 AddNewNodeRaw(int nblocks); //adds a node into the buffer, returns its index.
 	void RemoveNodeRaw(uint16 index, int nblocks, IndexArray &indexarray);
-	void* GetRaw(uint16 index) { if(index>=nextfree) REPORT("bad index: "+tostring(index)); return location.GetAddressAt( index * blocksize ); }
+	inline void* GetRaw(uint16 index) { assert(index < nextfreeblock); return location.GetAddressAt( index * blocksize ); }
 
 private:
 	friend int64 HugeBuffer::CompactData();
 	void Compact(); //only called by HugeBuffer
 	void CopyTo( PagePtr newlocation );
+	uint16 NearestLegalNBlocks( uint16 desiredblocks );
+	uint16 NextLargestLegalNBlocks( uint16 desiredblocks );
 
 	PagePtr location;
 	const uint16 flagmask; //defines what type of array this is so that RemoveNode can determine which elements of indexarray point to THIS array
-	const uint8 numofcounts; //the first numofcounts * maxlength bytes of this array are chars
+	const uint8 numofcounts; //the first numofcounts * maxnblocks bytes of this array are chars
 	const uint8 blocksize; //all sizes & lengths in units of this. this is in units of bytes. does not include counts.
-	uint16 maxlength;
-	uint16 nextfree;
+	uint16 maxnblocks;
+	uint16 nextfreeblock;
 
 	PooledArray(const PooledArray& rhs);
 	PooledArray& operator=(const PooledArray& rhs);
@@ -175,7 +184,7 @@ template <int FLAGBITS> class IndexDataBits
 public:
 	IndexDataBits() : loc(0xFFFF>>FLAGBITS), fl(NO_ALLOC) { } //constructor used for nodes at beginning of solving ==> nothing unallocated, location meaningless
 	inline void GetData(uint16 & location, AllocType & flags) { location = loc; flags = (AllocType)fl; }
-	uint16 GetLocation() { CheckLocation(); return loc; }
+	uint16 GetLocation() { assert(loc < (1<<(16-FLAGBITS)) - 5); return loc; }
 	AllocType GetFlags() { return (AllocType)fl; }
 	void SetLocation(uint16 location) { loc = location; CheckLocation(); }
 	void SetFlags(AllocType flags) { if(flags >= 1<<FLAGBITS) REPORT("bad flags: "+tostring(flags)); fl = flags; }
@@ -193,40 +202,34 @@ template <int NUMA> class StratnData
 {
 public:
 	StratnData() { for(int i=0; i<NUMA; i++) stratn[i] = 0; }
-	float stratn[NUMA];
+	RiverStratn_type stratn[NUMA];
 private:
 	StratnData(const StratnData&);
 	StratnData& operator=(const StratnData&);
-};
-BOOST_STATIC_ASSERT(sizeof(StratnData<2>) == 8);
-BOOST_STATIC_ASSERT(sizeof(StratnData<3>) == 12);
+} __attribute__((packed));
 
 template <int NUMA> class RegretData
 {
 public:
 	RegretData() { for(int i=0; i<NUMA; i++) regret[i] = 0; }
-	double regret[NUMA];
+	RiverRegret_type regret[NUMA];
 private:
 	RegretData(const RegretData&);
 	RegretData& operator=(const RegretData&);
-};
-BOOST_STATIC_ASSERT(sizeof(RegretData<2>) == 16);
-BOOST_STATIC_ASSERT(sizeof(RegretData<3>) == 24);
+} __attribute__((packed));
 
 template <int NUMA> class FullData
 {
+	FullData() { for(int i=0; i<NUMA; i++) stratn[i] = regret[i] = 0; } //do not allow promoted from null
 public:
-	//FullData() { for(int i=0; i<NUMA; i++) stratn[i] = regret[i] = 0; } do not allow promoted from null
 	FullData( const StratnData<NUMA> & sd ) { for(int i=0; i<NUMA; i++) { stratn[i] = sd.stratn[i]; regret[i] = 0; } }
 	FullData( const RegretData<NUMA> & rd ) { for(int i=0; i<NUMA; i++) { stratn[i] = 0; regret[i] = rd.regret[i]; } }
-	double regret[NUMA];
-	float stratn[NUMA];
+	RiverRegret_type regret[NUMA];
+	RiverStratn_type stratn[NUMA];
 private:
 	FullData(const FullData&);
 	FullData& operator=(const FullData&);
 } __attribute__((packed));
-BOOST_STATIC_ASSERT(sizeof(FullData<2>) == 24);
-BOOST_STATIC_ASSERT(sizeof(FullData<3>) == 36);
 
 //---------------------------------------------------------------------
 
@@ -236,8 +239,8 @@ class TypedPooledArray : public PooledArray
 {
 public:
 	//set blocksize to the size of our data type
-	TypedPooledArray(int maxlength, uint16 flagmask) 
-		: PooledArray(sizeof(T), maxlength, flagmask) { }
+	TypedPooledArray(int maxnblocks, uint16 flagmask) 
+		: PooledArray(sizeof(T), maxnblocks, flagmask) { }
 
 	//typed access of elements
 	inline T & operator[](uint16 index) { return *(T*)GetRaw(index); }
@@ -311,8 +314,8 @@ PagePtr HugeBuffer::AllocLocation(int nbytes, PooledArray * backptr, bool iscomp
 {
 	if(nbytes < 8 || backptr == NULL) 
 		REPORT("invalid params to AllocLocation");
-	if(nbytes%4 != 0)
-		REPORT("I would prefer if you allocated on 4 byte boundaries..", WARN);
+	if(nbytes%ALIGN_TO != 0)
+		REPORT("Not allocating on ALIGN_TO boundaries...");
 
 	pthread_mutex_lock(&nextfreepagelock);
 	// check for size issues
@@ -390,8 +393,13 @@ int64 HugeBuffer::CompactData()
 void PooledArray::Compact( ) //only called by CompactData above
 {
 	//we are friends to HugeBuffer for this reason
-	if( ( maxlength - nextfree ) * blocksize >= BYTES_ALLOWED_SLACK_IN_POOLEDARRAY) 
-		maxlength = nextfree + (BYTES_TO_COMPACT_TO_IN_POOLEDARRAY + blocksize/2) / blocksize; //round to nearest blocksize
+	if( ( maxnblocks - nextfreeblock ) * blocksize >= BYTES_ALLOWED_SLACK_IN_POOLEDARRAY ) 
+	{
+		const uint16 desirednblocks = nextfreeblock + (BYTES_TO_COMPACT_TO_IN_POOLEDARRAY + blocksize/2) / blocksize; //round to nearest blocksize
+		maxnblocks = NearestLegalNBlocks( desirednblocks ); //might round down to something very small
+		if(maxnblocks <= nextfreeblock + 2) // ... if it did, round up.
+			maxnblocks = NextLargestLegalNBlocks( desirednblocks );
+	}
 }
 
 void PooledArray::CopyTo( PagePtr newlocation )
@@ -401,19 +409,32 @@ void PooledArray::CopyTo( PagePtr newlocation )
 	location = newlocation;
 }
 
+//ensure things are aligned somewhat decently
+uint16 PooledArray::NearestLegalNBlocks( uint16 desiredblocks )
+{
+	const uint16 roundto = boost::math::lcm( (uint16)blocksize, ALIGN_TO ) / blocksize;
+	return roundto*((desiredblocks+(roundto/2))/roundto);
+}
+
+uint16 PooledArray::NextLargestLegalNBlocks( uint16 desiredblocks )
+{
+	const uint16 roundto = boost::math::lcm( (uint16)blocksize, ALIGN_TO ) / blocksize;
+	return roundto*((desiredblocks+roundto-1)/roundto);
+}
+
 uint16 PooledArray::AddNewNodeRaw(int nblocks) 
 { 
 	if(nblocks <= 0) REPORT("bad size"); 
-	uint16 r = nextfree;
-   	nextfree += nblocks;
-	if(nextfree > maxlength)
+	uint16 r = nextfreeblock;
+   	nextfreeblock += nblocks;
+	if(nextfreeblock > maxnblocks)
 	{
-		uint16 newlength = nextfree + (BYTES_TO_GROW_POOLEDARRAY_WHEN_FULL + blocksize/2) / blocksize;
+		uint16 newlength = nextfreeblock + (BYTES_TO_GROW_POOLEDARRAY_WHEN_FULL + blocksize/2) / blocksize;
 		PagePtr newlocation = hugebuffer->AllocLocation(newlength*blocksize, this, false /* not compacted */);
 		PagePtr oldlocation = location;
 		CopyTo( newlocation ); //calls GetBytes on us
-		hugebuffer->FreeLocation(oldlocation, maxlength*blocksize, this);
-		maxlength = newlength;
+		hugebuffer->FreeLocation(oldlocation, maxnblocks*blocksize, this);
+		maxnblocks = newlength;
 	}
    	return r;
 }
@@ -424,7 +445,7 @@ void PooledArray::RemoveNodeRaw(uint16 index, int nblocks, IndexArray & indexarr
 		REPORT("bad size: "+tostring(index)+" "+tostring(nblocks)); 
 	if(flagmask == 0)
 		REPORT("flagmask is zero, should not be removing from this array");
-	for(int i=0; i<indexarray.nextfree; i++)
+	for(int i=0; i<indexarray.nextfreeblock; i++)
 	{
 		//any elements of indexarray that have flags for THIS array and for with index larger than this one are shifted back
 		if( ( ( 1 << flagswitch(indexarray[i].GetFlags(), memory->getnumafromriveractioni(i)) ) & flagmask ) && indexarray[i].GetLocation() > index )
@@ -434,8 +455,8 @@ void PooledArray::RemoveNodeRaw(uint16 index, int nblocks, IndexArray & indexarr
 			indexarray[i].SetLocation( indexarray[i].GetLocation() - nblocks );
 		}
 	}
-	memmove( location.GetAddressAt(index*blocksize), location.GetAddressAt((index+nblocks)*blocksize), (nextfree-(index+nblocks))*blocksize );
-	nextfree -= nblocks;
+	memmove( location.GetAddressAt(index*blocksize), location.GetAddressAt((index+nblocks)*blocksize), (nextfreeblock-(index+nblocks))*blocksize );
+	nextfreeblock -= nblocks;
 }
 
 template < class T > uint16 TypedPooledArray<T>::AddNewNode()  //argumentns passed to constructor for T
@@ -507,12 +528,12 @@ int MemoryManager::getactionifromriveractioni(int ractioni) //opposite of rivera
 }
 
 //internal, used by the functions Solver calls
-template <typename FStore> 
-void computestratt(FWorking_type * stratt, FStore * regret, int numa)
+template <typename T> 
+void computestratt(Working_type * stratt, T * regret, int numa)
 {
 	//find total regret
 
-	FWorking_type totalregret=0;
+	Working_type totalregret=0;
 
 	for(int i=0; i<numa; i++)
 		if (regret[i]>0) totalregret += regret[i];
@@ -524,15 +545,15 @@ void computestratt(FWorking_type * stratt, FStore * regret, int numa)
 			stratt[i] = (regret[i]>0) ? regret[i] / totalregret : 0;
 	else
 		for(int i=0; i<numa; i++)
-			stratt[i] = (FWorking_type)1/(FWorking_type)numa;
+			stratt[i] = (Working_type)1/(Working_type)numa;
 }
 
-template <typename FStore>
-void computeprobs(unsigned char * buffer, unsigned char &checksum, FStore const * const stratn, int numa)
+template <typename T>
+void computeprobs(unsigned char * buffer, unsigned char &checksum, T const * const stratn, int numa)
 {
 	checksum = 0;
 
-	FStore max_value = *max_element(stratn, stratn+numa);
+	T max_value = *max_element(stratn, stratn+numa);
 
 	if(*min_element(stratn, stratn+numa) < 0)
 		REPORT("stratn has negative values...");
@@ -558,15 +579,15 @@ void computeprobs(unsigned char * buffer, unsigned char &checksum, FStore const 
 	}
 }
 
-template <typename FStore>
-void computestratn(FStore * stratn, FWorking_type prob, FWorking_type * stratt, int numa)
+template <typename T>
+void computestratn(T * stratn, Working_type prob, Working_type * stratt, int numa)
 {
 	for(int a=0; a<numa; a++)
 		stratn[a] += prob * stratt[a];
 }
 
-template <int P, typename FStore>
-void computeregret(FStore * regret, FWorking_type prob, FWorking_type avgutility, tuple<FWorking_type,FWorking_type> * utility, int numa )
+template <int P, typename T>
+void computeregret(T * regret, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility, int numa )
 {
 	for(int a=0; a<numa; a++)
 		regret[a] += prob * (utility[a].get<P>() - avgutility);
@@ -597,9 +618,9 @@ T2 & promote( uint16 oldindex, TypedPooledArray<T1> & oldarray, TypedPooledArray
 // increment counts as needed
 
 //functions that solver calls to do its work
-void MemoryManager::readstratt( FWorking_type * stratt, int gr, int numa, int actioni, int cardsi )
+void MemoryManager::readstratt( Working_type * stratt, int gr, int numa, int actioni, int cardsi )
 {
-	if(gr == 3)
+	if (gr==3 && MEMORY_OVER_SPEED)
 	{
 		const int fullindex = riveractioni(numa, actioni);
 		uint16 allocindex;
@@ -612,7 +633,7 @@ void MemoryManager::readstratt( FWorking_type * stratt, int gr, int numa, int ac
 		case flagswitch(STRATN_ONLY, 2):
 		case flagswitch(STRATN_ONLY, 3):
 			for(int i=0; i<numa; i++)
-				stratt[i] = (FWorking_type)1/(FWorking_type)numa;
+				stratt[i] = (Working_type)1/(Working_type)numa;
 			break;
 
 		case flagswitch(REGRET_ONLY, 2):
@@ -638,10 +659,28 @@ void MemoryManager::readstratt( FWorking_type * stratt, int gr, int numa, int ac
 		default: REPORT("catastrophic error: flags="+tostring(flags)+" numa="+tostring(numa));
 		}
 	}
-	else
+	else if (gr==3 && !MEMORY_OVER_SPEED)
 	{
-		FStore_type * regret;
-		data[gr][numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		RiverRegret_type * regret;
+		riverdata_oldmethod[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		computestratt(stratt, regret, numa);
+	}
+	else if (gr == 2)
+	{
+		TurnStore_type * regret;
+		turndata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		computestratt(stratt, regret, numa);
+	}
+	else if (gr == 1)
+	{
+		FlopStore_type * regret;
+		flopdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		computestratt(stratt, regret, numa);
+	}
+	else if (gr == 0)
+	{
+		PFlopStore_type * regret;
+		pflopdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computestratt(stratt, regret, numa);
 	}
 }
@@ -649,7 +688,7 @@ void MemoryManager::readstratt( FWorking_type * stratt, int gr, int numa, int ac
 
 void MemoryManager::readstratn( unsigned char * buffer, unsigned char & checksum, int gr, int numa, int actioni, int cardsi )
 {
-	if(gr == 3)
+	if (gr == 3 && MEMORY_OVER_SPEED)
 	{
 		const int fullindex = riveractioni(numa, actioni);
 		uint16 allocindex;
@@ -683,17 +722,35 @@ void MemoryManager::readstratn( unsigned char * buffer, unsigned char & checksum
 		default: REPORT("catastrophic error: flags="+tostring(flags)+" numa="+tostring(numa));
 		}
 	}
-	else
+	else if (gr == 3 && !MEMORY_OVER_SPEED)
 	{
-		FStore_type * stratn;
-		data[gr][numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa );
+		RiverRegret_type * stratn;
+		riverdata_oldmethod[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
+		computeprobs( buffer, checksum, stratn, numa );
+	}
+	else if (gr == 2)
+	{
+		TurnStore_type * stratn;
+		turndata[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa );
+		computeprobs( buffer, checksum, stratn, numa );
+	}
+	else if (gr == 1)
+	{
+		FlopStore_type * stratn;
+		flopdata[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa );
+		computeprobs( buffer, checksum, stratn, numa );
+	}
+	else if (gr == 0)
+	{
+		PFlopStore_type * stratn;
+		pflopdata[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa );
 		computeprobs( buffer, checksum, stratn, numa );
 	}
 }
 
-void MemoryManager::writestratn( int gr, int numa, int actioni, int cardsi, FWorking_type prob, FWorking_type * stratt )
+void MemoryManager::writestratn( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type * stratt )
 {
-	if(gr == 3)
+	if (gr == 3 && MEMORY_OVER_SPEED)
 	{
 		const int fullindex = riveractioni(numa, actioni);
 		riverdata[cardsi].writestratncount[fullindex]++;
@@ -727,14 +784,16 @@ void MemoryManager::writestratn( int gr, int numa, int actioni, int cardsi, FWor
 
 		case flagswitch(REGRET_ONLY, 2):
 		{
-			FullData<2> & newnode = promote( allocindex, riverdata[cardsi].regretarr2, riverdata[cardsi].fullarr2, FULL_ALLOC, riverdata[cardsi].indexarr, myindexdata );
+			FullData<2> & newnode = 
+				promote( allocindex, riverdata[cardsi].regretarr2, riverdata[cardsi].fullarr2, FULL_ALLOC, riverdata[cardsi].indexarr, myindexdata );
 			computestratn(newnode.stratn, prob, stratt, numa);
 			break;
 		}
 
 		case flagswitch(REGRET_ONLY, 3):
 		{
-			FullData<3> & newnode = promote( allocindex, riverdata[cardsi].regretarr3, riverdata[cardsi].fullarr3, FULL_ALLOC, riverdata[cardsi].indexarr, myindexdata );
+			FullData<3> & newnode = 
+				promote( allocindex, riverdata[cardsi].regretarr3, riverdata[cardsi].fullarr3, FULL_ALLOC, riverdata[cardsi].indexarr, myindexdata );
 			computestratn(newnode.stratn, prob, stratt, numa);
 			break;
 		}
@@ -750,19 +809,37 @@ void MemoryManager::writestratn( int gr, int numa, int actioni, int cardsi, FWor
 		default: REPORT("catastrophic error: flags="+tostring(flags)+" numa="+tostring(numa));
 		}
 	}
-	else
+	else if (gr == 3 && !MEMORY_OVER_SPEED)
 	{
-		FStore_type * stratn;
-		data[gr][numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
+		RiverRegret_type * stratn;
+		riverdata_oldmethod[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
+		computestratn(stratn, prob, stratt, numa);
+	}
+	else if (gr == 2)
+	{
+		TurnStore_type * stratn;
+		turndata[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
+		computestratn(stratn, prob, stratt, numa);
+	}
+	else if (gr == 1)
+	{
+		FlopStore_type * stratn;
+		flopdata[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
+		computestratn(stratn, prob, stratt, numa);
+	}
+	else if (gr == 0)
+	{
+		PFlopStore_type * stratn;
+		pflopdata[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
 		computestratn(stratn, prob, stratt, numa);
 	}
 }
 
 template < int P >
 inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cardsi, 
-		FWorking_type prob, FWorking_type avgutility, tuple<FWorking_type,FWorking_type> * utility )
+		Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility )
 {
-	if(gr == 3)
+	if (gr == 3 && MEMORY_OVER_SPEED)
 	{
 		const int fullindex = riveractioni(numa, actioni);
 		riverdata[cardsi].writeregretcount[fullindex]++;
@@ -788,14 +865,16 @@ inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cards
 
 		case flagswitch(STRATN_ONLY, 2):
 		{
-			FullData<2> & newnode = promote( allocindex, riverdata[cardsi].stratnarr2, riverdata[cardsi].fullarr2, FULL_ALLOC, riverdata[cardsi].indexarr, myindexdata );
+			FullData<2> & newnode = 
+				promote( allocindex, riverdata[cardsi].stratnarr2, riverdata[cardsi].fullarr2, FULL_ALLOC, riverdata[cardsi].indexarr, myindexdata );
 			computeregret<P> ( newnode.regret, prob, avgutility, utility, numa );
 		}
 		break;
 
 		case flagswitch(STRATN_ONLY, 3):
 		{
-			FullData<3> & newnode = promote( allocindex, riverdata[cardsi].stratnarr3, riverdata[cardsi].fullarr3, FULL_ALLOC, riverdata[cardsi].indexarr, myindexdata );
+			FullData<3> & newnode = 
+				promote( allocindex, riverdata[cardsi].stratnarr3, riverdata[cardsi].fullarr3, FULL_ALLOC, riverdata[cardsi].indexarr, myindexdata );
 			computeregret<P> ( newnode.regret, prob, avgutility, utility, numa );
 		}
 		break;
@@ -819,10 +898,28 @@ inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cards
 		default: REPORT("catastrophic error: flags="+tostring(flags)+" numa="+tostring(numa));
 		}
 	}
-	else
+	else if (gr == 3 && !MEMORY_OVER_SPEED)
 	{
-		FStore_type * regret;
-		data[gr][numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		RiverRegret_type * regret;
+		riverdata_oldmethod[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		computeregret<P>(regret, prob, avgutility, utility, numa);
+	}
+	else if (gr == 2)
+	{
+		TurnStore_type * regret;
+		turndata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		computeregret<P>(regret, prob, avgutility, utility, numa);
+	}
+	else if (gr == 1)
+	{
+		FlopStore_type * regret;
+		flopdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		computeregret<P>(regret, prob, avgutility, utility, numa);
+	}
+	else if (gr == 0)
+	{
+		PFlopStore_type * regret;
+		pflopdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computeregret<P>(regret, prob, avgutility, utility, numa);
 	}
 }
@@ -830,15 +927,15 @@ inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cards
 // ---------------------------------------------------------------------------
 
 // these are here to avoid putting my templated functions in the header file, 
-// instantiate them in this cpp file to be linked to writeregret<..,..> is defined inline
+// instantiate them in this cpp file to be linked to. writeregret<-,-> is defined inline.
 void MemoryManager::writeregret0( int gr, int numa, int actioni, int cardsi, 
-		FWorking_type prob, FWorking_type avgutility, tuple<FWorking_type,FWorking_type> * utility )
+		Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility )
 {
 	writeregret<0>(gr,numa,actioni,cardsi,prob,avgutility,utility);
 }
 
 void MemoryManager::writeregret1( int gr, int numa, int actioni, int cardsi, 
-		FWorking_type prob, FWorking_type avgutility, tuple<FWorking_type,FWorking_type> * utility )
+		Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility )
 {
 	writeregret<1>(gr,numa,actioni,cardsi,prob,avgutility,utility);
 }
@@ -846,19 +943,29 @@ void MemoryManager::writeregret1( int gr, int numa, int actioni, int cardsi,
 //used for outputting info in MemoryManager ctor only
 int getsize(int r, int nacts)
 {
-	return (r==3?sizeof(double):sizeof(FStore_type)) * 2 * nacts;
+	switch(r)
+	{
+		case 3: return nacts*2*(sizeof(RiverStratn_type)+sizeof(RiverRegret_type))/2;
+		case 2: return nacts*2*sizeof(TurnStore_type);
+		case 1: return nacts*2*sizeof(FlopStore_type);
+		case 0: return nacts*2*sizeof(PFlopStore_type);
+		default: REPORT("bad r"); return 0;
+	}
 }
 	
 //cout how much memory will use, then allocate it
 MemoryManager::MemoryManager(const BettingTree &bettingtree, const CardMachine &cardmachine)
-	: cardmach(cardmachine),
-	tree(bettingtree),
-	data( boost::extents[3][boost::multi_array_types::extent_range(2,10)] ),
-	mastercompactflag( false )
+	: cardmach( cardmachine ), tree( bettingtree ),
+	pflopdata( boost::extents[boost::multi_array_types::extent_range(2,10)] ),
+	flopdata( boost::extents[boost::multi_array_types::extent_range(2,10)] ),
+	turndata( boost::extents[boost::multi_array_types::extent_range(2,10)] ),
+	riverdata_oldmethod( boost::extents[boost::multi_array_types::extent_range(2,10)] ),
+	riverdata( NULL ), mastercompactflag( false )
 {
 	//print out space requirements, then pause
 
-	cout << "floating point type FWorking_type is " << FWORKING_TYPENAME << " and uses " << sizeof(FWorking_type) << " bytes." << endl;
+	for(unsigned i=0; i<sizeof(TYPENAMES)/sizeof(TYPENAMES[0]); i++)
+		cout << "floating point type " << TYPENAMES[i][0] << " is " << TYPENAMES[i][1] << "." << endl;
 
 	int64 totalbytes = 0;
 	int64 riverbytes = 0;
@@ -887,50 +994,56 @@ MemoryManager::MemoryManager(const BettingTree &bettingtree, const CardMachine &
 		totalbytes += cardmach.getparams().filesize[gr];
 	}
 
-	cout << "CardsiContainers use " << sizeof(CardsiContainer) << " bytes each for total of " << space(cardmach.getcardsimax(3)*sizeof(CardsiContainer)) << endl;
-	totalbytes += cardmach.getcardsimax(3)*sizeof(CardsiContainer);
+	if(MEMORY_OVER_SPEED)
+	{
+		cout << "CardsiContainers use " << sizeof(CardsiContainer) << " bytes each for total of " << space(cardmach.getcardsimax(3)*sizeof(CardsiContainer)) << endl;
+		totalbytes += cardmach.getcardsimax(3)*sizeof(CardsiContainer);
 
-	cout << "Extra counts per node are " << EXTRA_CARDSI_BYTES_PER_NODE << " bytes amounting to " 
-		<< space(cardmach.getcardsimax(3)*(getactmax(3,2)+getactmax(3,3))*EXTRA_CARDSI_BYTES_PER_NODE) << " in the hugebuffer." << endl;
-	totalbytes += cardmach.getcardsimax(3)*(getactmax(3,2)+getactmax(3,3))*EXTRA_CARDSI_BYTES_PER_NODE;
+		cout << "Extra counts per node are " << EXTRA_CARDSI_BYTES_PER_NODE << " bytes amounting to " 
+			<< space(cardmach.getcardsimax(3)*(getactmax(3,2)+getactmax(3,3))*EXTRA_CARDSI_BYTES_PER_NODE) << " in the hugebuffer." << endl;
+		totalbytes += cardmach.getcardsimax(3)*(getactmax(3,2)+getactmax(3,3))*EXTRA_CARDSI_BYTES_PER_NODE;
 
-	cout << "River nodes use " << space(riverbytes) << " when fully allocated using datatype of size " << space(getsize(3,2)/(2*2)) << endl;
+		cout << "River nodes use " << space(riverbytes) << " when fully allocated using datatype of size " << space(getsize(3,2)/(2*2)) << endl;
+	}
 
 	cout << "total: " << space(totalbytes) << endl;
 
-	cout << endl << "How much memory (in GB) would you like? ";
-	double gigabytes;
-	cin >> gigabytes;
-	int64 nbytes = (int64)(gigabytes*1024.0*1024.0*1024.0) + 1;
-	nbytes = (nbytes >> 23) << 23; //round down to nearest 8 MB
-	cout << "Very well. I shall allocate " << nbytes << " bytes." << endl;
+	//allocate for river
 
-	cout << "allocating memory..." << endl;
+	if(MEMORY_OVER_SPEED)
+	{
+		cout << endl << "How much memory (in GB) would you like? ";
+		double gigabytes;
+		cin >> gigabytes;
+		int64 nbytes = (int64)(gigabytes*1024.0*1024.0*1024.0) + 1;
+		nbytes = (nbytes >> 23) << 23; //round down to nearest 8 MB
+		cout << "Very well. I shall allocate " << nbytes << " bytes." << endl;
 
-	//now allocate memory
+		for(int n=2; n<10; n++) riverdata_oldmethod[n] = NULL; //not initialized in constructor
+		hugebuffer = new HugeBuffer( nbytes ); //global, HugeBuffer must exist ant this set before CardiContainer's is created
+		memory = this; //global, must be set before CardiContainer constructor is run. (next line)
+		riverdata = new CardsiContainer[ cardmach.getcardsimax(3) ] ( );
+	}
+	else
+	{
+		for(int n=2; n<10; n++) riverdata_oldmethod[n] = getactmax(3,n) > 0 ? new DataContainer<RiverRegret_type>(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
+	}
 
-	//for river
-	hugebuffer = new HugeBuffer( nbytes ); //global
-	memory = this; //global, must be set before CardiContainer constructor is run. (next line)
-	riverdata = new CardsiContainer[ cardmach.getcardsimax(3) ] ( );
+	//allocate for preflop, flop, and turn.
 
-	//... for preflop, flop, turn...
-	for (int r=0; r<3; r++)
-		for(int n=2; n<10; n++)
-			data[r][n] = new DataContainer<FStore_type>(n, getactmax(r,n)*cardmach.getcardsimax(r));
+	for(int n=2; n<10; n++) pflopdata[n] = getactmax(0,n) > 0 ? new DataContainer<PFlopStore_type>(n, getactmax(0,n)*cardmach.getcardsimax(0)) : NULL;
+	for(int n=2; n<10; n++) flopdata[n] = getactmax(1,n) > 0 ? new DataContainer<FlopStore_type>(n, getactmax(1,n)*cardmach.getcardsimax(1)) : NULL;
+	for(int n=2; n<10; n++) turndata[n] = getactmax(2,n) > 0 ? new DataContainer<TurnStore_type>(n, getactmax(2,n)*cardmach.getcardsimax(2)) : NULL;
 }
 
 MemoryManager::~MemoryManager()
 {
-	for (int r=0; r<3; r++)
-		for(int n=2; n<10; n++)
-			delete data[r][n];
-
-	if(riverdata != NULL)
-		delete[] riverdata;
-
-	if(hugebuffer != NULL)
-		delete hugebuffer;
+	for(int n=2; n<10; n++) if(pflopdata[n] != NULL) delete pflopdata[n];
+	for(int n=2; n<10; n++) if(flopdata[n] != NULL) delete flopdata[n];
+	for(int n=2; n<10; n++) if(turndata[n] != NULL) delete turndata[n];
+	for(int n=2; n<10; n++) if(riverdata_oldmethod[n] != NULL) delete riverdata_oldmethod[n];
+	if(riverdata != NULL) delete[] riverdata;
+	if(hugebuffer != NULL) delete hugebuffer;
 }
 
 void MemoryManager::savecounts(const string & filename)
@@ -956,7 +1069,8 @@ void MemoryManager::savecounts(const string & filename)
 
 int64 MemoryManager::save(const string &filename)
 {
-	savecounts(filename);
+	if(MEMORY_OVER_SPEED)
+		savecounts(filename);
 
 	cout << "Saving strategy data file..." << endl;
 
@@ -1001,10 +1115,12 @@ int64 MemoryManager::save(const string &filename)
 //provide access to HugeBuffer functions via public MemoryManager functions, these are used by Solver
 int64 MemoryManager::CompactMemory()
 {
-	return hugebuffer->CompactData();
+	if(MEMORY_OVER_SPEED) return hugebuffer->CompactData();
+	else return -1;
 }
 
 int64 MemoryManager::GetHugeBufferSize()
 {
-	return hugebuffer->GetSize();
+	if(MEMORY_OVER_SPEED) return hugebuffer->GetSize();
+	else return -1;
 }

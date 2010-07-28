@@ -34,6 +34,7 @@ public:
 
 	//my own strategy file reading implementation
 	void getprobs(int gr, int actioni, int numa, const vector<CardMask> &cards, vector<double> &probs);
+	void getprobs(int gr, int actioni, int numa, int cardsi, vector<double> &probs);
 
 	InFile& getstratfile() { return strategyfile; }
 

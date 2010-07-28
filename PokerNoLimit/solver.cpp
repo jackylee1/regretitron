@@ -145,8 +145,8 @@ void Solver::save(const string &filename, bool writedata)
 	//floating point data types
 
 	TiXmlElement * data = new TiXmlElement("data");
-	data->SetAttribute("FWorking_type", FWORKING_TYPENAME);
-	data->SetAttribute("FStore_type", FSTORE_TYPENAME);
+	for(unsigned i=0; i<sizeof(TYPENAMES)/sizeof(TYPENAMES[0]); i++)
+		data->SetAttribute(TYPENAMES[i][0], TYPENAMES[i][1]);
 
 	//solve parameters
 
@@ -228,8 +228,8 @@ Solver solvers[NUM_THREADS]; //global so threadlooptrace can work
 //function called by main()
 tuple<
 	double, //time taken
-	double, //cumulative seconds compacting
 	double, //seconds compacting this cycle
+	double, //cumulative seconds compacting
 	int64, //number of compactings this cycle
 	int64, //bytes used
 	int64 //total bytes available
@@ -239,7 +239,7 @@ Solver::solve(int64 iter)
 	double starttime = getdoubletime();
 	double secondscompactingstarted = secondscompacting;
 	int64 ncompactingsstarted = numbercompactings;
-	total += iter; 
+	total += iter - N_LOOKAHEAD; 
 	iterations = iter - N_LOOKAHEAD;
 
 	//Solver solvers[NUM_THREADS];
@@ -259,14 +259,15 @@ Solver::solve(int64 iter)
 #endif
 
 	//do the last few unthreaded for consistency (to clear the queue)
+	total += N_LOOKAHEAD; 
 	iterations = N_LOOKAHEAD;
 	solvers[0].threadloop();
 
 	//return much useful data
 	return boost::make_tuple(
 			getdoubletime() - starttime,
-			secondscompacting,
 			secondscompacting - secondscompactingstarted,
+			secondscompacting,
 			numbercompactings - ncompactingsstarted,
 			memory->CompactMemory(),
 			memory->GetHugeBufferSize()
@@ -382,8 +383,6 @@ inline void Solver::ThreadDebug(string debugstring)
 
 void Solver::threadloop()
 {
-	fpu_fix_start(NULL);
-
 	list<iteration_data_t>::iterator my_data_it; //iterator pointing to my data I want to use
 
 	pthread_mutex_lock(&threaddatalock);
@@ -420,6 +419,7 @@ void Solver::threadloop()
 			iterations--;
 
 			ThreadDebug("....doing iteration cardsi "+tostring(cardsi[0][0])+"/"+tostring(cardsi[0][1]));
+			if(WALKERDEBUG) cout << "ITERATION: " << total-iterations << endl << endl;
 			pthread_mutex_unlock(&threaddatalock);
 			pthread_cond_signal(&signaler); //I found data, maybe you can too!
 
@@ -459,8 +459,6 @@ void Solver::threadloop()
 
 void Solver::threadloop()
 {
-	fpu_fix_start(NULL);
-
 	while(iterations!=0) //each loop does one iteration or compacts or sleeps
 	{
 		if(memory->GetMasterCompactFlag())
@@ -471,6 +469,7 @@ void Solver::threadloop()
 		{
 			cardmachine->getnewgame(cardsi, twoprob0wins);
 			iterations--;
+			if(WALKERDEBUG) cout << "ITERATION: " << total-iterations << endl << endl;
 			walker(PREFLOP,0,treeroot,1,1);
 		}
 	}
@@ -478,31 +477,67 @@ void Solver::threadloop()
 
 #endif  /*DO_THREADS*/
 
-inline tuple<FWorking_type, FWorking_type> utiltuple(int p0utility)
+inline tuple<Working_type, Working_type> utiltuple(int p0utility)
 {
-	const FWorking_type aggression_multiplier = (FWorking_type)1 + (FWorking_type)AGGRESSION_FACTOR/100;
+	const Working_type aggression_multiplier = (Working_type)1 + (Working_type)AGGRESSION_FACTOR/100.0;
 
 	if(p0utility>0)
-		return tuple<FWorking_type,FWorking_type>( aggression_multiplier * (FWorking_type)rake(p0utility), -(FWorking_type)p0utility);
+		return tuple<Working_type,Working_type>( aggression_multiplier * (Working_type)rake(p0utility), -(Working_type)p0utility);
 	else
-		return tuple<FWorking_type,FWorking_type>( (FWorking_type)p0utility, aggression_multiplier * (FWorking_type)rake(-p0utility));
+		return tuple<Working_type,Working_type>( (Working_type)p0utility, aggression_multiplier * (Working_type)rake(-p0utility));
 }
 
-tuple<FWorking_type,FWorking_type> Solver::walker(const int gr, const int pot, const Vertex node, const FWorking_type prob0, const FWorking_type prob1)
+struct NodeData
+{
+	int gr;
+	int numa;
+	int actioni;
+	int cardsi;
+	inline bool operator == (const NodeData & nd) const { return gr == nd.gr && numa == nd.numa && actioni == nd.actioni && cardsi == nd.cardsi; }
+};
+bool isdebugnode(int gr, int numa, int actioni, int cardsi)
+{
+	const NodeData gooddata[] = {
+		{ 3, 2, 1925, 624 },
+		{ 3, 2, 1924, 624 },
+		{ 2, 2, 214, 124 },
+		{ 2, 3, 320, 124 },
+		{ 2, 3, 319, 124 },
+		{ 2, 3, 318, 124 },
+		{ 2, 2, 213, 124 },
+		{ 2, 2, 212, 124 },
+		{ 1, 2, 23, 24 },
+		{ 1, 3, 35, 24 },
+		{ 1, 3, 34, 24 },
+		{ 1, 3, 33, 24 },
+		{ 1, 2, 20, 24 },
+		{ 0, 3, 4, 4 },
+		{ 0, 3, 3, 4 },
+		{ 0, 3, 0, 4 }};
+	const NodeData mydata = { gr, numa, actioni, cardsi };
+	for(unsigned i=0; i<sizeof(gooddata)/sizeof(NodeData); i++)
+		if(gooddata[i] == mydata)
+			return true;
+	return false;
+}
+
+
+tuple<Working_type,Working_type> Solver::walker(const int gr, const int pot, const Vertex node, const Working_type prob0, const Working_type prob1)
 {
 	const int numa = out_degree(node, *tree);
 	const int playeri = playerindex((*tree)[node].type);
 
 	//read stratt from the data store. 
 
-	FWorking_type stratt[MAX_ACTIONS_SOLVER];
+	Working_type stratt[MAX_ACTIONS_SOLVER];
 	memory->readstratt( stratt, gr, numa, (*tree)[node].actioni, cardsi[gr][playeri] );
 
 	//debug printing
 
-	if(WALKERDEBUG)
+	if(WALKERDEBUG && isdebugnode(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri]) )
 	{
-		cout << "Starting Gameround: " << gr << /*" Pot: " << pot <<*/ " Actioni: " << (*tree)[node].actioni << " Cardsi: " << cardsi[gr][playeri] << endl;
+		cout << "Starting Gameround: " << gr << /*" Pot: " << pot <<*/ " Actioni: " << (*tree)[node].actioni << " Cardsi: " << cardsi[gr][playeri]
+			<< " Player(0/1): P" << playeri << endl;
 		cout << "Prob0: " << prob0 << " Prob1: " << prob1 << " Stratt[]: { ";
 		for(int i=0; i<numa; i++) cout << stratt[i] << " ";
 		cout << "}" << endl << endl;
@@ -510,14 +545,14 @@ tuple<FWorking_type,FWorking_type> Solver::walker(const int gr, const int pot, c
 
 	//recursively find utility of each action
 
-	tuple<FWorking_type,FWorking_type> utility[MAX_ACTIONS_SOLVER];
-	tuple<FWorking_type,FWorking_type> avgutility(0,0);
+	tuple<Working_type,Working_type> utility[MAX_ACTIONS_SOLVER];
+	tuple<Working_type,Working_type> avgutility(0,0);
 
 	EIter e, elast;
 	int i=0;
 	for(tie(e, elast) = out_edges(node, *tree); e!=elast; e++, i++)
 	{
-		if(stratt[i]==0.0 && (((*tree)[node].type==P0Plays && prob1==0.0) || ((*tree)[node].type==P1Plays && prob0==0.0)) )
+		if( stratt[i]==0.0 && (((*tree)[node].type==P0Plays && prob1==0.0) || ((*tree)[node].type==P1Plays && prob0==0.0)) )
 			continue; //utility will be unused, children's regret will be unaffected
 
 		switch((*tree)[*e].type)
@@ -556,9 +591,10 @@ tuple<FWorking_type,FWorking_type> Solver::walker(const int gr, const int pot, c
 
 	//debug printing
 
-	if(WALKERDEBUG)
+	if(WALKERDEBUG && isdebugnode(gr, numa, (*tree)[node].actioni, cardsi[gr][playeri]) )
 	{
-		cout << "Ending Gameround: " << gr << /*" Pot: " << pot <<*/ " Actioni: " << (*tree)[node].actioni << " Cardsi: " << cardsi[gr][playeri] << endl;
+		cout << "Ending Gameround: " << gr << /*" Pot: " << pot <<*/ " Actioni: " << (*tree)[node].actioni << " Cardsi: " << cardsi[gr][playeri]
+			<< " Player(0/1): P" << playeri << endl;
 		cout << "Utility[].get<0>(): { ";
 		for(int i=0; i<numa; i++) cout << utility[i].get<0>() << " ";
 		cout << "} Utility[].get<1>(): { ";

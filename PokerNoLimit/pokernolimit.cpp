@@ -57,15 +57,15 @@ void simulate(int64 iter)
 {
 	static double prevrate=-1;
 	cout << endl << "At " << timestring(time(NULL)) << ": doing " << iterstring(iter) << " iterations to make total of "
-	   << Solver::gettotal() + iter << " ... ";
-	if(prevrate > 0) cout << "expect to finish at " << timestring(time(NULL)+iter/prevrate) << " ... ";
+	   << iterstring(Solver::gettotal() + iter) << " ... " << flush;
+	if(prevrate > 0) cout << "expect to finish at " << timestring(time(NULL)+iter/prevrate) << " ... " << flush;
 
 	double timetaken, compactthistime, compacttotal; //seconds
 	int64 ncompactings, spaceused, spacetotal; //bytes, number
 	boost::tie(timetaken, compactthistime, compacttotal, ncompactings, spaceused, spacetotal) = Solver::solve(iter);
 	prevrate = iter / timetaken;
 
-	cout << "Took " << timeival(timetaken) << " (" << setprecision(4) << prevrate << " per second)" << endl
+	cout << "Took " << timeival(timetaken) << " (" << fixed << setprecision(1) << prevrate << " per second)" << endl
 		<< "Spent " << timeival(compactthistime) << " (" << 100.0*compactthistime/timetaken << "%) compacting " 
 		<< ncompactings << " times, using " << space(spaceused) << " of total " << space(spacetotal) << " allocated ("
 		<< 100.0*spaceused/spacetotal << "%), have spent total of " << timeival(compacttotal) << " ("
@@ -74,8 +74,6 @@ void simulate(int64 iter)
 
 int main(int argc, char* argv[])
 {
-	fpu_fix_start(NULL);
-
 	turnloggingon("cout");
 
 	cout << "Save file: " << SAVENAME << endl;
@@ -84,6 +82,7 @@ int main(int argc, char* argv[])
 
 	//do TESTING_AMT and then STARTING_AMT iterations
 
+	int64 plateau_counter = 0;
 	int64 current_iter_amount=STARTING_AMT;
 	simulate(TESTING_AMT);
 	simulate(current_iter_amount-TESTING_AMT);
@@ -102,7 +101,12 @@ int main(int argc, char* argv[])
 
 		//update the current iteration amount and do more iterations
 
-		current_iter_amount *= MULTIPLIER;
+		if(++plateau_counter == PLATEAU_AMT)
+		{
+			current_iter_amount *= MULTIPLIER;
+			plateau_counter = 1; //1 for the previous iterations done at lower scale
+		}
+
 		simulate(current_iter_amount);
 	}
 

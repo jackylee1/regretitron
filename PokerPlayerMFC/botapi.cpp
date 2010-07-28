@@ -54,7 +54,7 @@ BotAPI::BotAPI(string xmlfile, string botname, bool preload)
 		{
 			//check version
 			if(!root->HasAttribute("version") || root->GetAttribute<int>("version") != PORTFOLIO_VERSION)
-				REPORT("Unsupported portfolio XML file (older/newer version).");
+				REPORT("Unsupported portfolio XML file (older/newer version).",KNOWN);
 
 			//set working directory to portfolio directory
 			string newdirectory = xmlfile.substr(0,xmlfile.find_last_of("/\\"));
@@ -67,12 +67,12 @@ BotAPI::BotAPI(string xmlfile, string botname, bool preload)
 				mystrats.push_back(new Strategy(child->GetText(), preload));
 
 			if(root->GetAttribute<unsigned>("size") != mystrats.size())
-				REPORT("Portfolio only had "+tostring(mystrats.size())+" bots!");
+				REPORT("Portfolio only had "+tostring(mystrats.size())+" bots!",KNOWN);
 		}
 	}
 	catch(Exception &ex) //error parsing XML
 	{
-		REPORT(ex.what());
+		REPORT(ex.what(),KNOWN);
 	}
 
 	//restore directory
