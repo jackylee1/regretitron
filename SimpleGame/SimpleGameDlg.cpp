@@ -4,6 +4,7 @@
 #include "XSleep.h"
 #include "UserInput.h"
 #include <sstream>
+using std::istringstream;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -167,7 +168,11 @@ BOOL CSimpleGameDlg::OnInitDialog()
 
 	//set logging on/off
 
-	turnloggingon("cout");
+	string logfilename;
+	if(getuserinput("Enter filename for logfile: (click cancel for console window) ", logfilename))
+		turnloggingon(logfilename+".txt");
+	else
+		turnloggingon("cout");
 
 	//make a menu!
 	//"Create a CMenu object on the stack frame as a local, then call CMenu's 
@@ -193,6 +198,22 @@ BOOL CSimpleGameDlg::OnInitDialog()
 
 	OpenBotButton.LoadBitmaps(IDB_OPEN1, IDB_OPEN1, IDB_OPEN1, IDB_OPEN2);
 	OpenBotButton.SizeToContent();
+
+	unsigned gametype;
+	while(!getuserinput("Choices:\n"
+		"   Enter \"1\" to start a new Tournament (Full Tilt style, 2 person heads-up sit-n-go)\n"
+		"   Enter \"2\" to start a Cash Game at default bankroll\n"
+		"   Enter another number to set the starting bankroll for a "
+		+tostring(cashsblind*2)+"/"+tostring(cashbblind*2)+" Cash Game", gametype));
+	if(gametype == 1)
+		OnMenuNewTourney();
+	else if(gametype == 2)
+		OnMenuPlayCashGame();
+	else
+	{
+		botstacksize = humanstacksize = effstacksize = gametype;
+		OnMenuPlayCashGame();
+	}
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -537,9 +558,17 @@ void CSimpleGameDlg::dogameover(bool fold)
 
 	if(AutoNewGame.GetCheck())
 	{
-		//sleep less when there's folds. more when there's cards to look at!
-		XSleep((fold?2000:4000), this);
-		OnBnClickedButton5();
+		if(fpgreater(mymin(humanstacksize, botstacksize), 0))
+		{
+			//sleep less when there's folds. more when there's cards to look at!
+			XSleep((fold?2000:4000), this);
+			OnBnClickedButton5();
+		}
+		else
+		{
+			AutoNewGame.SetCheck(BST_UNCHECKED);
+			graygameover();
+		}
 	}
 	else
 		graygameover();
@@ -736,8 +765,7 @@ void CSimpleGameDlg::OnBnClickedButton5()
 {
 	if(fpequal(0, mymin(humanstacksize, botstacksize)))
 	{
-		//stop infinite loop
-		AutoNewGame.SetCheck(BST_UNCHECKED);
+		REPORT("no money left, use bankroll options on menu.", INFO);
 		return;
 	}
 	else if(fpgreater(0, mymin(humanstacksize, botstacksize)))
@@ -888,6 +916,7 @@ void CSimpleGameDlg::OnMenuNewTourney()
 	//set starting stacks for a tourney
 	humanstacksize = 1500;
 	botstacksize = 1500;
+	effstacksize = 1500;
 	istournament = true;
 	handsplayedtourney = 0;
 	MyMenu.CheckMenuItem(ID_MENU_NEWTOURNEY, MF_CHECKED);
@@ -935,7 +964,7 @@ void CSimpleGameDlg::OnMenuSetAllBankroll()
 }
 
 void CSimpleGameDlg::OnLoadbotfile()
-{ loadbotfile(); /*now start new game*/ OnBnClickedButton5(); } 
+{ if(loadbotfile()) /*then start new game*/ OnBnClickedButton5(); } 
 void CSimpleGameDlg::OnShowbotfile()
 { REPORT(_mybot->getxmlfile(),INFO); } 
 void CSimpleGameDlg::OnMenuExit()

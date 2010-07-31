@@ -482,7 +482,7 @@ int getindex2N(const vector<CardMask> &cards, int maxround)
 {
 	CardMask board;
 	CardMask_RESET(board);
-	if((maxround = std::min((int)cards.size()-1, maxround)) == PREFLOP)
+	if((maxround = mymin<int>((int)cards.size()-1, maxround)) == PREFLOP)
 		return getindex2(cards[PREFLOP]);
 	else
 	{
