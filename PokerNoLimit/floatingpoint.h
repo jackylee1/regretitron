@@ -11,7 +11,7 @@
 //adapted to use uint64 instead of 2 uint32's
 union my_ieee754_double
 {
-	double d;
+	double f; //f to match the float one to use the included file polymorphically
 
 	/* This is the IEEE 754 double-precision format.  */
 	struct
@@ -30,20 +30,35 @@ union my_ieee754_double
 	} ieee;
 };
 
-const int SUPER_MANTBITS = 52; //number of bits in the mantissa of the "SUPER" type, here double.
+const int SUPER_MANTBITS_DOUBLE = 52; //number of bits in the mantissa of the "SUPER" type, here double.
+const int SUPER_MANTBITS_FLOAT = 23; //number of bits in the mantissa of the "SUPER" type, here float.
 
 // I use the same header to generate the two classes. No better way to remove that bit from the representation.
 // We're going for the bits!
 
-#define SIGNED 12345
-#define UNSIGNED 67890
+#define SIGNED 12
+#define UNSIGNED 34
+#define FLOAT 56
+#define DOUBLE 78
+#define MASTERTYPE FLOAT
 #define SIGNEDNESS SIGNED
 #include "floatingpoint_internal.h"
 #undef SIGNEDNESS
 #define SIGNEDNESS UNSIGNED
 #include "floatingpoint_internal.h"
 #undef SIGNEDNESS
+#undef MASTERTYPE
+#define MASTERTYPE DOUBLE
+#define SIGNEDNESS SIGNED
+#include "floatingpoint_internal.h"
+#undef SIGNEDNESS
+#define SIGNEDNESS UNSIGNED
+#include "floatingpoint_internal.h"
+#undef SIGNEDNESS
+#undef MASTERTYPE
 #undef SIGNED
 #undef UNSIGNED
+#undef FLOAT
+#undef DOUBLE
 
 #endif

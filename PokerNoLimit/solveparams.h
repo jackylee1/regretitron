@@ -7,61 +7,38 @@
 #include "../PokerLibrary/binstorage.h" //to determine bin filesize
 #include "../utility.h" // for TOSTRING()
 #include <boost/preprocessor.hpp>
-//CMD_LINE_VAR = 
-// 2 - __float128
-// 3 - __float80
-// 4 - double
-// 5 - float
-// 6 - Half
-// 7 - Byte
-// 8 - Bit
-
-#if CMD_LINE_VAR == 2
-#define MYTYPE __float128
-#elif CMD_LINE_VAR == 3
-#define MYTYPE __float80
-#elif CMD_LINE_VAR == 4
-#define MYTYPE double
-#elif CMD_LINE_VAR == 5
-#define MYTYPE float
-#elif CMD_LINE_VAR == 6
-#define MYTYPE Half
-class Half
-{
-#error no class
-};
-#elif CMD_LINE_VAR == 7
-#define MYTYPE Bytes
-class Bytes
-{
-#error no class
-};
-#elif CMD_LINE_VAR == 8
-#define MYTYPE Bits
-class Bits
-{
-#error no class
-};
-#else
-#error "define CMD_LINE_VAR for type usage"
-#endif
+#include "floatingpoint.h"
+const int64 THOUSAND = 1000;
+const int64 MILLION = 1000000;
+const int64 BILLION = THOUSAND*MILLION;
 
 //settings for the settings - metasettings
+/*
+#if CMD_LINE_VAR == 5
+#define mysp_millions_iter 100
+#elif CMD_LINE_VAR == 6
+#define mysp_millions_iter 225
+#elif CMD_LINE_VAR == 8
+#define mysp_millions_iter 750
+#elif CMD_LINE_VAR == 10
+#define mysp_millions_iter 2000
+#elif CMD_LINE_VAR == 12
+#define mysp_millions_iter 4000
+#else
+#define mysp_millions_iter -1
+#endif
+*/
+
 const int PFBIN = 5;
 const int FBIN = 5;
 const int TBIN = 5;
 const int RBIN = 5;
 const bool USE_FLOPALYZER = false;
 const int64 mysp_millions_iter = 100;
-//end metasettings
-
-const int64 THOUSAND = 1000;
-const int64 MILLION = 1000000;
-const int64 BILLION = THOUSAND*MILLION;
 
 //main settings
-const int64 TESTING_AMT = 1; //do this many iterations as a test for speed
-const int64 STARTING_AMT = 10; //do this many iterations, then...
+const int64 TESTING_AMT = 10; //do this many iterations as a test for speed
+const int64 STARTING_AMT = mysp_millions_iter*MILLION; //do this many iterations, then...
 const int64 PLATEAU_AMT = 10; //do starting_amt this many times, then multiply by multiplier, then do that amt this many times, then....
 const double MULTIPLIER = 10; //multiply by this amount, do that many, repeat ....
 const int64 SAVEAFTER = 0; // save xml after this amount
@@ -69,18 +46,34 @@ const bool SAVESTRAT = true; //save strategy file when saving xml
 const int64 STOPAFTER = mysp_millions_iter*MILLION; //stop after (at least) this amount of iterations
 
 //solver settings
-#define SOLVER_TYPES (6, ( \
-( Working_type, MYTYPE ), \
-( PFlopStore_type, MYTYPE ), \
-( FlopStore_type, MYTYPE ), \
-( TurnStore_type, MYTYPE ), \
-( RiverStratn_type, MYTYPE ), \
-( RiverRegret_type, MYTYPE )))
-const string SAVENAME = tostring(PFBIN)+"bin-precision-f80randseed3";
-const bool MEMORY_OVER_SPEED = false; //must be true for __float128 to work due to alignment issues
+/* Note FloatCustom ranges: can usually use 5 or 6
+   expbits = 4, 512
+   expbits = 5, 131072
+   expbits = 6, 8.6e9
+   expbits = 7, 3.7e19
+   *******/
+
+typedef FloatCustomUnsigned< uint16, 6, true > FloatCustomUnsigned_uint16_6_true;
+typedef FloatCustomSigned< uint8, 5, true > FloatCustomSigned_uint8_5_true;
+typedef FloatCustomSigned< uint16, 5, true > FloatCustomSigned_uint16_5_true;
+#define SOLVER_TYPES (9, ( \
+( Working_type, float ), \
+( PFlopStratn_type, double ), \
+( FlopStratn_type, double ), \
+( TurnStratn_type, double ), \
+( RiverStratn_type, float ), \
+( PFlopRegret_type, float ), \
+( FlopRegret_type, float ), \
+( TurnRegret_type, float ), \
+( RiverRegret_type, float )))
+const string SAVENAME = tostring( PFBIN ) + "bin-aggression" + tostring( CMD_LINE_VAR );
+#define SEPARATE_STRATN_REGRET 1
+#define DYNAMIC_ALLOC_STRATN 0 /*must be false for __float128 to work due to alignment issues*/
+#define DYNAMIC_ALLOC_REGRET 0 /*must be false for __float128 to work due to alignment issues*/
+#define DYNAMIC_ALLOC_COUNTS 0
 #define NUM_THREADS 1
-#define N_LOOK 3 //affects threading performance
-const double AGGRESSION_FACTOR = 0; //0 = "calm old man", 7 = "crazed, cocaine-driven maniac with an ax"
+#define N_LOOK 5 //affects threading performance
+const double AGGRESSION_FACTOR = CMD_LINE_VAR; //0 = "calm old man", 7 = "crazed, cocaine-driven maniac with an ax"
 const bool SEED_RAND = false;
 const int  SEED_WITH = 3;
 const bool THREADLOOPTRACE = false; //prints out debugging
@@ -272,18 +265,25 @@ const int N_LOOKAHEAD = N_LOOK;
 #define NUM_THREADS 1
 const int N_LOOKAHEAD = 0;
 #endif
+#undef N_LOOK
 
 //tuples are ( name, type ), otherwise this is COMPLETE MAGIC
 #define TYPEDEF( tuple ) typedef BOOST_PP_TUPLE_ELEM(2,1,tuple) BOOST_PP_TUPLE_ELEM(2,0,tuple);
-#define ARRAYELEM( tuple ) { BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2,0,tuple)), BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2,1,tuple)) }
+#define ARRAYELEM_TN( tuple ) { BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2,0,tuple)), BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2,1,tuple)) }
+#define ARRAYELEM_TS( tuple ) sizeof( BOOST_PP_TUPLE_ELEM(2,0,tuple) )
 #define MACROTD(r, state) TYPEDEF(BOOST_PP_ARRAY_ELEM( BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_TUPLE_ELEM(2,1,state)))
-#define MACROARR(r, state) ARRAYELEM(BOOST_PP_ARRAY_ELEM( BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_TUPLE_ELEM(2,1,state))) \
+#define MACROARR_TN(r, state) ARRAYELEM_TN(BOOST_PP_ARRAY_ELEM( BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_TUPLE_ELEM(2,1,state))) \
+	BOOST_PP_IIF( BOOST_PP_EQUAL( BOOST_PP_INC(BOOST_PP_TUPLE_ELEM(2,0,state)), BOOST_PP_ARRAY_SIZE( BOOST_PP_TUPLE_ELEM(2,1,state))), \
+	BOOST_PP_EMPTY, BOOST_PP_COMMA )()
+#define MACROARR_TS(r, state) ARRAYELEM_TS(BOOST_PP_ARRAY_ELEM( BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_TUPLE_ELEM(2,1,state))) \
 	BOOST_PP_IIF( BOOST_PP_EQUAL( BOOST_PP_INC(BOOST_PP_TUPLE_ELEM(2,0,state)), BOOST_PP_ARRAY_SIZE( BOOST_PP_TUPLE_ELEM(2,1,state))), \
 	BOOST_PP_EMPTY, BOOST_PP_COMMA )()
 #define PRED(r, state) BOOST_PP_NOT_EQUAL(BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_ARRAY_SIZE(BOOST_PP_TUPLE_ELEM(2,1,state)))
 #define OP(r, state) (BOOST_PP_INC(BOOST_PP_TUPLE_ELEM(2,0,state)), BOOST_PP_TUPLE_ELEM(2,1,state))
 BOOST_PP_FOR( (0, SOLVER_TYPES), PRED, OP, MACROTD) //defines all my typedefs
-const char* const TYPENAMES[][2] = { BOOST_PP_FOR( (0, SOLVER_TYPES), PRED, OP, MACROARR) }; //defines key, value strings
+const char* const TYPENAMES[][2] = { BOOST_PP_FOR( (0, SOLVER_TYPES), PRED, OP, MACROARR_TN) }; //defines key, value strings
+const int TYPESIZES[] = { BOOST_PP_FOR( ( 0, SOLVER_TYPES ), PRED, OP, MACROARR_TS ) }; //an array of sizes
+#include "floatingpoint.h"
 #undef TYPEDEF
 #undef ARRAYELEM
 #undef MACROTD
