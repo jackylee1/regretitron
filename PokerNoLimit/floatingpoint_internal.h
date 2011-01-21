@@ -1,30 +1,11 @@
 
-#if SIGNEDNESS == SIGNED && MASTERTYPE == FLOAT
+#if SIGNEDNESS == SIGNED
 #define USE_SIGN_BIT
 #define ClassName FloatCustomSigned
-#elif SIGNEDNESS == UNSIGNED && MASTERTYPE == FLOAT
+#elif SIGNEDNESS == UNSIGNED
 #define ClassName FloatCustomUnsigned
-#elif SIGNEDNESS == SIGNED && MASTERTYPE == DOUBLE
-#define USE_SIGN_BIT
-#define ClassName DoubleCustomSigned
-#elif SIGNEDNESS == UNSIGNED && MASTERTYPE == DOUBLE
-#define ClassName DoubleCustomUnsigned
 #else
-#error __FILE__ " is only to be #included by a header that defines SIGNEDNESS to SIGNED or UNSIGNED and MASTERTYPE to FLOAT or DOUBLE. Try again."
-#endif
-
-#if MASTERTYPE == FLOAT
-#define SUPER_MANTBITS SUPER_MANTBITS_FLOAT
-#define MY_IEEE754 ieee754_float
-#define MASTERTYPE_BIAS IEEE754_FLOAT_BIAS
-#define MASTER_T float
-#elif MASTERTYPE == DOUBLE
-#define SUPER_MANTBITS SUPER_MANTBITS_DOUBLE
-#define MY_IEEE754 my_ieee754_double
-#define MASTERTYPE_BIAS IEEE754_DOUBLE_BIAS
-#define MASTER_T double
-#else
-#error
+#error __FILE__ " is only to be #included by a header that defines SIGNEDNESS to SIGNED Or UNSIGNED. Try again."
 #endif
 
 template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR >
@@ -32,14 +13,14 @@ class ClassName
 {
 public:
 	ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR>( ) { Set( 0 ); }
-	ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR>( const MASTER_T init ) { Set( init ); }
-	inline ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR> & operator= ( const MASTER_T source ) { Set( source ); return *this; }
-	inline ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR> & operator+= ( const MASTER_T other ) { Set( Get() + other ); return *this; }
-	inline operator MASTER_T () const { return Get(); }
+	ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR>( const double init ) { Set( init ); }
+	inline ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR> & operator= ( const double source ) { Set( source ); return *this; }
+	inline ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR> & operator+= ( const double other ) { Set( Get() + other ); return *this; }
+	inline operator double () const { return Get(); }
 
 private:
-	void Set( const MASTER_T source );
-	MASTER_T Get( ) const;
+	void Set( const double source );
+	double Get( ) const;
 
 #ifdef USE_SIGN_BIT
 	static const int SIGNBITS = 1;
@@ -52,8 +33,6 @@ private:
 	static const INTTYPE EXPMAX = (EXPBIAS << 1) | 1;
 	static const INTTYPE MANTMAX = (INTTYPE)0xFFFFFFFFU >> ( 8*sizeof(INTTYPE) - MANTBITS );
 	static const uint64 TRUNCATEDMAX = ( 1ULL << TRUNCATEDBITS ); // truncated in in range [0..TRUNCATEDMAX)
-	static const MASTER_T DENORMALIZED_MULTIPLIER;
-	static MASTER_T calc_denorm_multiplier( );
 
 #ifdef USE_SIGN_BIT
 	INTTYPE negative : SIGNBITS;
@@ -72,46 +51,26 @@ private:
 	   BOOST_STATIC_ASSERT( RAND_MAX == 0x7FFFFFFF );
     ***/
 
-	BOOST_STATIC_ASSERT( 1 <= EXPBITS && EXPBITS <= 8 * sizeof( MASTER_T ) - SUPER_MANTBITS - 1 ); //8 * sizeof( MASTER_T ) - SUPER_MANTBITS - 1 expbits in a MASTER_T
-	BOOST_STATIC_ASSERT( MASTERTYPE_BIAS >= EXPBIAS );
-	BOOST_STATIC_ASSERT( MASTERTYPE_BIAS >> ( 8 * sizeof( MASTER_T ) - SUPER_MANTBITS - 1 - EXPBITS ) == EXPBIAS );
+	BOOST_STATIC_ASSERT( 1 <= EXPBITS && EXPBITS <= 11 ); //11 expbits in a double
+	BOOST_STATIC_ASSERT( IEEE754_DOUBLE_BIAS >= EXPBIAS );
+	BOOST_STATIC_ASSERT( IEEE754_DOUBLE_BIAS >> ( 11-EXPBITS ) == EXPBIAS );
 	BOOST_STATIC_ASSERT( SIGNBITS + MANTBITS + EXPBITS == 8*sizeof( INTTYPE ) );
 } __attribute__((packed));
 
-//static non-integral members
-
 template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR > //rediculous templates
 uint64 ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::ran = ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::TRUNCATEDMAX / 4;
-template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR > // divide by 2^( -EXPBIAS + 1 ), multiply by 2^MANTBITS
-const MASTER_T ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::DENORMALIZED_MULTIPLIER = calc_denorm_multiplier( );
-template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR >
-MASTER_T ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::calc_denorm_multiplier( )
-{
-	MY_IEEE754 myf;
-	myf.ieee.negative = 0;
-	myf.ieee.mantissa = 0;
-	myf.ieee.exponent = MASTERTYPE_BIAS + MANTBITS + EXPBIAS - 1;
-#if MASTERTYPE == DOUBLE
-    if( myf.f != boost::math::pow< MANTBITS + EXPBIAS - 1, double >( 2.0 ) )
-#elif MASTERTYPE == FLOAT
-    if( myf.f != boost::math::pow< MANTBITS + EXPBIAS - 1, float >( 2.0F ) )
-#endif
-		REPORT( "Failure to initialize denormalized multiplier" );
-	return myf.f;
-}
 
-// conversion functions
-//  see summary table: http://steve.hollasch.net/cgindex/coding/ieeefloat.html
+// see summary table: http://steve.hollasch.net/cgindex/coding/ieeefloat.html
 
 template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR >
-void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source )
+void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const double source )
 {
-	MY_IEEE754 myf;
-	myf.f = source;
+	my_ieee754_double myd;
+	myd.d = source;
 	INTTYPE m; // will temporarily hold the mantissa
 
 #ifdef USE_SIGN_BIT
-	negative = myf.ieee.negative;
+	negative = myd.ieee.negative;
 #else
 	if( source < 0 ) //rather not check negative due to -0
 		REPORT( "Setting a FloatCustomUnsigned to " + tostring( source ) );
@@ -119,15 +78,11 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 
 	if( isnan(source) || isinf(source) )
 		{ REPORT( "Detected a NAN or an INF (" + tostring(source) + ") while setting a FloatCustom" ); exit(-1); }
-	else if( (int)myf.ieee.exponent - (int)MASTERTYPE_BIAS > (int)EXPMAX - (int)EXPBIAS )
+	else if( (int)myd.ieee.exponent - (int)IEEE754_DOUBLE_BIAS > (int)EXPMAX - (int)EXPBIAS )
 	{   
 		//overflow: infinity
 
-		if( OVERFLOWISERROR 
-#ifdef USE_SIGN_BIT
-				&& ! negative //see other comment
-#endif
-				) //report an error
+		if( OVERFLOWISERROR ) //report an error
 			{ REPORT( "Your FloatCustom has overflowed, could not deal with " + tostring( source ) ); exit(-1); }
 		else //just do the best we can
 		{
@@ -135,18 +90,18 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 			m = MANTMAX;
 		}
 	}
-	else if( (int)myf.ieee.exponent - (int)MASTERTYPE_BIAS <= (int)0 - (int)EXPBIAS )
+	else if( (int)myd.ieee.exponent - (int)IEEE754_DOUBLE_BIAS <= (int)0 - (int)EXPBIAS )
 	{   
 		//my denormalized: use the mantissa to store the number on a scale from 0 to 2^( -EXPBIAS + 1 )
 
 		exponent = 0;
-		myf.ieee.negative = 0; //since I will be using the logical value of this thing forget about the sign bit
-		myf.f *= DENORMALIZED_MULTIPLIER; // divide by 2^( -EXPBIAS + 1 ), multiply by 2^MANTBITS
-		m = (INTTYPE) ( myf.f );
+		myd.ieee.negative = 0; //since I will be using the logical value of this thing forget about the sign bit
+		myd.d *= boost::math::pow< MANTBITS + EXPBIAS - 1, double >( 2.0 ); // divide by 2^( -EXPBIAS + 1 ), multiply by 2^MANTBITS
+		m = (INTTYPE) ( myd.d );
 
-		//myf.f - m is a number from 0 to 1
-		//cout << myf.f << ' ' << (int64)m << ' ' << myf.f - (int64)m << ' ';
-		if( 0.5 < ( myf.f - m ) * TRUNCATEDMAX - GetRand( ) )
+		//myd.d - m is a number from 0 to 1
+		//cout << myd.d << ' ' << (int64)m << ' ' << myd.d - (int64)m << ' ';
+		if( 0.5 < ( myd.d - m ) * TRUNCATEDMAX - GetRand( ) )
 			m++;
 
 		//cout << "encoding denormalized... " << source << " --> " << (int64)m << endl;
@@ -155,9 +110,9 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 	{   
 		//regular flow, loss of precision
 
-		exponent = (INTTYPE)( (int)myf.ieee.exponent - (int)MASTERTYPE_BIAS + (int)EXPBIAS );
-		m = myf.ieee.mantissa >> ( SUPER_MANTBITS - MANTBITS );
-		uint64 truncatedpart = myf.ieee.mantissa & ( 0xFFFFFFFFFFFFFFFFULL >> ( 64 - TRUNCATEDBITS ) );
+		exponent = (INTTYPE)( (int)myd.ieee.exponent - (int)IEEE754_DOUBLE_BIAS + (int)EXPBIAS );
+		m = myd.ieee.mantissa >> ( SUPER_MANTBITS - MANTBITS );
+		uint64 truncatedpart = myd.ieee.mantissa & ( 0xFFFFFFFFFFFFFFFFULL >> ( 64 - TRUNCATEDBITS ) );
 		/*******
 
 		  let's say 2 bits are being truncated.
@@ -165,7 +120,7 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 		  GetRand( ) would return numbers in the range 0..3
 		  truncatedpart would have the possible values 0..3
 
-		  |  0  |  1  |  2  |  3  |  0  |  1  |  2  |  3  | <-- truncatedpart and | are divisions between MASTER_T representations on the real number line
+		  |  0  |  1  |  2  |  3  |  0  |  1  |  2  |  3  | <-- truncatedpart and | are divisions between double representations on the real number line
 		  *************************************************** <-- real number line
              ^                       ^                      <-- position on the real number line of our FloatCustom representation
 
@@ -179,20 +134,12 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 	// I have stored the correct mantissa in m, but it may need to be adjusted for the case where it was rounded up
 
 	if( m > ( 1U << MANTBITS ) )
-		REPORT( "Error in MASTER_T conversion " + tostring(m) + " > " + tostring( 1U << MANTBITS ) + " for source=" + tostring( source ) );
+		REPORT( "Error in double conversion " + tostring(m) + " > " + tostring( 1U << MANTBITS ) + " for source=" + tostring( source ) );
 	else if( m == ( 1U << MANTBITS ) ) //rare case where we round the mantissa up and have to increase the exponent
 	{
 		if( exponent == EXPMAX )
 		{
-			if( OVERFLOWISERROR
-#ifdef USE_SIGN_BIT
-					// I do not want to throw an error on small subtractions from negative numbers. Signed numbers only are used for
-					// regrets, and the pattern for an action that is always bad is for it to just become more and more negative. 
-					// If I cap the negativeness, this does nothing because only positive regrets are used. The only danger is if 
-					// it later becomes positive due to a turn in the cards. I see this as unlikely, for decent number of EXPBITS
-			    && ! negative 
-#endif
-			  )
+			if( OVERFLOWISERROR )
 				{ REPORT( "Your FloatCustom has overflowed on adding a small number, could not deal with " + tostring( source ) ); exit(-1); }
 			else //exponent already at largest, just use mantissa all ones
 				mantissa = MANTMAX;
@@ -208,37 +155,33 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 }
 
 template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR >
-MASTER_T ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Get( ) const
+double ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Get( ) const
 {
-	MY_IEEE754 myf;
+	my_ieee754_double myd;
 
 	if( exponent == 0 )
 	{
 		// my number is denormalized, convert from denormalized
-		myf.f = mantissa;
-		myf.f /= DENORMALIZED_MULTIPLIER;
-		//cout << "decoding denormalized... " << (int64)mantissa << " --> " << myf.f << endl;
+		myd.d = mantissa;
+		myd.d /= boost::math::pow< MANTBITS + EXPBIAS - 1, double >( 2.0 );
+		//cout << "decoding denormalized... " << (int64)mantissa << " --> " << myd.d << endl;
 	}
 	else
 	{
 		// my number is regular
-		myf.ieee.exponent = (int)exponent - (int)EXPBIAS + (int)MASTERTYPE_BIAS;
-		myf.ieee.mantissa = ( (uint64)mantissa ) << TRUNCATEDBITS;
+		myd.ieee.exponent = (int)exponent - (int)EXPBIAS + (int)IEEE754_DOUBLE_BIAS;
+		myd.ieee.mantissa = ( (uint64)mantissa ) << TRUNCATEDBITS;
 	}
 
 #ifdef USE_SIGN_BIT
-	myf.ieee.negative = negative;
+	myd.ieee.negative = negative;
 #else
-	myf.ieee.negative = 0;
+	myd.ieee.negative = 0;
 #endif
-	return myf.f;
+	return myd.d;
 }
 
 #undef ClassName
-#undef SUPER_MANTBITS
-#undef MY_IEEE754
-#undef MASTERTYPE_BIAS
-#undef MASTER_T
 #ifdef USE_SIGN_BIT
 #undef USE_SIGN_BIT
 #endif
