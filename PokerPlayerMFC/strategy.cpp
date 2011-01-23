@@ -98,7 +98,7 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 				REPORT("cat strategy failed");
 		strategyfile.Open(strat->GetText(), strategyfilesize);
 	}
-	catch(Exception &ex)
+	catch(ticpp::Exception &ex)
 	{
 		REPORT(ex.what(),KNOWN);
 		exit(-1);

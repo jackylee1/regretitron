@@ -2,6 +2,7 @@
 #define __utility_h__
 
 #include <string>
+#include <string.h>
 #include <sstream>
 #include <vector>
 #include <poker_defs.h>
@@ -150,5 +151,39 @@ private:
 	int file;
 #endif
 };
+
+// My own exception class that accepts a string
+
+class Exception : public std::exception
+{
+	public:
+		Exception( const std::string & message ) throw( )
+		{
+			try
+			{
+#ifdef _WIN32
+				strncpy_s( m_message, BUFFSIZE, message.c_str( ), BUFFSIZE );
+#else
+				strncpy( m_message, message.c_str( ), BUFFSIZE );
+#endif
+				m_message[ BUFFSIZE - 1 ] = '\0';
+			}
+			catch( ... )
+			{
+#ifdef _WIN32
+				strcpy_s( m_message, BUFFSIZE, "String copy failed while making exception." );
+#else
+				strcpy( m_message, "String copy failed while making exception." );
+#endif
+
+			}
+		}
+		virtual const char * what( ) const throw( ) { return m_message; }
+		virtual ~Exception( ) throw ( ) { }
+	private:
+		static const int BUFFSIZE = 1024;
+		char m_message[ BUFFSIZE ];
+};
+
 
 #endif

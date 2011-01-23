@@ -70,7 +70,7 @@ BotAPI::BotAPI(string xmlfile, string botname, bool preload)
 				REPORT("Portfolio only had "+tostring(mystrats.size())+" bots!",KNOWN);
 		}
 	}
-	catch(Exception &ex) //error parsing XML
+	catch(ticpp::Exception &ex) //error parsing XML
 	{
 		REPORT(ex.what(),KNOWN);
 	}

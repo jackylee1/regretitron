@@ -146,7 +146,7 @@ void REPORT(string infomsg, report_t killswitch)
 		break;
 
 	case WARN: infomsg.insert(0, "Warning: "); break;
-	case INFO: infomsg.insert(0, "It turns out: "); break;
+	case INFO: break;
 	}
 
 	if(isloggingon() && mylogfile != &cout)
@@ -156,12 +156,12 @@ void REPORT(string infomsg, report_t killswitch)
 
 	if(killswitch == KILL)
 	{
-		dobreakpoint();
-		exit(-1);
+		// dobreakpoint();
+		throw Exception( infomsg );
 	}
 	else if(killswitch == KNOWN) //e.g. bin file not found, cannot continue, but not a bug
 	{
-		exit(1);
+		throw Exception( infomsg );
 	}
 }
 
