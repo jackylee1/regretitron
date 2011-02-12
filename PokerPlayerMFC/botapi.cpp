@@ -252,8 +252,8 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 
 	if(bot_status != WAITING_ACTION) REPORT("doaction called at wrong time " + tostr( bot_status ) );
 	if(!playerequal(pl, currstrat->gettree()[currentnode].type)) REPORT("doaction thought the other player should be acting");
-	if(fpgreatereq(actualpot+actualinv[1-pl],truestacksize) && fpgreatereq(actualpot+amount,truestacksize))
-		REPORT("You're sending me an action when you've already bet all-in'd.");
+	if( fpgreatereq( actualpot + actualinv[ pl ], truestacksize ) )
+		REPORT( "A player who was already all-in is now doing an action." );
 	if( pl == myplayer && ( a != lastchosenaction || ! fpequal( amount/multiplier, lastchosenamount ) ) )
 		REPORT( "Bot failed to get filled on its orders exactly." );
 
