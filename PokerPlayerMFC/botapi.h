@@ -26,7 +26,7 @@ class DiagnosticsPage; //forward declaration
 class BotAPI
 {
 public:
-	BotAPI(string xmlfile, string botname = "bot", bool preload = false);
+	BotAPI(string xmlfile, bool preload = false);
 	~BotAPI();
 
 	//control game progress
@@ -48,6 +48,12 @@ public:
 	//amount is the total amount of a wager when betting/raising (relative to the beginning of the round)
 	//          the amount aggreed upon when calling (same as above) or folding (not same as above)
 	Action getbotaction(double &amount);
+	//this version just returns more info (which can be used to make the action human readable)
+	Action getbotaction(double &amount, string & actionstr, int & level);
+
+	//these are for logging (possibly error checking) purposes
+	void endofgame( );  // for when cards are unknown
+	void endofgame( CardMask opponentcards ); //for when cards are known
 
 	//diagnostics
 #ifdef _MFC_VER
@@ -65,17 +71,16 @@ private:
 	BotAPI& operator=(const BotAPI& rhs);
 
 	//helperfunctions
+	void dofold(Player pl, double amount);
 	void docall(Player pl, double amount);
 	void dobet(Player pl, double amount);
 	void doallin(Player pl);
 	void processmyturn();
 	double mintotalwager();
+	void logendgame( bool iwin, const std::string & story );
 
 	//xml file
 	string myxmlfile;
-
-	//logging file
-	string myname;
 
 	//diagnostics window
 	DiagnosticsPage * MyWindow;
@@ -107,7 +112,11 @@ private:
 	int currentgr;
 	Vertex currentnode;
 	bool offtreebetallins; //when they bet and my tree doesn't have bets there
-	enum { INVALID, WAITING_ACTION, WAITING_ROUND } bot_status;
+	enum { INVALID, WAITING_ACTION, WAITING_ROUND, WAITING_ENDOFGAME } bot_status;
+
+	//for error checking and logging
+	Action lastchosenaction;
+	double lastchosenamount;
 };
 
 #endif

@@ -10,8 +10,8 @@ const int RIVER = 3;
 
 enum Player
 {
-	P0 = 0,//first to act post-flop
-	P1 = 1 //first to act pre-flop
+	P0 = 0,//first to act post-flop, has the big blind
+	P1 = 1 //first to act pre-flop, has the small blind, has the dealer button
 };
 
 const int MAX_ACTIONS = 9;

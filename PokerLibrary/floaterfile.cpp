@@ -27,7 +27,7 @@ FloaterFile::FloaterFile(string filename, const int64 n_floaters, const bool pre
 	if(!file_exists(filename))
 	{
 		broken = true;
-		REPORT(filename + " doesn't exist.", WARN);
+		logger( "The Floater file " + filename + " doesn't exist." );
 		return;
 	}
 

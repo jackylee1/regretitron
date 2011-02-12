@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sstream>
 #include <vector>
+#include <fstream>
 #include <poker_defs.h>
 #ifdef _MSC_VER
 #include <windows.h>
@@ -33,10 +34,49 @@ extern MTRand playoff_rand;
 
 // universal logging
 
-extern void turnloggingon(std::string what);
-extern void turnloggingoff();
-extern std::ostream& getlog();
-extern bool isloggingon();
+class LoggerClass
+{
+public:
+	virtual void operator( )( const std::string & message ) = 0;
+};
+
+extern LoggerClass & logger; // reference to a concrete logger class, all defined in some other (top-level) file.
+
+class NullLogger : public LoggerClass
+{
+public:
+	virtual void operator( )( const std::string & message ) { }
+};
+
+class ConsoleLogger : public LoggerClass
+{
+public:
+	ConsoleLogger( );
+	~ConsoleLogger( );
+	virtual void operator( )( const std::string & message );
+private:
+#ifdef _WIN32
+	std::ofstream * console;
+#endif
+};
+
+class FileLogger : public LoggerClass
+{
+public:
+	FileLogger( const std::string & filename, bool append );
+	~FileLogger( );
+	virtual void operator( )( const std::string & message );
+private:
+	std::ofstream file;
+};
+
+// Delete function
+
+template < typename T > inline void Delete( T * & something )
+{
+	delete something;
+	something = NULL;
+}
 
 // how to get a 64 bit integer type
 
@@ -58,11 +98,11 @@ typedef uint8_t uint8;
 //functions defined in the cpp file
 
 extern double getdoubletime(); //returns time since some (any) refence in seconds
-enum report_t{ KNOWN, KILL, WARN, INFO };
+enum report_t{ KNOWN, KILL };
 extern void REPORT(std::string infomsg, report_t killswitch = KILL);
 extern void checkdataformat(); //performs the magic numbers test
-template <typename T> 
-extern std::string tostring(const T &myobj);
+#define tostr tostring
+extern std::string tostr2(double money);
 extern std::string tostring(CardMask cards);
 extern std::string tostring(const std::vector<CardMask> &cards);
 extern std::string gameroundstring(int gr);

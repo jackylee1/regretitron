@@ -17,58 +17,70 @@ MTRand playoff_rand(PLAYOFFDEBUG);
 
 // universal logging
 
-bool mylogindicator = false;
-ostream * mylogfile = NULL;
-#ifdef _MSC_VER
-bool killconsole = false;
+ConsoleLogger::ConsoleLogger( )
+{
+#ifdef _WIN32
+	AllocConsole();
+	console = new ofstream("CONOUT$");
 #endif
+}
 
-void turnloggingon(string what)
+ConsoleLogger::~ConsoleLogger( )
 {
-	if(!mylogindicator)
-	{
-		mylogindicator = true;
-		if(what == "cout")
-		{
-#ifdef _MSC_VER
-			AllocConsole();
-			killconsole = true;
-			mylogfile = new ofstream("CONOUT$");
+#ifdef _WIN32
+	delete console;
+	FreeConsole();
+#endif
+}
+
+void ConsoleLogger::operator( )( const string & message )
+{
+#ifdef _WIN32
+	*console << message << endl;
 #else
-			mylogfile = &cout;
+	cout << message << endl;
 #endif
-		}
-		else
-			mylogfile = new ofstream(what.c_str());
-	}
 }
-void turnloggingoff()
+
+
+FileLogger::FileLogger( const std::string & filename, bool append )
 {
-	if(mylogindicator)
-	{
-		mylogindicator = false;
-		if(mylogfile != &cout)
-			delete mylogfile;
-#ifdef _MSC_VER
-		if(killconsole)
-		{
-			killconsole = false;
-			FreeConsole();
-		}
-#endif
-	}
-}
-ostream& getlog()
-{
-	if(isloggingon())
-		return *mylogfile;
+	if( append )
+		file.open( filename.c_str( ), ios_base::out | ios_base::app | ios_base::ate );
 	else
-		REPORT("check for islogon() before using getlog()");
-	exit(-1);
+		file.open( filename.c_str( ), ios_base::out );
+
+	if( ! file.good( ) )
+		throw Exception( "Failed to open '" + filename + "' for logging." );
+
+	if( append && file.tellp( ) > 0)
+		file << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
+	file << "----------------------------------" << endl;
+
+	time_t rawtime;
+	struct tm * timeinfo;
+
+	time ( & rawtime );
+	timeinfo = localtime ( & rawtime );
+
+	file << "File opened for logging at " << asctime( timeinfo ) << endl << endl;
 }
-bool isloggingon() 
-{ 
-	return mylogindicator; 
+
+FileLogger::~FileLogger( )
+{
+	time_t rawtime;
+	struct tm * timeinfo;
+
+	time ( & rawtime );
+	timeinfo = localtime ( & rawtime );
+
+	file << "File closed for logging at " << asctime( timeinfo ) << endl;
+	file << "----------------------------------" << endl;
+}
+
+void FileLogger::operator( )( const string & message )
+{
+	file << message << endl;
 }
 
 // how to get seconds with milliseconds
@@ -132,37 +144,44 @@ inline string getbacktracestring()
 
 void REPORT(string infomsg, report_t killswitch)
 {
-	switch(killswitch)
-	{
-	case KNOWN: 
-		infomsg = "Problem: " + infomsg + "\n";
-		break;
+	throw Exception( infomsg );
 
-	case KILL: 
-		infomsg = "Error: " + infomsg + "\n";
-#ifdef __GNUC__
-		infomsg += getbacktracestring();
-#endif
-		break;
+//	switch(killswitch)
+//	{
+//	case KNOWN: 
+//		infomsg = "Problem: " + infomsg + "\n";
+//		break;
+//
+//	case KILL: 
+//		infomsg = "Error: " + infomsg + "\n";
+//#ifdef __GNUC__
+//		infomsg += getbacktracestring();
+//#endif
+//		break;
+//	}
+//
+//	//logger( "\n\nREPORTED:\n" + infomsg );
+//
+//    //notify(infomsg);
+//
+//	if(killswitch == KILL)
+//	{
+//		// dobreakpoint();
+//		throw Exception( infomsg );
+//	}
+//	else if(killswitch == KNOWN) //e.g. bin file not found, cannot continue, but not a bug
+//	{
+//		throw Exception( infomsg );
+//	}
+}
 
-	case WARN: infomsg.insert(0, "Warning: "); break;
-	case INFO: break;
-	}
+// two digit money strings
 
-	if(isloggingon() && mylogfile != &cout)
-		getlog() << endl << "REPORTED:" << endl << infomsg << endl << endl;
-
-    notify(infomsg);
-
-	if(killswitch == KILL)
-	{
-		// dobreakpoint();
-		throw Exception( infomsg );
-	}
-	else if(killswitch == KNOWN) //e.g. bin file not found, cannot continue, but not a bug
-	{
-		throw Exception( infomsg );
-	}
+string tostr2(double money)
+{
+	ostringstream o;
+	o << fixed << setprecision( 2 ) << money;
+	return o.str( );
 }
 
 // how to get a string corresponding to a CardMask

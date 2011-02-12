@@ -7,19 +7,22 @@
 #include "DiagnosticsPage.h" //to access radios for answer
 #include "../utility.h"
 #include <iomanip>
+#include <poker_defs.h>
+#include <inlines/eval.h>
 #ifndef TIXML_USE_TICPP
 #define TIXML_USE_TICPP
 #endif
 #include "../TinyXML++/ticpp.h"
+
+const bool debug = true;
 
 inline bool playerequal(Player player, NodeType nodetype)
 {
 	return ((player == P0 && nodetype == P0Plays) || (player == P1 && nodetype == P1Plays));
 }
 
-BotAPI::BotAPI(string xmlfile, string botname, bool preload)
+BotAPI::BotAPI(string xmlfile, bool preload)
    : myxmlfile(xmlfile),
-     myname(botname),
 	 MyWindow(NULL),
      isdiagnosticson(false),
 #if PLAYOFFDEBUG > 0
@@ -32,7 +35,9 @@ BotAPI::BotAPI(string xmlfile, string botname, bool preload)
 	 actualinv(2, -1), //size is 2, initial values are -1
 	 perceivedinv(2, -1), //size is 2, initial values are -1
 	 cards(), //size is 0, will be resized
-	 bot_status(INVALID)
+	 bot_status(INVALID),
+	 lastchosenaction( (Action)-1 ),
+	 lastchosenamount( -1 )
 { 
 	//check the xml file to see if it's a bot or a collection of bots
 
@@ -98,15 +103,6 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	if(playernum != P0 && playernum != P1)
 		REPORT("invalid myplayer number in BotAPI::setnewgame()");
 
-	//these stacksizes do not leave the bot with any choices in the game
-	//we set the status to INVALID, allowing this call, but any subsequent calls for this
-	//"game" will fail
-	if(fpgreatereq(sblind, stacksize) || (fpgreatereq(bblind, stacksize) && playernum == P0))
-	{
-		bot_status = INVALID;
-		return;
-	}
-
 	//find the strategy with the nearest stacksize
 	
 	double besterror = numeric_limits<double>::infinity();
@@ -134,18 +130,9 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 			currstrat = mystrats[i]; //pointer
 		}
 	}
-	if(besterror > 1e20)
+	if(besterror == numeric_limits<double>::infinity())
 	{
 		REPORT("Could find no suitable strategy to play with a stacksize of "+tostring(stacksize/bblind)+" bblinds in "+(islimit()?"limit.":"no-limit."));
-	}
-
-
-	if(isloggingon())
-	{
-		getlog() << endl << endl << myname << " is in BotAPI::setnewgame(), starting game as P" << playernum << "." << endl;
-		getlog() << myname << " sees " << sblind << '/' << bblind << " with stacksize " << stacksize << endl;
-		getlog() << myname << " chose strategy " << currstrat->getfilename() << endl;
-		getlog() << myname << "'s hole cards: " << tostring(myhand) << endl << endl;
 	}
 
 	//We go through the list of our private data and update each.
@@ -171,7 +158,22 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	currentnode = currstrat->gettreeroot();
 
 	offtreebetallins = false;
-	bot_status = WAITING_ACTION;
+
+	if(fpgreatereq(sblind, stacksize))
+		bot_status = WAITING_ROUND;
+	else
+		bot_status = WAITING_ACTION;
+
+	//finally log things
+
+	logger( "\n\n\n************" );
+	logger( "*** New Game: Player " + tostr( myplayer ) + " (" + ( myplayer ? "SB" : "BB" )
+			+ "), with SB = $" + tostr2( multiplier * actualinv[ 1 ] )
+			+ " and BB = $" + tostr2( multiplier * actualinv[ 0 ] ) );
+	logger( "**  The smaller pre-betting stacksize is: $" + tostr2( multiplier * truestacksize ) );
+	logger( "*   Using Strategy: " + currstrat->getfilename() + '\n' );
+
+	logger( ">>> Bot has hole cards: " + tostr( cards[ PREFLOP ] ) + '\n' );
 
 	processmyturn();
 }
@@ -184,15 +186,13 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 	//check input parameters
 
 	if ((int)cards.size() != gr || currentgr != gr-1 || gr < FLOP || gr > RIVER) REPORT("you set the next round at the wrong time");
-	if (bot_status != WAITING_ROUND) REPORT("you must advancetree before you setflop");
+	if (bot_status != WAITING_ROUND) REPORT("you must doaction before you setnextround");
 	if (!fpequal(actualinv[0], actualinv[1])) REPORT("you both best be betting the same.");
 	if (perceivedinv[0] != perceivedinv[1]) REPORT("perceived state is messed up");
 	if (!fpequal(actualpot+actualinv[0], newpot/multiplier)) REPORT("your new pot is unexpected.");
-	if(fpgreatereq(actualpot+actualinv[P0],truestacksize) && fpgreatereq(actualpot+actualinv[P1],truestacksize))
-		REPORT("You're sending me a round when we've already all-in'd.");
 
-	if(isloggingon())
-		getlog() << endl << "In BotAPI::setnextround() for " << gameroundstring(gr) << ": " << tostring(newboard) << " (pot = " << newpot << ")" << endl << endl;
+	logger( ">>> " + gameroundstring( gr ) + " comes: " + tostring( newboard ) 
+			+ " (pot is $" + tostr2( 2 * newpot ) + ")\n" ); //newpot is actual (post multiplier), but for 1 person
 
 	//Update the state of our private data members
 
@@ -215,7 +215,14 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 		}
 	}
 
-	bot_status = WAITING_ACTION;
+	if( fpequal( actualpot, truestacksize ) ) //all-in
+		if( currentgr == RIVER )
+			bot_status = WAITING_ENDOFGAME;
+		else
+			bot_status = WAITING_ROUND;
+	else
+		bot_status = WAITING_ACTION;
+
 	processmyturn();
 }
 
@@ -223,12 +230,32 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 //amount is only used during a call or a bet
 //amount called - the total amount from ONE player to complete all bets from this round
 //amount bet - the total amount wagered from ONE player, beyond what the other has put out so far
+//amount fold - the total amount that player is forfeiting for this round
 void BotAPI::doaction(Player pl, Action a, double amount)
 {
-	if(bot_status != WAITING_ACTION) REPORT("doaction called at wrong time");
+	if( debug )
+		logger( string( __FUNCTION__ ) + "( player=" + tostr( pl ) + ", a=" + tostr( a ) + ", amount=" + tostr( amount ) + " )"
+				+ "\nmultiplier = " + tostr( multiplier )
+				+ "\nmultiplied values:"
+				+ "\n truestacksize = " + tostr( multiplier * truestacksize )
+				+ "\n actualinv[0] = " + tostr( multiplier * actualinv[0] )
+				+ "\n actualinv[1] = " + tostr( multiplier * actualinv[1] )
+				+ "\n perceivedinv[0] = " + tostr( multiplier * perceivedinv[0] )
+				+ "\n perceivedinv[1] = " + tostr( multiplier * perceivedinv[1] )
+				+ "\n actualpot = " + tostr( multiplier * actualpot )
+				+ "\n perceivedpot = " + tostr( multiplier * perceivedpot )
+				+ "\n myplayer = " + tostr( myplayer )
+				+ "\n currentgr = " + tostr( currentgr )
+				+ "\n lastchosenaction = " + tostr( lastchosenaction )
+				+ "\n lastchosenamount = " + tostr( multiplier * lastchosenamount ) 
+				+ "\n");
+
+	if(bot_status != WAITING_ACTION) REPORT("doaction called at wrong time " + tostr( bot_status ) );
 	if(!playerequal(pl, currstrat->gettree()[currentnode].type)) REPORT("doaction thought the other player should be acting");
 	if(fpgreatereq(actualpot+actualinv[1-pl],truestacksize) && fpgreatereq(actualpot+amount,truestacksize))
 		REPORT("You're sending me an action when you've already bet all-in'd.");
+	if( pl == myplayer && ( a != lastchosenaction || ! fpequal( amount/multiplier, lastchosenamount ) ) )
+		REPORT( "Bot failed to get filled on its orders exactly." );
 
 	if(a == BETALLIN && pl == myplayer && offtreebetallins) 
 	//if true, there would be no all-in node to find
@@ -237,7 +264,7 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 
 	switch(a)
 	{
-	case FOLD:  REPORT("The bot does not need to know about folds");
+	case FOLD:  dofold (pl, amount/multiplier); break;
 	case CALL:  docall (pl, amount/multiplier); break;
 	case BET:   dobet  (pl, amount/multiplier); break;
 	case BETALLIN: if(islimit()) REPORT("NO ALLIN 4 u!"); doallin(pl); break;
@@ -245,6 +272,99 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 	}
 
 	processmyturn();
+}
+
+namespace 
+{
+	//used for formatting in the next function
+	static string dollarstring( double value ){ return "$" + tostr2( value ); }
+	static string numberstring( double value ){ return tostr( value ); }
+}
+
+//this version of the function is just a wrapper around the other one 
+// this one returns more info
+Action BotAPI::getbotaction(double &amount, string & actionstr, int & level )
+{
+	if( ! islimit( ) ) REPORT( "getbotaction with actionstr is only written for limit." );
+
+	// ********************************************************************
+	// settings that control the behavior of the strings eminated from here
+	// chipfmt: a function that formats money printed
+	string (* chipfmt)( double ) = & numberstring;
+	// raiseamtabove:
+	// if true: output amounts to raise are ( amt I will invest - amt opp has invested )
+	// if false: output amounts are total amount i am raising it to this round
+	const bool raiseamtabove = false; // false for fulltilt, true for pokeracademy
+	// *********************************************************************
+
+	const Action action = getbotaction( amount );
+	const double adjamount = amount / multiplier;
+	const double amtaboveme = amount - multiplier * actualinv[ myplayer ];
+	const double amtabovehim = amount - multiplier * actualinv[ 1 - myplayer ];
+
+	// we need to generate a string that describes the action
+	// and set the level to something that indicates the color
+	// for the level,
+	//   0 = fold
+	//   1 = check
+	//   2 = call
+	//   3 = bet
+	//   4 = raise
+
+	// the folding case is easy
+	if( action == FOLD )
+	{
+		actionstr = "Fold";
+		level = 0;
+	}
+	// this is when no ones bet at the flop, turn, river
+	// and also when i'm the big blind and the small blind only called
+	else if( fpequal( actualinv[ P0 ], actualinv[ P1 ] ) )
+	{
+		if( fpequal( adjamount, actualinv[ P0 ] ) )
+		{
+			actionstr = "Check";
+			level = 1;
+		}
+		else
+		{
+			if( fpequal( 0, actualinv[ P0 ] ) )
+				actionstr = "Bet " + chipfmt( amount );
+			// the actualinv's can only be equal to each other AND zero when 
+			// the SB called and we have the option to bet from the big blind.
+			else if( raiseamtabove )
+				actionstr = "Bet additional " + chipfmt( amtaboveme );
+			else
+				actionstr = "Bet to " + chipfmt( amount );
+			level = 3;
+		}
+	}
+	// only case left is when I already have a bet to me
+	// this includes preflop when I'm the small blind facing the big blind
+	else
+	{
+		// I am raising above the bet to me
+		if( fpgreater( adjamount, actualinv[ 1 - myplayer ] ) )
+		{
+			if( raiseamtabove )
+				actionstr = "Raise " + chipfmt( amtabovehim );
+			else
+				actionstr = "Raise to " + chipfmt( amount );
+			level = 4;
+		}
+		// I am calling the bet to me
+		else
+		{
+			actionstr = "Call " + chipfmt( amtaboveme );
+			level = 2;
+		}
+	}
+
+	//lastly, if we are all-in, might want to mention that
+	if( fpequal( truestacksize, actualpot + adjamount ) )
+		actionstr += " (all-in)";
+
+	return action;
 }
 
 //amount is the total amount of a wager when betting/raising (relative to the beginning of the round)
@@ -268,17 +388,19 @@ Action BotAPI::getbotaction(double &amount)
 	currstrat->getprobs(currentgr, (currstrat->gettree())[currentnode].actioni,
 			out_degree(currentnode, currstrat->gettree()), cards, probabilities);
 
-	if(isloggingon())
+	//do the logging
+
 	{
-		getlog() << myname << "At node: gameround = " << currentgr << ", cardsi = " << currstrat->getcardmach().getcardsi(currentgr, cards) << ", actioni = " << (currstrat->gettree())[currentnode].actioni << endl;
-		getlog() << myname << "My options: ((";
+		logger( "Bot considers action (gameround = " + tostr( currentgr ) + ", cardsi = " + tostr( currstrat->getcardmach( ).getcardsi( currentgr, cards ) ) + ", actioni = " + tostr( ( currstrat->gettree( ) )[ currentnode ].actioni ) + ")" );
+		ostringstream o;
+		o << "Bot has options: ((";
 		EIter e, elast;
 		for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++)
-			getlog() << actionstring(currstrat->gettree(), *e, multiplier) << "  ";
-		getlog() << ")) = < ";
+			o << ' ' << actionstring(currstrat->gettree(), *e, multiplier) << ' ';
+		o << ")) = < ";
 		for(unsigned i=0; i<out_degree(currentnode, currstrat->gettree()); i++)
-			getlog() << setprecision(3) << fixed << 100*probabilities[i] << "% ";
-		getlog() << ">" << endl;
+			o << setprecision( 3 ) << fixed << 100*probabilities[i] << "% ";
+		logger( o.str( ) + ">\n" );
 	}
 
 	//choose an action
@@ -301,9 +423,6 @@ Action BotAPI::getbotaction(double &amount)
 	if(eanswer == elast) //can't be rounding error
 		REPORT("broken answer choosing mechanism!");
 
-	if(isloggingon())
-		getlog() << myname << "Chose " << actionstring(currstrat->gettree(), *eanswer, multiplier) << endl << endl;
-
 	//potentially over-ride choice with diagnostics window
 
 #ifdef _MFC_VER
@@ -322,6 +441,7 @@ Action BotAPI::getbotaction(double &amount)
 			case IDC_RADIO2: efirst++;
 			case IDC_RADIO1:
 				eanswer = efirst;
+				logger( "       Bot was overridden by Diagnostic Window." );
 			case 0: 
 				break; //this is what we get if no radio button is chosen
 			default: 
@@ -383,9 +503,7 @@ Action BotAPI::getbotaction(double &amount)
 				amount = multiplier * ((currstrat->gettree())[*eanswer].potcontrib + actualinv[1-myplayer]-perceivedinv[1-myplayer]);
 				if(fpgreater(multiplier * mintotalwager(), amount))
 				{
-					if(isloggingon())
-						getlog() << myname << "...changing bet amount from " << amount << " to " << multiplier * mintotalwager() << " ... " << endl;
-					REPORT("bot bet amount was less than multiplier * mintotalwager()", WARN);
+					logger( "Warning: adjusting bet amount from " + tostr( amount ) + " to " + tostr( multiplier * mintotalwager() ) + "." );
 					amount = multiplier * mintotalwager();
 				}
 				myact = BET;
@@ -395,7 +513,123 @@ Action BotAPI::getbotaction(double &amount)
 			REPORT("bad action"); exit(0);
 	}
 
+	ostringstream o; 
+	o << "       Bot chose >>>   " << actionstring(currstrat->gettree(), *eanswer, multiplier) << "   <<<";
+	if( fpgreater( amount, multiplier * actualinv[ myplayer ] ) )
+		o << " (adding $" << tostr2( amount - multiplier * actualinv[ myplayer ] ) << " to pot)\n";
+	else
+		o << '\n';
+	logger( o.str( ) );
+
+	lastchosenaction = myact;
+	lastchosenamount = amount/multiplier;
 	return myact;
+}
+
+void BotAPI::logendgame( bool iwin, const string & story )
+{
+	const double loserinvested = iwin ? actualinv[ 1 - myplayer ] : actualinv[ myplayer ];
+
+	// pot is for one person, i will print pot from 2 people
+
+	logger( ">>> Game ended. " + story + "Bot " + ( iwin ? "won" : "lost" ) + " pot of $" 
+			+ tostr2( multiplier * ( 2 * actualpot + actualinv[ 0 ] + actualinv[ 1 ] ) )
+			+ " ($" + tostr2( multiplier * ( actualpot + loserinvested ) ) 
+			+ " " + ( iwin ? "profit" : "loss" ) + ")\n" ); 
+}
+
+void BotAPI::endofgame( )
+{
+	// the game has ended, and we have not seen the opponent's cards
+	// what could have happened?
+	// we can figure it out from the currentgr, if the bot was waiting for an action, and the invested's
+	// we know we have the last currentgr by the cards that were dealt, and 
+	// have handled the case of allin's elsewhere.
+
+	if( bot_status == WAITING_ACTION )
+	{
+		// we were waiting for an action and the game ended before the river ==> folded
+		if( currentgr != RIVER )
+		{
+			doaction( (Player)(1 - myplayer), FOLD, multiplier * actualinv[ 1 - myplayer ] );
+			logendgame( true, "" );
+		}
+		// we were waiting for an action and the game ended at the river (without seeing opp's cards)...
+		else
+		{
+			logger( ">>> Opponent has either mucked or folded.\n" );
+			logendgame( true, "Approx results: " );
+		}
+	}
+	// we have actually done doaction and everything enough that BotAPI knows the game was over...
+	else if( bot_status == WAITING_ENDOFGAME )
+	{
+		if( fpequal( actualinv[0], actualinv[1] ) ) //someone called, to end the game...
+			//...if it was me, then the oppenent must have bet, but we didn't see his cards....
+			if( lastchosenaction == CALL )
+				REPORT( "Opponent bet and then mucked." );
+			//...if i folded, something is wrong.
+			else if( lastchosenaction == FOLD )
+				REPORT( "Invalid numbers." );
+			//... but it looks like the opponent called, and then mucked. (I don't think I can detect/reach this case.)
+			else
+				logendgame( true, "Opponent mucked. " );
+		// if I had more invested, then the opponent must have just folded (I don't think I can detect/reach this case / handled above.)
+		else if( fpgreater( actualinv[ myplayer ], actualinv[ 1 - myplayer ] ) ) //opp folded
+			if( lastchosenaction == CALL || lastchosenaction == FOLD )
+				REPORT( "I can't have just called or folded...." );
+			else
+				logendgame( true, "Opponent folded. " );
+		else
+			if( lastchosenaction != FOLD )
+				REPORT( "I have to have just folded." );
+			else
+				logendgame( false, "Bot folded. " );
+	}
+	// a game shouldn't end in any other state than WAITING_ACTION or WAITING_ENDOFGAME
+	else
+		REPORT( "Invalid logic at endofgame in BotAPI." );
+
+	bot_status = INVALID;
+}
+
+void BotAPI::endofgame( CardMask opponentcards )
+{
+	logger( ">>> Opponent shows: " + tostr( opponentcards ) );
+
+	// the game has ended, and we saw the opponent's cards
+	// assume it is a showdown.
+
+	if( currentgr != RIVER )
+		REPORT( "We saw the opponent's cards but it was not at the river..." );
+	if( cards.size( ) != 4 )
+		REPORT( "currentgr == RIVER but cards.size( ) != 4" );
+	if( bot_status == WAITING_ACTION ) //the opponent must have called to see this showdown (assume didn't fold and show cards)
+		doaction( (Player)( 1 - myplayer ), CALL, multiplier * actualinv[ myplayer ] );
+	if( bot_status != WAITING_ENDOFGAME )
+		REPORT( "After [possibly] calling at showdown, bot_status not endofgame." );
+
+	CardMask fullbot, fullopp;
+	CardMask_OR( fullbot, cards[1], cards[2] );
+	CardMask_OR( fullbot, fullbot, cards[3] );
+	fullopp = fullbot; //now both variables have the full board in them
+
+	CardMask_OR( fullbot, fullbot, cards[0] );
+	CardMask_OR( fullopp, fullopp, opponentcards );
+
+	HandVal valopp = Hand_EVAL_N( fullopp, 7 );
+	HandVal valbot = Hand_EVAL_N( fullbot, 7 );
+
+	if( valbot > valopp )
+		logendgame( true /* iwin */, "Bot won the showdown. " );
+	else if( valopp > valbot )
+		logendgame( false /* i dont win */, "Bot lost the showdown. " );
+	else
+		logger( ">>> Game ended. TIE! Split pot of $" 
+				+ tostr2( multiplier * ( 2 * actualpot + actualinv[ 0 ] + actualinv[ 1 ] ) )
+				+ "\n" );
+
+	bot_status = INVALID;
 }
 
 #ifdef _MFC_VER
@@ -413,20 +647,44 @@ void BotAPI::setdiagnostics(bool onoff, CWnd* parentwin)
 #endif
 
 
+//this amount has been DIVIDED by multiplier
+void BotAPI::dofold(Player pl, double amount)
+{
+	if(!fpequal(amount,actualinv[pl])) REPORT("you folded the wrong amount");
+	if( !fpgreater( actualinv[1-pl], actualinv[pl] ) ) REPORT( "You can't fold unless the other player's bet more than you." );
+
+	if( pl != myplayer )
+	{
+		logger( "       Opponent has folded.\n" );
+	}
+
+	bot_status = WAITING_ENDOFGAME;
+}
+
 //a "call" by definition ends the betting round
+//this amount has been DIVIDED by multiplier
 void BotAPI::docall(Player pl, double amount)
 {
 	if(!fpequal(amount,actualinv[1-pl])) REPORT("you called the wrong amount");
 
-	if(isloggingon())
-		getlog() << (pl == myplayer ? myname : "Human") << " in BotAPI::docall has called $" << amount << endl;
+	if( pl != myplayer )
+	{
+		if( fpequal( amount, 0 ) )
+			logger( "       Opponent has checked.\n" );
+		else
+			logger( "       Opponent has called $" + tostr2( multiplier * amount ) + " (added $" + tostr2( multiplier * ( amount - actualinv[ pl ] ) ) + " to pot)\n" );
+	}
 
 	actualinv[pl] = actualinv[1-pl];
 	perceivedinv[pl] = perceivedinv[1-pl];
-	bot_status = WAITING_ROUND;
+	if( currentgr == 3 )
+		bot_status = WAITING_ENDOFGAME;
+	else
+		bot_status = WAITING_ROUND;
 }
 
 //a "bet" by definition continues the betting round
+//this amount has been DIVIDED by multiplier
 void BotAPI::dobet(Player pl, double amount)
 {
 
@@ -434,9 +692,6 @@ void BotAPI::dobet(Player pl, double amount)
 
 	if(fpgreater(mintotalwager(), amount) || fpgreater(actualpot + amount, truestacksize))
 		REPORT("Invalid bet amount");
-
-	if(isloggingon())
-		getlog() << (pl == myplayer ? myname : "Human") << " in BotAPI::dobet has bet/raised $" << amount << endl;
 
 	//NO LIMIT: try to find the bet action that will set the new perceived pot closest to the actual.
 	// if no bet actions, then offtreebetallins is invoked to handle this human's behavior that my tree does not have.
@@ -463,11 +718,11 @@ void BotAPI::dobet(Player pl, double amount)
 		}
 	}
 
-	if(besterror > 1e20) //probably still infinity -> found no node
+	if(besterror == numeric_limits<double>::infinity()) // -> found no node
 	{
 		if(islimit()) REPORT("in limit, we could not find a 'Bet' node to match some player's Bet. Fatal.");
 		if(pl == myplayer) REPORT("could not find Bot's own bet action in tree. the bot HAD to have bet from the tree. we should find a bet action.");
-		else REPORT("the oppenent bet when the tree had no betting actions. off tree -> treating as all-in", INFO);
+		else logger( "       Note: The oppenent bet when our tree had no betting actions. off tree -> treating as all-in." );
 		offtreebetallins = true;
 		doallin(pl);
 	}
@@ -476,8 +731,19 @@ void BotAPI::dobet(Player pl, double amount)
 		if(islimit() && !( fpequal(besterror, 0) ||
 					   ( fpequal(actualpot + amount, truestacksize) && !fpequal(get_property(currstrat->gettree(), settings_tag()).stacksize, truestacksize) )))
 			REPORT("in limit, we expect bets to either exactly match the tree's bets or this to be a covert all-in");
-		if(!fpequal(besterror, 0) && isloggingon())
-			getlog() << myname << " in BotAPI::dobet found best betting action of $" << currstrat->gettree()[*ebest].potcontrib*multiplier << " with error " << besterror << endl;
+		if( pl != myplayer )
+		{
+			if( fpequal( amount, 0 ) )
+				logger( "       Opponent has checked." );
+			else if( ! fpequal( 0, mymax( actualinv[ 0 ], actualinv[ 1 ] ) ) )
+				logger( "       Opponent has raised to $" + tostr2( multiplier * amount ) + " (added $" + tostr2( multiplier * ( amount - actualinv[ pl ] ) ) + " to pot)" );
+			else
+				logger( "       Opponent has bet $" + tostr2( multiplier * amount ) + " (added $" + tostr2( multiplier * ( amount - actualinv[ pl ] ) ) + " to pot)" );
+		}
+		if(!fpequal(besterror, 0))
+			logger( "       Note: The best betting action represented in our tree is $" + tostr2( currstrat->gettree()[*ebest].potcontrib * multiplier ) + " with error $" + tostr2( multiplier * besterror ) + ".\n" );
+		else if( pl != myplayer )
+			logger( "" ); // ensure a newline in this case to keep log spacing nice
 		actualinv[pl] = amount;
 		perceivedinv[pl] = currstrat->gettree()[*ebest].potcontrib;
 		currentnode = target(*ebest, currstrat->gettree());
@@ -500,12 +766,12 @@ void BotAPI::doallin(Player pl)
 	currentnode = target(*e, currstrat->gettree());
 
 	if(perceivedpot + (currstrat->gettree())[*e].potcontrib != get_property(currstrat->gettree(), settings_tag()).stacksize) 
-		REPORT("all-in potcontrib set incorrectly",WARN);
+		REPORT("all-in potcontrib set incorrectly");
 
-	if(isloggingon())
-		getlog() << (pl == myplayer ? myname : "Human") << " in BotAPI::doallin has bet/raised All-In" << endl;
+	if( pl != myplayer )
+		logger( "       Opponent has bet all-in. (added $" + tostr2( multiplier * ( truestacksize - actualpot - actualinv[ pl ] ) ) + " to pot)" );
 
-	actualinv[pl] = get_property(currstrat->gettree(), settings_tag()).stacksize-actualpot;
+	actualinv[pl] = truestacksize-actualpot;
 	perceivedinv[pl] = (currstrat->gettree())[*e].potcontrib;
 }
 
@@ -557,7 +823,7 @@ void BotAPI::populatewindow(CWnd* parentwin)
 
 	//create window if needed
 
-	if(MyWindow == NULL && parentwin != NULL)
+	if(MyWindow == NULL)// && parentwin != NULL)
 		MyWindow = new DiagnosticsPage(parentwin);
 
 	if(bot_status == INVALID) return; //can't do nothin with that!
