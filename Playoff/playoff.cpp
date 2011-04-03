@@ -17,6 +17,13 @@
 #include <list>
 using namespace std;
 
+//my global logger class, defined for each top-level project
+ConsoleLogger my_console_logger;
+LoggerClass & logger( my_console_logger );
+
+NullLogger nulllog;
+LoggerClass & botapireclog( nulllog );
+
 const double LOAD_LIMIT = 3.9; //load average number
 const int LOAD_TO_USE = 1; //1, 2, or 3, for 1 min, 5 min, or 15 min.
 const int SLEEP_ON_THREADSTART = 60; // in seconds, sleep this much after starting a thread before looking for more work to do
@@ -93,9 +100,9 @@ Playoff::Playoff(string file1, string file2)
 	{
 
 		_stacksize = _bots[0]->islimit() ? min(stacksizemult1,stacksizemult2) : (stacksizemult1+stacksizemult2) / 2.0;
-		REPORT(file1+" has stacksize "+tostring(stacksizemult1)+"bb while "+file2+" has stacksize "
+		logger("Warning: "+file1+" has stacksize "+tostring(stacksizemult1)+"bb while "+file2+" has stacksize "
 				+tostring(stacksizemult2)+"bb for "+(_bots[0]->islimit() ? "limit" : "no-limit")
-				+" poker... using "+tostring(_stacksize)+"bb.", WARN);
+				+" poker... using "+tostring(_stacksize)+"bb.");
 		_stacksize *= _bblind;
 	}
 	else

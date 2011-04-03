@@ -26,7 +26,7 @@ class DiagnosticsPage; //forward declaration
 class BotAPI
 {
 public:
-	BotAPI(string xmlfile, bool preload = false);
+	BotAPI(string xmlfile, bool preload = false, MTRand::uint32 randseed = MTRand::gettimeclockseed( ) );
 	~BotAPI();
 
 	//control game progress
@@ -45,11 +45,24 @@ public:
 	//amount bet - the total amount wagered from ONE player, beyond what the other has put out so far
 	void doaction(Player player, Action a, double amount);
 
-	//amount is the total amount of a wager when betting/raising (relative to the beginning of the round)
-	//          the amount aggreed upon when calling (same as above) or folding (not same as above)
-	Action getbotaction(double &amount);
+	//this version just gives you what you need
+	Action getbotaction( double & amount ) { return getbotaction_internal( amount, false, FOLD, 0 ); }
 	//this version just returns more info (which can be used to make the action human readable)
-	Action getbotaction(double &amount, string & actionstr, int & level);
+	Action getbotaction( double & amount, string & actionstr, int & level )
+	{
+		const Action act = getbotaction_internal( amount, false, FOLD, 0 );
+		getactionstring( act, amount, actionstr, level );
+		return act;
+	}
+	//this version just forces an action instead of getting it
+	void forcebotaction( Action act, double amount, string & actionstr, int & level )
+	{
+		double amountcheck;
+		const Action actcheck = getbotaction_internal( amountcheck, true, act, amount );
+		if( ! ( act == actcheck && amount == amountcheck ) ) 
+			REPORT( "forcebotaction failed" );
+		getactionstring( act, amount, actionstr, level );
+	}
 
 	//these are for logging (possibly error checking) purposes
 	void endofgame( );  // for when cards are unknown
@@ -66,6 +79,15 @@ public:
 	string getxmlfile() const { return myxmlfile; }
 
 private:
+	//amount is the total amount of a wager when betting/raising (relative to the beginning of the round)
+	//          the amount aggreed upon when calling (same as above) or folding (not same as above)
+	//forcing: if doforceaction is false, proceed as usual,
+	//         otherwise, force the bot's action to be the forced values
+	Action getbotaction_internal( double & amount, bool doforceaction, Action forceaction, double forceamount );
+
+	//this function returns human readable info designed to be used at the time of a call to getbotaction
+	void getactionstring( Action act, double amount, string & actionstr, int & level );
+
 	//we do not support copying.
 	BotAPI(const BotAPI& rhs);
 	BotAPI& operator=(const BotAPI& rhs);

@@ -5,7 +5,7 @@ CFLAGS := -Wall -DTIXML_USE_TICPP -march=native -Wno-deprecated
 # linker flags:
 # define library paths in addition to /usr/lib with -L
 # define any libraries to link into executable with -l
-LFLAGS := -lpthread -rdynamic -ggdb -march=native
+LFLAGS := -lpthread -lboost_regex -rdynamic -ggdb -march=native
 
 ifeq ($(PEDANTIC),y)
    CPP += -ansi -pedantic -Wextra -Wno-long-long
@@ -13,23 +13,30 @@ endif
 
 # define the output executable file
 # OUT is used by clean. MYOUT is used for compiling to.
-OUT := bin/playoff
-OUTD := bin/playoffd
-OUTP := bin/playoffp
+OUT1 := bin/playoff
+OUT1D := bin/playoffd
+OUT1P := bin/playoffp
+
+OUT2 := bin/reconciler
+OUT2D := bin/reconcilerd
+OUT2P := bin/reconcilerp
 
 ifeq ($(DEBUG),y)
    CFLAGS += -ggdb -D_GLIBCXX_DEBUG
-   MYOUT := $(OUTD)
+   MYOUT1 := $(OUT1D)
+   MYOUT2 := $(OUT2D)
    CFGDIR := debug
 else 
 ifeq ($(PROFILE),y)
    CFLAGS += -O3 -pg -ggdb
    LFLAGS += -pg
-   MYOUT := $(OUTP)
+   MYOUT1 := $(OUT1P)
+   MYOUT2 := $(OUT2P)
    CFGDIR := profile
 else
    CFLAGS += -O3 -ggdb
-   MYOUT := $(OUT)
+   MYOUT1 := $(OUT1)
+   MYOUT2 := $(OUT2)
    CFGDIR := release
 endif
 endif
@@ -44,43 +51,51 @@ DEPFILE = .depends
 # define the object files and sources
 SRCPE := $(wildcard pokereval/lib/*.c)
 
-SRC := $(wildcard PokerPlayerMFC/*.cpp PokerLibrary/*.cpp TinyXML++/*.cpp Playoff/*.cpp HandIndexingV1/*.cpp)
-SRC += utility.cpp
-OBJ := $(SRC:%.cpp=$(CFGDIR)/%.o)
-OBJ += $(SRCPE:%.c=$(CFGDIR)/%.o) 
+SRC1 := $(wildcard PokerPlayerMFC/*.cpp PokerLibrary/*.cpp TinyXML++/*.cpp Playoff/*.cpp HandIndexingV1/*.cpp) utility.cpp
+OBJ1 := $(SRC1:%.cpp=$(CFGDIR)/%.o)
+OBJ1 += $(SRCPE:%.c=$(CFGDIR)/%.o) 
 
-.PHONY:	clean all init solver binmaker
+SRC2 := $(wildcard PokerPlayerMFC/*.cpp PokerLibrary/*.cpp TinyXML++/*.cpp Reconciler/*.cpp HandIndexingV1/*.cpp) utility.cpp
+OBJ2 := $(SRC2:%.cpp=$(CFGDIR)/%.o)
+OBJ2 += $(SRCPE:%.c=$(CFGDIR)/%.o) 
+
+.PHONY:	clean all init playoff reconciler
 
 init:
 	@mkdir -p $(CFGDIR)/Playoff
+	@mkdir -p $(CFGDIR)/Reconciler
 	@mkdir -p $(CFGDIR)/PokerPlayerMFC
-	@mkdir -p $(CFGDIR)/HandSSCalculator
 	@mkdir -p $(CFGDIR)/PokerLibrary
-	@mkdir -p $(CFGDIR)/PokerNoLimit
 	@mkdir -p $(CFGDIR)/HandIndexingV1
 	@mkdir -p $(CFGDIR)/pokereval/lib
 	@mkdir -p $(CFGDIR)/TinyXML++
-	@find $(CFGDIR)/TinyXML++ -name "*.o" -exec rm {} \;
+	@find $(CFGDIR)/TinyXML++ -name "*.o" -delete
 	@rm -f $(DEPFILE)
 	@touch $(DEPFILE)
-	@makedepend -Y -p$(CFGDIR)/ -f$(DEPFILE) -- $(CFLAGS) -- $(INCLUDES) $(SRC) $(SRCPE) 2>/dev/null
+	@makedepend -Y -p$(CFGDIR)/ -f$(DEPFILE) -- $(CFLAGS) -- $(INCLUDES) $(SRC1) $(SRC2) $(SRCPE) 2>/dev/null
 	@touch stdafx.h
 	@$(MAKE) -f playoff.mk all -r --no-print-directory
-	@find $(CFGDIR)/TinyXML++ -name "*.o" -exec rm {} \;
+	@find $(CFGDIR)/TinyXML++ -name "*.o" -delete
 	@rm -f $(DEPFILE) $(DEPFILE).bak stdafx.h
 
-all: playoff
+all: playoff reconciler
 
-playoff: $(MYOUT)
+playoff: $(MYOUT1)
+
+reconciler: $(MYOUT2)
 
 clean:
 	@echo "deleting crap..."
-	@find . -name "*.o" -exec rm {} \;
-	@rm -f $(OUT) $(OUTD) $(OUTP) $(DEPFILE) $(DEPFILE).bak
+	@find . -name "*.o" -delete
+	@rm -f $(OUT1) $(OUT1D) $(OUT1P) $(OUT2) $(OUT2D) $(OUT2P) $(DEPFILE) $(DEPFILE).bak stdafx.h
 
-$(MYOUT): $(OBJ)
+$(MYOUT1): $(OBJ1)
 	@echo "$(CPP) (object files) $(LFLAGS) -o $@"
-	@$(CPP) $(OBJ) $(LFLAGS) -o $@
+	@$(CPP) $(OBJ1) $(LFLAGS) -o $@
+
+$(MYOUT2): $(OBJ2)
+	@echo "$(CPP) (object files) $(LFLAGS) -o $@"
+	@$(CPP) $(OBJ2) $(LFLAGS) -o $@
 
 $(CFGDIR)/%.o : %.cpp
 	@echo "$(CPP) $(CFLAGS) $(INCLUDES) ($<)"
