@@ -354,13 +354,9 @@ bool CSimpleGameDlg::loadbotfile()
 #ifdef USE_NETWORK_CLIENT
 	if( _mybot->GetSessionType( ) == SESSION_NONE )
 	{
-		MessageCreateNewCashSession message;
-		message.startingbalance = 0;
-		message.sbet = 0;
-		message.bbet = 0;
-		memset( message.opponentname, 0, 1024 );
+		MessageCreateNewSession message;
 		message.gametype = GAME_SIMPLEGAME;
-		_mybot->CreateNewCashSession( message );
+		_mybot->CreateNewSession( message );
 	}
 	else
 	{
