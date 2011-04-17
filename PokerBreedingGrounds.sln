@@ -53,7 +53,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SimpleGame", "SimpleGame\Si
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 	ProjectSection(ProjectDependencies) = postProject
-		{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A} = {4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}
+		{A4DEF05E-E072-493E-B282-84731D60BCF0} = {A4DEF05E-E072-493E-B282-84731D60BCF0}
+		{E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B} = {E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PokerPlayer", "PokerPlayerMFC\PokerPlayerMFC.vcproj", "{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}"
@@ -78,7 +79,20 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenHoldemDLL", "OpenHoldem
 		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 	ProjectSection(ProjectDependencies) = postProject
-		{4A7BE015-A3C8-4AC3-92C4-7B2090973B0A} = {4A7BE015-A3C8-4AC3-92C4-7B2090973B0A}
+		{A4DEF05E-E072-493E-B282-84731D60BCF0} = {A4DEF05E-E072-493E-B282-84731D60BCF0}
+		{E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B} = {E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NetworkClient", "NetworkClient\NetworkClient.vcproj", "{E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B}"
+	ProjectSection(WebsiteProperties) = preProject
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.Debug = "False"
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NetworkServer", "NetworkServer\NetworkServer.vcproj", "{49DE589A-42A1-4532-A767-1BF548314C90}"
+	ProjectSection(WebsiteProperties) = preProject
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.Debug = "False"
 	EndProjectSection
 EndProject
 Global
@@ -142,6 +156,18 @@ Global
 		{15B6E802-D3A8-4970-A66E-F72FA2A6DE8F}.profile|Win32.Build.0 = Release|Win32
 		{15B6E802-D3A8-4970-A66E-F72FA2A6DE8F}.Release|Win32.ActiveCfg = Release|Win32
 		{15B6E802-D3A8-4970-A66E-F72FA2A6DE8F}.Release|Win32.Build.0 = Release|Win32
+		{E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B}.Debug|Win32.Build.0 = Debug|Win32
+		{E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B}.profile|Win32.ActiveCfg = Release|Win32
+		{E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B}.profile|Win32.Build.0 = Release|Win32
+		{E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B}.Release|Win32.ActiveCfg = Release|Win32
+		{E3063A8E-0B5E-4F61-9C45-7A2C3A60A20B}.Release|Win32.Build.0 = Release|Win32
+		{49DE589A-42A1-4532-A767-1BF548314C90}.Debug|Win32.ActiveCfg = Debug|Win32
+		{49DE589A-42A1-4532-A767-1BF548314C90}.Debug|Win32.Build.0 = Debug|Win32
+		{49DE589A-42A1-4532-A767-1BF548314C90}.profile|Win32.ActiveCfg = Release|Win32
+		{49DE589A-42A1-4532-A767-1BF548314C90}.profile|Win32.Build.0 = Release|Win32
+		{49DE589A-42A1-4532-A767-1BF548314C90}.Release|Win32.ActiveCfg = Release|Win32
+		{49DE589A-42A1-4532-A767-1BF548314C90}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
