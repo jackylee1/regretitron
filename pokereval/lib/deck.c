@@ -53,7 +53,7 @@ GenericDeck_printMask(Deck *deck, void *cardMask) {
 
 char *
 GenericDeck_maskString(Deck *deck, void *cardMask) {
-  static thread char outString[150];
+  static POKEREVAL_DEFINE_THREAD char outString[150];
 
   GenericDeck_maskToString(deck, cardMask, outString);
   return outString;
@@ -68,7 +68,7 @@ GenericDeck_numCards(Deck *deck, void *cardMask) {
 
 char *
 GenericDeck_cardString(Deck *deck, int cardIndex) {
-  static thread char outString[16];
+  static POKEREVAL_DEFINE_THREAD char outString[16];
 
   (*deck->cardToString)(cardIndex, outString);
   return outString;

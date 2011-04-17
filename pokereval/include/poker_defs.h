@@ -27,9 +27,9 @@
 #if defined(_MSC_VER)
 #  define UINT64_TYPE unsigned __int64
 #  define inline __inline
-#  define thread __declspec( thread )
+#  define POKEREVAL_DEFINE_THREAD __declspec( thread )
 #else
-#  define thread 
+#  define POKEREVAL_DEFINE_THREAD 
 #  include "poker_config.h"
 #endif
 
@@ -46,20 +46,29 @@
 
 /* 64-bit integer junk */
 
-#undef USE_INT64
-#ifdef HAVE_UINT64_T
-typedef uint64_t		uint64;
-#define USE_INT64 1
-#elif defined(HAVE_LONG_LONG)
-typedef unsigned long long      uint64;
-#define USE_INT64 1
-#elif SIZEOF_LONG == 8
-typedef unsigned long           uint64;
-#define USE_INT64 1
-#elif defined(UINT64_TYPE)
-typedef UINT64_TYPE             uint64;
-#define USE_INT64 1
+#ifdef _MSC_VER
+typedef __int64 int64;
+typedef unsigned __int64 uint64;
+typedef __int32 int32;
+typedef unsigned __int32 uint32;
+typedef __int16 int16;
+typedef unsigned __int16 uint16;
+typedef __int8 int8;
+typedef unsigned __int8 uint8;
+#elif __GNUC__ 
+#include <stdint.h>
+typedef int64_t int64;
+typedef uint64_t uint64;
+typedef int32_t int32;
+typedef uint32_t uint32;
+typedef int16_t int16;
+typedef uint16_t uint16;
+typedef int8_t int8;
+typedef uint8_t uint8;
 #endif
+
+#define USE_INT64 1
+
 
 #ifdef USE_INT64
 #define LongLong_OP(result, op1, op2, operation) \
@@ -69,13 +78,6 @@ typedef UINT64_TYPE             uint64;
 #define LongLong_XOR(result, op1, op2) LongLong_OP(result, op1, op2, ^)
 #endif
 
-
-typedef unsigned char  uint8;
-#ifndef HAVE_INT8
-typedef signed char   int8;
-#endif
-typedef unsigned short uint16;
-typedef unsigned int   uint32;
 
 #include "deck.h"
 #include "handval.h"
