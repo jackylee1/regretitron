@@ -45,7 +45,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="../pokereval/include;&quot;C:\Program Files (x86)\boost\boost_1_42&quot;"
-				PreprocessorDefinitions="_WINDOWS;_DEBUG;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WINDOWS;_DEBUG;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;USE_NETWORK_CLIENT"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -133,7 +133,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalIncludeDirectories="../pokereval/include;&quot;C:\Program Files (x86)\boost\boost_1_42&quot;"
-				PreprocessorDefinitions="_WINDOWS;NDEBUG;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_WINDOWS;NDEBUG;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;USE_NETWORK_CLIENT"
 				MinimalRebuild="false"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="2"
@@ -201,6 +201,10 @@
 			Filter="cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
+			<File
+				RelativePath="..\PokerPlayerMFC\PictureCtrl.cpp"
+				>
+			</File>
 			<File
 				RelativePath=".\SimpleGame.cpp"
 				>

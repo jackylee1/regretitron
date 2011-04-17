@@ -3,7 +3,11 @@
 
 #pragma once
 
+#ifdef USE_NETWORK_CLIENT
+#include "../NetworkClient/clientapi.h"
+#else
 #include "../PokerPlayerMFC/botapi.h"
+#endif
 #include "../PokerPlayerMFC/picturectrl.h"
 #include "../PokerLibrary/constants.h"
 #include "afxwin.h"
@@ -64,7 +68,11 @@ private:
 	void graygameover();
 	void graypostact(Player nexttoact);
 	//variables
+#ifdef USE_NETWORK_CLIENT
+	ClientAPI * _mybot;
+#else
 	BotAPI * _mybot;
+#endif
 	MTRand cardrandom;
 	int handsplayed;
 	int handsplayedtourney;

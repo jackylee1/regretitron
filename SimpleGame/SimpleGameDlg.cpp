@@ -33,7 +33,11 @@ template<typename T> bool getuserinput(string inputtext, T &value)
 // CSimpleGameDlg dialog
 CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSimpleGameDlg::IDD, pParent),
+#ifdef USE_NETWORK_CLIENT
+	  _mybot( new ClientAPI ),
+#else
 	  _mybot(NULL),
+#endif
 	  cardrandom(),
 	  handsplayed(0),
 	  handsplayedtourney(0),
@@ -136,7 +140,6 @@ void CSimpleGameDlg::PostNcDestroy()
 void CSimpleGameDlg::OnCancel()
 {
 	_mybot->setdiagnostics(false); //this will DestroyWindow the diagnostics page if it exists.
-	turnloggingoff();
 	DestroyWindow();
 }
 
@@ -158,63 +161,64 @@ void CSimpleGameDlg::OnOK()
 
 BOOL CSimpleGameDlg::OnInitDialog()
 {
-	CDialog::OnInitDialog();
-
-	// Set the icon for this dialog.  The framework does this automatically
-	//  when the application's main window is not a dialog
-
-	SetIcon(m_hIcon, TRUE);			// Set big icon
-	SetIcon(m_hIcon, FALSE);		// Set small icon
-
-	//set logging on/off
-
-	string logfilename;
-	if(getuserinput("Enter filename for logfile: (click cancel for console window) ", logfilename))
-		turnloggingon(logfilename+".txt");
-	else
-		turnloggingon("cout");
-
-	//make a menu!
-	//"Create a CMenu object on the stack frame as a local, then call CMenu's 
-	// member functions to manipulate the new menu as needed. Next, call 
-	// CWnd::SetMenu to set the menu to a window, followed immediately by a 
-	// call to the CMenu object's Detach member function."
-	//(I save the menu to an object here so I can check/uncheck and such)
-	MyMenu.LoadMenu(IDR_MYMENU);
-	SetMenu(&MyMenu);
-	MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_CHECKED);
-
-	//find a strategy/portfolio file and create the bot api
-
-	if(!loadbotfile()) 
-		exit(0);
-
-	//initialize the window controls that need it
-
-	TotalWon.SetWindowText(TEXT(""));
-	graygameover();
-
-	//set the picture on the File Open Button
-
-	OpenBotButton.LoadBitmaps(IDB_OPEN1, IDB_OPEN1, IDB_OPEN1, IDB_OPEN2);
-	OpenBotButton.SizeToContent();
-
-	unsigned gametype;
-	while(!getuserinput("Choices:\n"
-		"   Enter \"1\" to start a new Tournament (Full Tilt style, 2 person heads-up sit-n-go)\n"
-		"   Enter \"2\" to start a Cash Game at default bankroll\n"
-		"   Enter another number to set the starting bankroll for a "
-		+tostring(cashsblind*2)+"/"+tostring(cashbblind*2)+" Cash Game", gametype));
-	if(gametype == 1)
-		OnMenuNewTourney();
-	else if(gametype == 2)
-		OnMenuPlayCashGame();
-	else
+	try
 	{
-		botstacksize = humanstacksize = effstacksize = gametype;
-		OnMenuPlayCashGame();
-	}
+		CDialog::OnInitDialog();
 
+		// Set the icon for this dialog.  The framework does this automatically
+		//  when the application's main window is not a dialog
+
+		SetIcon(m_hIcon, TRUE);			// Set big icon
+		SetIcon(m_hIcon, FALSE);		// Set small icon
+
+		//make a menu!
+		//"Create a CMenu object on the stack frame as a local, then call CMenu's 
+		// member functions to manipulate the new menu as needed. Next, call 
+		// CWnd::SetMenu to set the menu to a window, followed immediately by a 
+		// call to the CMenu object's Detach member function."
+		//(I save the menu to an object here so I can check/uncheck and such)
+		MyMenu.LoadMenu(IDR_MYMENU);
+		SetMenu(&MyMenu);
+		MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_CHECKED);
+
+		//find a strategy/portfolio file and create the bot api
+
+	#ifdef USE_NETWORK_CLIENT
+		_mybot->Init( );
+	#endif
+		if(!loadbotfile()) 
+			exit(0);
+
+		//initialize the window controls that need it
+
+		TotalWon.SetWindowText(TEXT(""));
+		graygameover();
+
+		//set the picture on the File Open Button
+
+		OpenBotButton.LoadBitmaps(IDB_OPEN1, IDB_OPEN1, IDB_OPEN1, IDB_OPEN2);
+		OpenBotButton.SizeToContent();
+
+		unsigned gametype;
+		while(!getuserinput("Choices:\n"
+			"   Enter \"1\" to start a new Tournament (Full Tilt style, 2 person heads-up sit-n-go)\n"
+			"   Enter \"2\" to start a Cash Game at default bankroll\n"
+			"   Enter another number to set the starting bankroll for a "
+			+tostring(cashsblind*2)+"/"+tostring(cashbblind*2)+" Cash Game", gametype));
+		if(gametype == 1)
+			OnMenuNewTourney();
+		else if(gametype == 2)
+			OnMenuPlayCashGame();
+		else
+		{
+			botstacksize = humanstacksize = effstacksize = gametype;
+			OnMenuPlayCashGame();
+		}
+	}
+	catch( std::exception & e )
+	{
+		MessageBox( e.what( ) );
+	}
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -347,6 +351,22 @@ void CSimpleGameDlg::updateinvested(Player justacted)
 
 bool CSimpleGameDlg::loadbotfile()
 {
+#ifdef USE_NETWORK_CLIENT
+	if( _mybot->GetSessionType( ) == SESSION_NONE )
+	{
+		MessageCreateNewCashSession message;
+		message.startingbalance = 0;
+		message.sbet = 0;
+		message.bbet = 0;
+		memset( message.opponentname, 0, 1024 );
+		message.gametype = GAME_SIMPLEGAME;
+		_mybot->CreateNewCashSession( message );
+	}
+	else
+	{
+		MessageBox( "Already loaded." );
+	}
+#else
 	CFileDialog filechooser(TRUE, "xml", NULL, OFN_NOCHANGEDIR, "Bot Definition XML files (*.xml)|*.xml||");
 	if(filechooser.DoModal() == IDCANCEL) 
 		return false;
@@ -356,6 +376,8 @@ bool CSimpleGameDlg::loadbotfile()
 	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()));
 	if(ShowDiagnostics.GetCheck())
 		_mybot->setdiagnostics(true, this);
+#endif
+
 	totalhumanwon = 0;
 	handsplayed = 0;
 	if(_mybot->islimit())
@@ -522,9 +544,9 @@ void CSimpleGameDlg::dogameover(bool fold)
 	effstacksize = mymin(humanstacksize, botstacksize);
 
 	if(fpequal(humanstacksize, 0))
-		REPORT("bot won",INFO);
+		MessageBox( "bot won", "game over.", MB_OK );
 	if(fpequal(botstacksize, 0))
-		REPORT("you won",INFO);
+		MessageBox( "you won", "Good job.", MB_OK );
 
 	//reset values to reprint the stacks to the screen
 	pot = invested[bot] = invested[human] = 0;
@@ -765,7 +787,7 @@ void CSimpleGameDlg::OnBnClickedButton5()
 {
 	if(fpequal(0, mymin(humanstacksize, botstacksize)))
 	{
-		REPORT("no money left, use bankroll options on menu.", INFO);
+		MessageBox( "no money left, use bankroll options on menu." );
 		return;
 	}
 	else if(fpgreater(0, mymin(humanstacksize, botstacksize)))
@@ -787,7 +809,7 @@ void CSimpleGameDlg::OnBnClickedButton5()
 		{
 			_bblind = bbets[handsplayedtourney/18] / 2;
 			_sblind = bbets[handsplayedtourney/18] / 4;
-			REPORT("Tourney bets are now "+tostring(_bblind)+"/"+tostring(_bblind*2)+".", INFO);
+			MessageBox( ( "Tourney bets are now "+tostring(_bblind)+"/"+tostring(_bblind*2)+"." ).c_str( ) , "Blinds", MB_OK );
 		}
 	}
 	else
@@ -930,7 +952,7 @@ void CSimpleGameDlg::OnMenuPlayCashGame()
 	istournament = false;
 	MyMenu.CheckMenuItem(ID_MENU_NEWTOURNEY, MF_UNCHECKED);
 	MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_CHECKED);
-	REPORT("Playing Cash Game: Blinds are set to "+tostring(cashsblind)+", "+tostring(cashbblind), INFO);
+	MessageBox( ( "Playing Cash Game: Blinds are set to "+tostring(cashsblind)+", "+tostring(cashbblind) ).c_str( ), "New Game" );
 	OnBnClickedButton5();
 }
 
@@ -966,6 +988,6 @@ void CSimpleGameDlg::OnMenuSetAllBankroll()
 void CSimpleGameDlg::OnLoadbotfile()
 { if(loadbotfile()) /*then start new game*/ OnBnClickedButton5(); } 
 void CSimpleGameDlg::OnShowbotfile()
-{ REPORT(_mybot->getxmlfile(),INFO); } 
+{ MessageBox(_mybot->getxmlfile().c_str( ), "Bot version" ); } 
 void CSimpleGameDlg::OnMenuExit()
 { OnCancel(); }
