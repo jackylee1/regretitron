@@ -27,8 +27,7 @@ enum MessageTypeEnum
 	//client to server messages
 
 	//session management -- all respond by sending session state
-	MESSAGE_TYPE_CREATENEWTOURNEYSESSION = 0,
-	MESSAGE_TYPE_CREATENEWCASHSESSION = 1,
+	MESSAGE_TYPE_CREATENEWSESSION = 0,
 	MESSAGE_TYPE_CLOSESESSION = 2,
 	MESSAGE_TYPE_CANCELSESSION = 3,
 	MESSAGE_TYPE_GETSESSIONSTATE = 4,
@@ -53,15 +52,13 @@ enum GameTypeEnum
 {
 	GAME_SIMPLEGAME = 0,
 	GAME_POKERACADEMY = 1,
-	GAME_FULLTILT_SITNGO = 10,
-	GAME_FULLTILT_SITNGO_TURBO = 11
+	GAME_REALMONEY_NORAKE = 10
 };
 
 enum SessionTypeEnum
 {
 	SESSION_NONE,
-	SESSION_CASH,
-	SESSION_TOURNEY
+	SESSION_OPEN
 };
 
 
@@ -87,35 +84,22 @@ BOOST_STATIC_ASSERT( sizeof( MessageHeader ) == 24 );
 //session management
 
 
-struct MessageCreateNewTourneySession
+struct MessageCreateNewSession
 {
-	double buyin;
-	double rake;
-	char opponentname[ 1024 ];
 	uint8 gametype;
 };
-BOOST_STATIC_ASSERT( sizeof( MessageCreateNewTourneySession ) == 1024 + 24 );
-
-struct MessageCreateNewCashSession
-{
-	double startingbalance;
-	double sbet;
-	double bbet;
-	char opponentname[ 1024 ];
-	uint8 gametype;
-};
-BOOST_STATIC_ASSERT( sizeof( MessageCreateNewCashSession ) == 1024 + 32 );
+BOOST_STATIC_ASSERT( sizeof( MessageCreateNewSession ) == 1 );
 
 const int CLOSESESSION_MAXFILES = 4;
 const int CLOSESESSION_MAXFILENAMEBYTES = 1024;
+const int CLOSESESSION_NOTESLENGTH = 10000;
 struct MessageCloseSession
 {
 	char filename[ CLOSESESSION_MAXFILES ][ CLOSESESSION_MAXFILENAMEBYTES ];
 	uint64 filelength[ CLOSESESSION_MAXFILES ];
-	double endingbalance;
-	uint8 tourneywinner;
+	char notes[ CLOSESESSION_NOTESLENGTH ];
 };
-BOOST_STATIC_ASSERT( sizeof( MessageCloseSession ) == ( CLOSESESSION_MAXFILENAMEBYTES + 8 ) * CLOSESESSION_MAXFILES + 8 + 8 );
+BOOST_STATIC_ASSERT( sizeof( MessageCloseSession ) == ( CLOSESESSION_MAXFILENAMEBYTES + 8 ) * CLOSESESSION_MAXFILES + CLOSESESSION_NOTESLENGTH );
 
 
 //BotAPI functions

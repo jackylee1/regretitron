@@ -32,8 +32,7 @@ public:
 	void Init( );
 
 	//create new session event
-	void CreateNewTourneySession( const MessageCreateNewTourneySession & request );
-	void CreateNewCashSession( const MessageCreateNewCashSession & request );
+	void CreateNewSession( const MessageCreateNewSession & request );
 
 	//game events
 	void setnewgame(Player playernum, CardMask myhand, double sblind, double bblind, double stacksize);

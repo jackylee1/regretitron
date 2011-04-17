@@ -5,7 +5,7 @@
 #include <boost/scoped_array.hpp>
 using namespace std;
 
-const boost::filesystem::path SESSIONDIR = "/home/scott/botsessions";
+const boost::filesystem::path SESSIONDIR = "/home/scott/pokerbreedinggrounds/bin/botsessions";
 
 string GetBotFolder( unsigned botid )
 {
@@ -61,72 +61,15 @@ void SessionManager::Init( )
 
 		insertionresult.first->second.bot = BotPtr( new BotAPI( xmlpath ) );
 		insertionresult.first->second.playerid = playerid;
-		insertionresult.first->second.type = SESSION_TOURNEY; //not always accurate
 		insertionresult.first->second.iserror = false;
 	}
 
 	cout << "loaded " << sessionloader.get_rpc( ) << " sessions..." << endl;
 }
 
-uint64 SessionManager::CreateTourneySession( uint64 playerid, const MessageCreateNewTourneySession & request, MessageSendSessionState & response )
+uint64 SessionManager::CreateSession( uint64 playerid, const MessageCreateNewSession & request, MessageSendSessionState & response )
 {
-	cout << "Creating new tourney session with playerid=" << playerid << " buyin=" << request.buyin << " rake=" << request.rake << " oppname='" << request.opponentname << "' gametype=" << (int)request.gametype << endl;
-
-	memset( response.message, 0, 1024 );
-
-	try
-	{
-		boost::unique_lock< boost::shared_mutex > exclusivelylocked( m_maplock );
-
-		otl_stream checkplayer( 3, "select enabled from players where playerid = :plid<unsigned> ", m_database );
-		checkplayer << (unsigned)playerid << endr;
-		if( checkplayer.get_prefetched_row_count( ) != 1 )
-			throw Exception( "Playerid not found." );
-		int isenabled = 0;
-		checkplayer >> isenabled >> endr;
-		if( ! isenabled )
-			throw Exception( "Playerid disabled." );
-
-		const unsigned botid = GetBotID( (GameTypeEnum)request.gametype );
-
-		otl_stream makesession( 3, "insert into sessions ( sessionid, playerid, botid, status, gametype ) values ( :sessid<unsigned>, :plid<unsigned>, :btid<unsigned>, 'ACTIVE', :gtp<int> )", m_database );
-		makesession << (unsigned)m_nextsessionid << (unsigned)playerid << botid 
-			<< (int)request.gametype << endr;
-
-		pair< SessionMap::iterator, bool > insertionresult
-			= m_map.insert( SessionMap::value_type( m_nextsessionid, SessionStruct( ) ) );
-
-		if( ! insertionresult.second )
-			throw Exception( "Error creating session (already there)" );
-
-		string xmlpath;
-		otl_stream getpath( 3, "select xmlpath from bots where botid = :btid<unsigned>", m_database );
-		getpath << botid << endr;
-		getpath >> xmlpath >> endr;
-
-		insertionresult.first->second.bot = BotPtr( new BotAPI( xmlpath ) );
-		insertionresult.first->second.playerid = playerid;
-		insertionresult.first->second.type = SESSION_TOURNEY;
-		insertionresult.first->second.iserror = false;
-
-		response.sessiontype = SESSION_TOURNEY;
-		strcpy( response.message, "Session created." );
-		m_nextsessionid++;
-		return insertionresult.first->first;
-	}
-	catch( std::exception & e )
-	{
-		m_map.erase( m_nextsessionid );
-		response.sessiontype = SESSION_NONE;
-		strncpy( response.message, e.what( ), sizeof( response.message ) );
-		response.message[ sizeof( response.message ) - 1 ] = 0;
-		return 0;
-	}
-}
-
-uint64 SessionManager::CreateCashSession( uint64 playerid, const MessageCreateNewCashSession & request, MessageSendSessionState & response )
-{
-	cout << "Creating new cash session with playerid=" << playerid << " startingbalance=" << request.startingbalance << " sbet=" << request.sbet << " bbet=" << request.bbet << " oppname='" << request.opponentname << "' gametype=" << (int)request.gametype << endl;
+	cout << "Creating new session with playerid=" << playerid << " gametype=" << (int)request.gametype << endl;
 
 	memset( response.message, 0, 1024 );
 
@@ -162,10 +105,9 @@ uint64 SessionManager::CreateCashSession( uint64 playerid, const MessageCreateNe
 
 		insertionresult.first->second.bot = BotPtr( new BotAPI( xmlpath ) );
 		insertionresult.first->second.playerid = playerid;
-		insertionresult.first->second.type = SESSION_CASH;
 		insertionresult.first->second.iserror = false;
 
-		response.sessiontype = SESSION_CASH;
+		response.sessiontype = SESSION_OPEN;
 		strcpy( response.message, "Session created." );
 		m_nextsessionid++;
 		return insertionresult.first->first;
@@ -200,7 +142,7 @@ uint64 SessionManager::TestSession( uint64 playerid, uint64 sessionid, MessageSe
 		otl_stream updatetests( 1, "update sessions set numtests = numtests + 1 where sessionid = :sessid<unsigned>", m_database );
 		updatetests << (unsigned)sessionid << endr;
 
-		response.sessiontype = findresult->second.type;
+		response.sessiontype = SESSION_OPEN;
 		strcpy( response.message, "Your session was restored." );
 		return findresult->first;
 	}
@@ -208,7 +150,7 @@ uint64 SessionManager::TestSession( uint64 playerid, uint64 sessionid, MessageSe
 
 void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socket & socket, const MessageCloseSession & request, MessageSendSessionState & response )
 {
-	cout << "closing session with playerid=" << playerid << " sessionid=" << sessionid << " endingbalance=" << request.endingbalance << " tourneywinner=" << (int)request.tourneywinner;
+	cout << "closing session with playerid=" << playerid << " sessionid=" << sessionid << " notes=" << request.notes;
 
 	memset( response.message, 0, 1024 );
 
@@ -260,8 +202,8 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 			}
 		}
 
-		otl_stream killsession( 3, "update sessions set status = 'LOGGED' where sessionid = :sessid<unsigned>", m_database );
-		killsession << (unsigned)sessionid << endr;
+		otl_stream killsession( 3, "update sessions set status = 'LOGGED', notes = :note<char[10000]> where sessionid = :sessid<unsigned>", m_database );
+		killsession << request.notes << (unsigned)sessionid << endr;
 
 		m_map.erase( findresult );
 

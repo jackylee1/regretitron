@@ -58,9 +58,9 @@ void ConnectionThreadProc( SocketPtr sock, SessionManager & sessionmanager )
 
 			switch( header.messagetype )
 			{
-				case MESSAGE_TYPE_CREATENEWTOURNEYSESSION:
+				case MESSAGE_TYPE_CREATENEWSESSION:
 				{
-					MessageCreateNewTourneySession msg;
+					MessageCreateNewSession msg;
 					ReadStruct( *sock, msg );
 
 					if( header.sessionid != 0 )
@@ -69,22 +69,7 @@ void ConnectionThreadProc( SocketPtr sock, SessionManager & sessionmanager )
 					MessageSendSessionState response;
 					MessageHeader responseheader( MESSAGE_TYPE_SENDSESSIONSTATE );
 					responseheader.playerid = header.playerid;
-					responseheader.sessionid = sessionmanager.CreateTourneySession( header.playerid, msg, response );
-					WriteStruct( *sock, responseheader, response );
-					break;
-				}
-				case MESSAGE_TYPE_CREATENEWCASHSESSION:
-				{
-					MessageCreateNewCashSession msg;
-					ReadStruct( *sock, msg );
-
-					if( header.sessionid != 0 )
-						throw Exception( "Trying to create session with existing sessionid " + tostr( header.sessionid ) );
-
-					MessageSendSessionState response;
-					MessageHeader responseheader( MESSAGE_TYPE_SENDSESSIONSTATE );
-					responseheader.playerid = header.playerid;
-					responseheader.sessionid = sessionmanager.CreateCashSession( header.playerid, msg, response );
+					responseheader.sessionid = sessionmanager.CreateSession( header.playerid, msg, response );
 					WriteStruct( *sock, responseheader, response );
 					break;
 				}

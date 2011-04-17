@@ -73,32 +73,14 @@ void ClientAPI::Init( )
 	ReadSessionState( false );
 }
 
-void ClientAPI::CreateNewTourneySession( const MessageCreateNewTourneySession & request )
+void ClientAPI::CreateNewSession( const MessageCreateNewSession & request )
 {
 	try
 	{
 		if( m_commonheader.sessionid != 0 )
 			throw Exception( "Trying to create new session but a session is already active" );
 		
-		m_commonheader.messagetype = MESSAGE_TYPE_CREATENEWTOURNEYSESSION;
-		WriteStruct( m_socket, m_commonheader, request );
-
-		ReadSessionState( true );
-	}
-	catch( std::exception & e )
-	{
-		MessageBox( NULL, ( string( "Error: \"" ) + e.what( ) + "\"" ).c_str( ), "Error", MB_ICONEXCLAMATION );
-	}
-}
-
-void ClientAPI::CreateNewCashSession( const MessageCreateNewCashSession & request )
-{
-	try
-	{
-		if( m_commonheader.sessionid != 0 )
-			throw Exception( "Trying to create new session but a session is already active" );
-		
-		m_commonheader.messagetype = MESSAGE_TYPE_CREATENEWCASHSESSION;
+		m_commonheader.messagetype = MESSAGE_TYPE_CREATENEWSESSION;
 		WriteStruct( m_socket, m_commonheader, request );
 
 		ReadSessionState( true );

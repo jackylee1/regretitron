@@ -17,8 +17,7 @@ public:
 	{ }
 
 	void Init( );
-	uint64 CreateTourneySession( uint64 playerid, const MessageCreateNewTourneySession & request, MessageSendSessionState & response );
-	uint64 CreateCashSession( uint64 playerid, const MessageCreateNewCashSession & request, MessageSendSessionState & response );
+	uint64 CreateSession( uint64 playerid, const MessageCreateNewSession & request, MessageSendSessionState & response );
 	uint64 TestSession( uint64 playerid, uint64 sessionid, MessageSendSessionState & response );
 	void CloseSession( uint64 playerid, uint64 sessionid, tcp::socket & socket, const MessageCloseSession & request, MessageSendSessionState & response );
 	void CancelSession( uint64 playerid, uint64 sessionid, MessageSendSessionState & response );
@@ -37,7 +36,6 @@ private:
 	{
 		BotPtr bot;
 		uint64 playerid;
-		SessionTypeEnum type;
 		bool iserror;
 		string errorstr;
 	};
