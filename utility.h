@@ -19,6 +19,8 @@
 #include <unistd.h>
 #endif
 #include "MersenneTwister.h"
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 
 // the version of my portfolio xml document
 
@@ -39,8 +41,6 @@ class LoggerClass
 public:
 	virtual void operator( )( const std::string & message ) = 0;
 };
-
-extern LoggerClass & logger; // reference to a concrete logger class, all defined in some other (top-level) file.
 
 class NullLogger : public LoggerClass
 {
@@ -63,11 +63,22 @@ private:
 class FileLogger : public LoggerClass
 {
 public:
-	FileLogger( const std::string & filename, bool append );
+	FileLogger( const boost::filesystem::path & filename, bool append );
 	~FileLogger( );
 	virtual void operator( )( const std::string & message );
+
+	class StopLog
+	{
+	public:
+		StopLog( FileLogger & filelog );
+		~StopLog( );
+		const boost::filesystem::path & GetFilePath( ) { return m_filelog.m_filepath; }
+	private:
+		FileLogger & m_filelog;
+	};
 private:
-	std::ofstream file;
+	const boost::filesystem::path m_filepath;
+	boost::filesystem::ofstream m_file;
 };
 
 // Delete function

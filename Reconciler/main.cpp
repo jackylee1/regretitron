@@ -17,6 +17,7 @@ string GetUsage( string exename )
 
 int main( int argc, char ** argv )
 {
+
 	try
 	{
 		if( argc == 3 )
@@ -29,7 +30,16 @@ int main( int argc, char ** argv )
 			bool forceactions = false;
 			if( actionchooserseed == 0 )
 				forceactions = true;
-			Reconciler reconciler( argv[ 2 ], actionchooserseed, forceactions );
+
+			// this is the logger used by BotAPI and others
+			FileLogger botapilogger( "reconciler.logger.log", false );
+
+			// this is the logger used by BotAPI's reconciler log
+			FileLogger botapireclog( "reconciler.reclog.log", false );
+
+			Reconciler reconciler( argv[ 2 ], actionchooserseed, forceactions,
+					botapilogger,
+					botapireclog );
 			FullTiltParser parser( reconciler );
 
 			// open input log file

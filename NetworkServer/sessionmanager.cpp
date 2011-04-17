@@ -7,6 +7,8 @@
 using namespace std;
 
 const boost::filesystem::path SESSIONDIR = "/home/scott/pokerbreedinggrounds/bin/botsessions";
+const boost::filesystem::path LOGGERFILE = "botapi.logger.log";
+const boost::filesystem::path RECLOGFILE = "botapi.reclog.log";
 
 string GetBotFolder( unsigned botid )
 {
@@ -43,15 +45,15 @@ void SessionManager::Init( )
 		nextsessionid = 1;
 	m_nextsessionid = nextsessionid;
 
-	otl_stream sessionloader( 50, "select sessionid, playerid, xmlpath from "
+	otl_stream sessionloader( 50, "select sessionid, playerid, s.botid, xmlpath from "
 			"sessions s inner join bots b on s.botid = b.botid where status = 'ACTIVE'", m_database );
 
 	while( ! sessionloader.eof( ) )
 	{
-		unsigned sessionid = 0, playerid = 0;
+		unsigned sessionid = 0, playerid = 0, botid = 0;
 		string xmlpath;
-		sessionloader >> sessionid >> playerid >> xmlpath >> endr;
-		if( sessionid == 0 || playerid == 0 )
+		sessionloader >> sessionid >> playerid >> botid >> xmlpath >> endr;
+		if( sessionid == 0 || playerid == 0 || botid == 0 )
 			throw Exception( "0 stuff found" );
 
 		pair< SessionMap::iterator, bool > insertionresult
@@ -60,7 +62,11 @@ void SessionManager::Init( )
 		if( ! insertionresult.second )
 			throw Exception( "Error creating session (already there)" );
 
-		insertionresult.first->second.bot = BotPtr( new BotAPI( xmlpath ) );
+		FileLogger * logptr = new FileLogger( ( SESSIONDIR / GetBotFolder( botid ) / GetSessionFolder( sessionid ) / LOGGERFILE ).string( ), true );
+		FileLogger * recptr = new FileLogger( ( SESSIONDIR / GetBotFolder( botid ) / GetSessionFolder( sessionid ) / RECLOGFILE ).string( ), true );
+		insertionresult.first->second.botapilogger = logptr;
+		insertionresult.first->second.botapireclog = recptr;
+		insertionresult.first->second.bot = new BotAPI( xmlpath, false, MTRand::gettimeclockseed( ), *logptr, *recptr );
 		insertionresult.first->second.playerid = playerid;
 		insertionresult.first->second.iserror = false;
 	}
@@ -104,7 +110,17 @@ uint64 SessionManager::CreateSession( uint64 playerid, const MessageCreateNewSes
 		getpath << botid << endr;
 		getpath >> xmlpath >> endr;
 
-		insertionresult.first->second.bot = BotPtr( new BotAPI( xmlpath ) );
+		const boost::filesystem::path botpath = SESSIONDIR / GetBotFolder( botid );
+		const boost::filesystem::path sessionpath = botpath / GetSessionFolder( m_nextsessionid );
+		boost::filesystem::create_directory( botpath );
+		boost::filesystem::create_directory( sessionpath );
+
+		//should be new files but doesn't hurt to append
+		FileLogger * logptr = new FileLogger( ( sessionpath / LOGGERFILE ).string( ), true );
+		FileLogger * recptr = new FileLogger( ( sessionpath / RECLOGFILE ).string( ), true );
+		insertionresult.first->second.botapilogger = logptr;
+		insertionresult.first->second.botapireclog = recptr;
+		insertionresult.first->second.bot = new BotAPI( xmlpath, false, MTRand::gettimeclockseed( ), *logptr, *recptr );
 		insertionresult.first->second.playerid = playerid;
 		insertionresult.first->second.iserror = false;
 
@@ -183,12 +199,10 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 
 		const boost::filesystem::path botpath = SESSIONDIR / GetBotFolder( botid );
 		const boost::filesystem::path sessionpath = botpath / GetSessionFolder( sessionid );
-		boost::filesystem::create_directory( botpath );
-		boost::filesystem::create_directory( sessionpath );
+		char * currentptr = filebuffer.get( );
 
 		for( int i = 0; i < CLOSESESSION_MAXFILES; i++ )
 		{
-			char * currentptr = filebuffer.get( );
 			if( request.filelength[ i ] )
 			{
 				const boost::filesystem::path filepath = sessionpath / request.filename[ i ];
@@ -206,6 +220,9 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 		otl_stream killsession( 3, "update sessions set status = 'LOGGED', notes = :note<char[10000]> where sessionid = :sessid<unsigned>", m_database );
 		killsession << request.notes << (unsigned)sessionid << endr;
 
+		delete findresult->second.bot;
+		delete findresult->second.botapilogger;
+		delete findresult->second.botapireclog;
 		m_map.erase( findresult );
 
 		response.sessiontype = SESSION_NONE;
@@ -236,6 +253,9 @@ void SessionManager::CancelSession( uint64 playerid, uint64 sessionid, MessageSe
 		otl_stream killsession( 3, "update sessions set status = 'CANCELLED' where sessionid = :sessid<unsigned>", m_database );
 		killsession << (unsigned)sessionid << endr;
 
+		delete findresult->second.bot;
+		delete findresult->second.botapilogger;
+		delete findresult->second.botapireclog;
 		m_map.erase( findresult );
 		response.sessiontype = SESSION_NONE;
 		strcpy( response.message, "Session cancelled." );

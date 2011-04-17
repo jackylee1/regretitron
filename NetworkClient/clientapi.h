@@ -56,7 +56,7 @@ public:
 #endif
 
 	//close out session event
-	void CloseSession( const vector< string > &, MessageCloseSession & request );
+	bool CloseSession( const vector< string > &, MessageCloseSession & request );
 	void CancelSession( );
 
 	SessionTypeEnum GetSessionType( ) { return m_sessiontype; }

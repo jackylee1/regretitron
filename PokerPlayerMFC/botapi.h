@@ -26,7 +26,9 @@ class DiagnosticsPage; //forward declaration
 class BotAPI
 {
 public:
-	BotAPI( string xmlfile, bool preload = false, MTRand::uint32 randseed = MTRand::gettimeclockseed( ));
+	BotAPI( string xmlfile, bool preload, MTRand::uint32 randseed, 
+			LoggerClass & botapilogger,
+			LoggerClass & botapireclog );
 	~BotAPI();
 
 	//control game progress
@@ -77,6 +79,7 @@ public:
 	bool islimit() const { return get_property(mystrats[0]->gettree(), settings_tag()).limit; }
 	bool isportfolio() const { return mystrats.size() >= 2; }
 	string getxmlfile() const { return myxmlfile; }
+	LoggerClass & GetLogger( ) { return m_logger; }
 
 private:
 	//amount is the total amount of a wager when betting/raising (relative to the beginning of the round)
@@ -113,6 +116,9 @@ private:
 	bool isdiagnosticson;
 
 	//private data
+	LoggerClass & m_logger;
+	LoggerClass & m_reclog;
+
 #if PLAYOFFDEBUG > 0
 	MTRand &actionchooser;
 #else

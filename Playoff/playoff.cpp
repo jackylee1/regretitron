@@ -17,14 +17,6 @@
 #include <list>
 using namespace std;
 
-//my global logger class, defined for each top-level project
-//ConsoleLogger my_logger;
-NullLogger my_logger;
-LoggerClass & logger( my_logger );
-
-NullLogger nulllog;
-LoggerClass & botapireclog( nulllog );
-
 const double LOAD_LIMIT = 3.9; //load average number
 const int LOAD_TO_USE = 1; //1, 2, or 3, for 1 min, 5 min, or 15 min.
 const int SLEEP_ON_THREADSTART = 60; // in seconds, sleep this much after starting a thread before looking for more work to do
@@ -91,8 +83,9 @@ Playoff::Playoff(string file1, string file2)
 	  mersenne() //my own local object seeded with time and clock
 #endif
 {
-	_bots[0] = new BotAPI(file1, true);
-	_bots[1] = new BotAPI(file2, true);
+	NullLogger playofflogger;
+	_bots[0] = new BotAPI(file1, true, MTRand::gettimeclockseed(), playofflogger, playofflogger );
+	_bots[1] = new BotAPI(file2, true, MTRand::gettimeclockseed(), playofflogger, playofflogger );
 	if(_bots[0]->islimit() != _bots[1]->islimit())
 		REPORT("You can't play a limit bot against a no-limit bot!");
 	double stacksizemult1 = _bots[0]->getstacksizemult();
@@ -101,9 +94,9 @@ Playoff::Playoff(string file1, string file2)
 	{
 
 		_stacksize = _bots[0]->islimit() ? min(stacksizemult1,stacksizemult2) : (stacksizemult1+stacksizemult2) / 2.0;
-		logger("Warning: "+file1+" has stacksize "+tostring(stacksizemult1)+"bb while "+file2+" has stacksize "
+		cerr << "Warning: "+file1+" has stacksize "+tostring(stacksizemult1)+"bb while "+file2+" has stacksize "
 				+tostring(stacksizemult2)+"bb for "+(_bots[0]->islimit() ? "limit" : "no-limit")
-				+" poker... using "+tostring(_stacksize)+"bb.");
+				+" poker... using "+tostring(_stacksize)+"bb." << endl;
 		_stacksize *= _bblind;
 	}
 	else

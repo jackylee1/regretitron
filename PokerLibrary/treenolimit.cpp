@@ -238,7 +238,7 @@ void testtree()
 	}
 }
 
-Vertex createtree(BettingTree &tree, const int max_actions)
+Vertex createtree(BettingTree &tree, const int max_actions, LoggerClass & treelogger)
 {
 	testtree();
 
@@ -305,7 +305,7 @@ Vertex createtree(BettingTree &tree, const int max_actions)
 	prunelimit(0, 0, BB, tree, n0, T0, T1, TSD, max_actions);
 
 	//at most (4 + 4 + 8 + 8) small bets = 24 bblinds can be spent in a game
-	logger( "Tree has " + tostr( num_vertices(tree)-3 ) + " nodes, and 3 terminal nodes also. "
+	treelogger( "Tree has " + tostr( num_vertices(tree)-3 ) + " nodes, and 3 terminal nodes also. "
 			+ "Lost " + tostr(  6378+3-num_vertices(tree) ) + " nodes compared to a full tree." );
 
 	if(get_property(tree, settings_tag()).stacksize >= 24 * get_property(tree, settings_tag()).bblind && num_vertices(tree) != 6378 + 3)

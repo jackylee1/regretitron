@@ -6,14 +6,6 @@
 #include "../utility.h"
 using namespace std;
 
-//my global logger class, defined for each top-level project
-//ConsoleLogger my_logger;
-NullLogger my_logger;
-LoggerClass & logger( my_logger );
-
-NullLogger nulllog;
-LoggerClass & botapireclog( nulllog );
-
 class IntContainer
 {
 public:

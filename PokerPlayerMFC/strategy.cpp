@@ -15,7 +15,7 @@
 #endif
 
 //loads a new strategy, reads xml
-Strategy::Strategy(string xmlfilename, bool preload) : 
+Strategy::Strategy(string xmlfilename, bool preload, LoggerClass & strategylogger) : 
 	_xmlfilename(xmlfilename),
 	tree(NULL),
 	cardmach(NULL),
@@ -85,7 +85,7 @@ Strategy::Strategy(string xmlfilename, bool preload) :
 		treesettings.pushfold = xmltree->FirstChildElement("meta")->GetAttribute<bool>("pushfold");
 		treesettings.limit = xmltree->FirstChildElement("meta")->GetAttribute<bool>("limit");
 		tree = new BettingTree(treesettings);
-		treeroot = createtree(*tree, MAX_ACTIONS);
+		treeroot = createtree(*tree, MAX_ACTIONS, strategylogger);
 
 		//set strategy file
 

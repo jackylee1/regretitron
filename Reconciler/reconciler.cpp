@@ -1,29 +1,11 @@
 #include "reconciler.h"
 
 // ............................................
-// this is the logger used by BotAPI and others
-
-FileLogger my_logger( "reconciler.regretinator.log", false );
-//ConsoleLogger my_logger;
-//NullLogger my_logger;
-
-// ............................................
 // this is the logger used by Reconciler's reconciler log
 
 FileLogger reclog( "reconciler.reclog.log", false );
 //ConsoleLogger reclog;
 //NullLogger reclog;
-
-// ............................................
-// this is the logger used by BotAPI's reconciler log
-
-FileLogger my_botapireclog( "reconciler.botapireclog.log", false );
-//ConsoleLogger my_botapireclog;
-//NullLogger my_botapireclog;
-
-// finally, the references used by other modules of the program
-LoggerClass & logger( my_logger );
-LoggerClass & botapireclog( my_botapireclog );
 
 // ............................................
 void Reconciler::setnewgame(uint64 gamenumber, Player playernum, MyCardMask cards, double sblind, double bblind, double stacksize)

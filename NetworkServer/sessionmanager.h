@@ -31,10 +31,11 @@ public:
 private:
 	unsigned GetBotID( GameTypeEnum gametype );
 
-	typedef boost::shared_ptr< BotAPI > BotPtr;
 	struct SessionStruct
 	{
-		BotPtr bot;
+		BotAPI * bot;
+		FileLogger * botapilogger;
+		FileLogger * botapireclog;
 		uint64 playerid;
 		bool iserror;
 		string errorstr;

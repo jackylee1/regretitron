@@ -14,15 +14,18 @@ using std::string;
 class Reconciler
 {
 public:
-	Reconciler( const std::string & reconcileagent, MTRand::uint32 seed, bool forceactions )
+	Reconciler( const std::string & reconcileagent, MTRand::uint32 seed, bool forceactions,
+			LoggerClass & botapilogger,
+			LoggerClass & botapireclog )
 		: m_forceactions( forceactions )
-		, m_bot( reconcileagent, false, seed )
+		, m_bot( reconcileagent, false, seed, botapilogger, botapireclog )
 	{ }
 	void setnewgame(uint64 gamenumber, Player playernum, MyCardMask cards, double sblind, double bblind, double stacksize);
 	void setnextround(int gr, MyCardMask newboard, double newpot);
 	void doaction(Player player, Action a, double amount);
 	void endofgame( );
 	void endofgame( MyCardMask cards );
+	LoggerClass & GetLogger( ) { return m_bot.GetLogger( ); }
 private:
 	const bool m_forceactions;
 	Player m_me;

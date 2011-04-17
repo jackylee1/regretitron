@@ -43,19 +43,20 @@ void ConsoleLogger::operator( )( const string & message )
 }
 
 
-FileLogger::FileLogger( const std::string & filename, bool append )
+FileLogger::FileLogger( const boost::filesystem::path & filename, bool append )
+	: m_filepath( filename )
 {
 	if( append )
-		file.open( filename.c_str( ), ios_base::out | ios_base::app | ios_base::ate );
+		m_file.open( m_filepath, ios_base::out | ios_base::app | ios_base::ate );
 	else
-		file.open( filename.c_str( ), ios_base::out );
+		m_file.open( m_filepath, ios_base::out );
 
-	if( ! file.good( ) )
-		throw Exception( "Failed to open '" + filename + "' for logging." );
+	if( ! m_file.good( ) )
+		throw Exception( "Failed to open '" + m_filepath.string( ) + "' for logging." );
 
-	if( append && file.tellp( ) > 0)
-		file << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
-	file << "----------------------------------" << endl;
+	if( append && m_file.tellp( ) > 0)
+		m_file << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
+	m_file << "----------------------------------" << endl;
 
 	time_t rawtime;
 	struct tm * timeinfo;
@@ -63,7 +64,7 @@ FileLogger::FileLogger( const std::string & filename, bool append )
 	time ( & rawtime );
 	timeinfo = localtime ( & rawtime );
 
-	file << "File opened for logging at " << asctime( timeinfo ) << endl << endl;
+	m_file << "File opened for logging at " << asctime( timeinfo ) << endl << endl;
 }
 
 FileLogger::~FileLogger( )
@@ -74,14 +75,28 @@ FileLogger::~FileLogger( )
 	time ( & rawtime );
 	timeinfo = localtime ( & rawtime );
 
-	file << "File closed for logging at " << asctime( timeinfo ) << endl;
-	file << "----------------------------------" << endl;
+	m_file << "File closed for logging at " << asctime( timeinfo ) << endl;
+	m_file << "----------------------------------" << endl;
 }
 
 void FileLogger::operator( )( const string & message )
 {
-	file << message << endl;
+	m_file << message << endl;
 }
+
+FileLogger::StopLog::StopLog( FileLogger & filelog )
+	: m_filelog ( filelog )
+{
+	//close it to reopen later
+	m_filelog.m_file.close( );
+}
+
+FileLogger::StopLog::~StopLog( )
+{
+	//reopen it where we were
+	m_filelog.m_file.open( m_filelog.m_filepath, ios_base::out | ios_base::app | ios_base::ate );
+}
+
 
 // how to get seconds with milliseconds
 

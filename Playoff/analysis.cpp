@@ -649,17 +649,19 @@ bool doanalysis(int argc, char* argv[])
 {
 	try
 	{
+		ConsoleLogger analysislogger;
+
 		if(argc == 1)
 			return false;
 		else if(argc == 3 && string(argv[1]) == "header")
 		{
-			Strategy mystrategy(argv[2], false);
+			Strategy mystrategy(argv[2], false, analysislogger);
 			printheader(mystrategy);
 			return true;
 		}
 		else if(argc == 3 && string(argv[1]) == "count")
 		{
-			Strategy mystrategy(argv[2], false);
+			Strategy mystrategy(argv[2], false, analysislogger);
 			printcount(mystrategy);
 			return true;
 		}
@@ -667,35 +669,35 @@ bool doanalysis(int argc, char* argv[])
 		{
 			for(int i=3; i<argc; i++)
 			{
-				Strategy mystrategy(argv[i], false);
+				Strategy mystrategy(argv[i], false, analysislogger);
 				printwhatat(mystrategy, argv[2]);
 			}
 			return true;
 		}
 		else if (argc == 4 && string(argv[1]) == "diff")
 		{
-			Strategy strat1(argv[2], false);
-			Strategy strat2(argv[3], false);
+			Strategy strat1(argv[2], false, analysislogger);
+			Strategy strat2(argv[3], false, analysislogger);
 			dodiffanalysis(strat1, strat2);
 			return true;
 		}
 		else if (argc == 6 && string(argv[1]) == "diff")
 		{
-			Strategy strat1(argv[4], false);
-			Strategy strat2(argv[5], false);
+			Strategy strat1(argv[4], false, analysislogger);
+			Strategy strat2(argv[5], false, analysislogger);
 			printdiff(strat1, strat2, atoi(argv[2]), atof(argv[3]));
 			return true;
 		}
 		else if (argc == 6 && string(argv[1]) == "historyof")
 		{
-			Strategy mystrategy(argv[5], false);
+			Strategy mystrategy(argv[5], false, analysislogger);
 			dohistoryof(mystrategy, atoi(argv[2]), atoi(argv[3]), atoi(argv[4]));
 			return true;
 		}
 		else if (argc == 4 && string(argv[1]) == "compare")
 		{
-			Strategy s1(argv[2], true);
-			Strategy s2(argv[3], true);
+			Strategy s1(argv[2], true, analysislogger);
+			Strategy s2(argv[3], true, analysislogger);
 			docompare(s1, s2);
 			return true;
 		}

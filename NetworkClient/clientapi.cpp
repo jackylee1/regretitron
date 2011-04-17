@@ -190,7 +190,7 @@ void ClientAPI::endofgame( CardMask opponentcards )
 	}
 }
 
-void ClientAPI::CloseSession( 
+bool ClientAPI::CloseSession( 
 		const vector< string > & pathnames,
 		MessageCloseSession & request )
 {
@@ -282,10 +282,12 @@ void ClientAPI::CloseSession(
 		//read the response from the server
 
 		ReadSessionState( true );
+		return true; //success
 	}
 	catch( std::exception & e )
 	{
 		MessageBox( NULL, ( string( "Error: cannot close session. \"" ) + e.what( ) + "\"" ).c_str( ), "Error", MB_ICONEXCLAMATION );
+		return false; //failure
 	}
 }
 
