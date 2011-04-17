@@ -1,5 +1,6 @@
-#include <iomanip>
 #include "sessionmanager.h"
+#include <iomanip>
+#include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/scoped_array.hpp>

@@ -1,10 +1,10 @@
 #pragma once
 
+#include "servercommon.h"
 #include <map>
 #include <boost/smart_ptr.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include "../PokerPlayerMFC/botapi.h"
-#include "servercommon.h"
 #include "database.h"
 using std::string;
 

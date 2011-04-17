@@ -1,7 +1,7 @@
+#include "servercommon.h"
 #include <boost/bind.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/thread.hpp>
-#include "servercommon.h"
 #include "sessionmanager.h"
 #include "../utility.h"
 using namespace std;
