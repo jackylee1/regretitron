@@ -91,18 +91,7 @@ Playoff::Playoff(string file1, string file2)
 	  mersenne() //my own local object seeded with time and clock
 #endif
 {
-	//TODO this should be made a cmd line parameter
-	const bool testsabotaged = false;
-
-	if( testsabotaged )
-	{
-		_bots[0] = new BotAPI(file1, true, MTRand::gettimeclockseed( ), BotAPI::correctkey + 1 );
-	}
-	else
-	{
-		_bots[0] = new BotAPI(file1, true, MTRand::gettimeclockseed( ), BotAPI::correctkey );
-	}
-
+	_bots[0] = new BotAPI(file1, true);
 	_bots[1] = new BotAPI(file2, true);
 	if(_bots[0]->islimit() != _bots[1]->islimit())
 		REPORT("You can't play a limit bot against a no-limit bot!");
