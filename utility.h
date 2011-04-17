@@ -83,6 +83,12 @@ template < typename T > inline void Delete( T * & something )
 #ifdef _MSC_VER
 typedef __int64 int64;
 typedef unsigned __int64 uint64;
+typedef __int32 int32;
+typedef unsigned __int32 uint32;
+typedef __int16 int16;
+typedef unsigned __int16 uint16;
+typedef __int8 int8;
+typedef unsigned __int8 uint8;
 #elif __GNUC__ 
 #include <stdint.h>
 typedef int64_t int64;
@@ -130,6 +136,7 @@ std::string tostring(const T &myobj)
 	return o.str();
 }
 
+
 //how to get string of preprocessor symbol.
 
 #define STRINGIFY(symb) #symb
@@ -157,6 +164,13 @@ inline void PAUSE() { std::cout << "Press [enter] to continue . . ."; getchar();
 #if defined _MFC_VER
 inline CString toCString(const std::string &stdstr) { return CString(stdstr.c_str()); }
 #endif
+
+// how to get the path to our executable
+
+#ifdef _WIN32
+EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+#endif
+std::string GetOurPath( );
 
 // functions that combine multiple indices into one index
 
@@ -194,6 +208,10 @@ private:
 
 // My own exception class that accepts a string
 
+#ifdef __GNUC__
+std::string getbacktracestring();
+#endif
+
 class Exception : public std::exception
 {
 	public:
@@ -204,7 +222,8 @@ class Exception : public std::exception
 #ifdef _WIN32
 				strncpy_s( m_message, BUFFSIZE, message.c_str( ), BUFFSIZE );
 #else
-				strncpy( m_message, message.c_str( ), BUFFSIZE );
+				const std::string mymessage = message + "\n\n" + getbacktracestring();
+				strncpy( m_message, mymessage.c_str( ), BUFFSIZE );
 #endif
 				m_message[ BUFFSIZE - 1 ] = '\0';
 			}
@@ -225,5 +244,15 @@ class Exception : public std::exception
 		char m_message[ BUFFSIZE ];
 };
 
+template <typename T>
+T fromstr( const std::string & str )
+{
+	std::istringstream i( str );
+	T value;
+	i >> value;
+	if( i.fail( ) )
+		throw Exception( "Error parsing from '" + str + "'" );
+	return value;
+}
 
 #endif

@@ -129,7 +129,7 @@ inline void notify(string text) { cout << text << endl; }
 #endif
 
 #ifdef __GNUC__
-inline string getbacktracestring()
+string getbacktracestring()
 {
 	const int maxtraces = 200;
 	void * backtraces[maxtraces];
@@ -216,6 +216,19 @@ string gameroundstring(int gr)
 	}
 	return "BAD GR";
 }
+
+// how to get the path to our executable
+
+#ifdef _WIN32
+string GetOurPath( )
+{
+	//get the executable directory
+	char pathchar[ MAX_PATH ];
+	::GetModuleFileName( (HINSTANCE) & __ImageBase, pathchar, MAX_PATH );
+	string pathcharstring = pathchar;
+	return pathcharstring.substr( 0, pathcharstring.find_last_of( "/\\" ) + 1 );
+}
+#endif
 
 // how to get and set the current working directory.
 

@@ -12,17 +12,6 @@ using namespace std;
 
 using namespace boost;
 
-template < typename T >
-T fromstr( const string & s )
-{
-	istringstream i( s );
-	T val;
-	i >> val;
-	if( i.fail( ) )
-		throw Exception( "Error parsing value from: '" + s + "'." );
-	return val;
-}
-
 void stripcomma( string & str )
 {
 	for( string::iterator i = str.begin( ); i != str.end( ); )
