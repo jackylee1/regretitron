@@ -26,9 +26,7 @@ class DiagnosticsPage; //forward declaration
 class BotAPI
 {
 public:
-	static const int correctkey;
-
-	BotAPI( string xmlfile, bool preload = false, MTRand::uint32 randseed = MTRand::gettimeclockseed( ), int key = correctkey);
+	BotAPI( string xmlfile, bool preload = false, MTRand::uint32 randseed = MTRand::gettimeclockseed( ));
 	~BotAPI();
 
 	//control game progress
@@ -78,7 +76,6 @@ public:
 		{ return (double) get_property(mystrats[0]->gettree(), settings_tag()).stacksize / get_property(mystrats[0]->gettree(), settings_tag()).bblind; }
 	bool islimit() const { return get_property(mystrats[0]->gettree(), settings_tag()).limit; }
 	bool isportfolio() const { return mystrats.size() >= 2; }
-	bool issabotaged() const { return ( mykey != correctkey ); }
 	string getxmlfile() const { return myxmlfile; }
 
 private:
@@ -116,8 +113,6 @@ private:
 	bool isdiagnosticson;
 
 	//private data
-	int mykey;
-
 #if PLAYOFFDEBUG > 0
 	MTRand &actionchooser;
 #else

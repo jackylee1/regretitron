@@ -23,13 +23,10 @@ inline bool playerequal(Player player, NodeType nodetype)
 	return ((player == P0 && nodetype == P0Plays) || (player == P1 && nodetype == P1Plays));
 }
 
-const int BotAPI::correctkey = ( time( NULL ) >> 21 ) + clock( );
-
-BotAPI::BotAPI(string xmlfile, bool preload, MTRand::uint32 randseed, int key)
+BotAPI::BotAPI(string xmlfile, bool preload, MTRand::uint32 randseed)
    : myxmlfile(xmlfile),
 	 MyWindow(NULL),
      isdiagnosticson(false),
-	 mykey(key),
 #if PLAYOFFDEBUG > 0
 	 actionchooser(playoff_rand), //alias to globally defined object from utility.cpp
 #else
@@ -423,18 +420,6 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 	vector<double> probabilities(out_degree(currentnode, currstrat->gettree()));
 	currstrat->getprobs(currentgr, (currstrat->gettree())[currentnode].actioni,
 			out_degree(currentnode, currstrat->gettree()), cards, probabilities);
-
-	//sabotage results
-
-	if( mykey != correctkey )
-	{
-		vector<double>::iterator maxel, minel;
-		maxel = max_element( probabilities.begin( ), probabilities.end( ) );
-		minel = min_element( probabilities.begin( ), probabilities.end( ) );
-		const double fuzz = *maxel * actionchooser.rand( ) * 0.70;
-		*maxel -= fuzz;
-		*minel += fuzz;
-	}
 
 	//do the logging
 
