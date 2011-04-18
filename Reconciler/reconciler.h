@@ -20,6 +20,7 @@ public:
 			LoggerClass & botapireclog )
 		: m_forceactions( forceactions )
 		, m_haveacted( false )
+		, m_iserror( false )
 		, m_bot( reconcileagent, false, seed, botapilogger, botapireclog )
 	{ }
 	void setnewgame(uint64 gamenumber, Player playernum, MyCardMask cards, double sblind, double bblind, double stacksize);
@@ -33,6 +34,7 @@ private:
 
 	const bool m_forceactions;
 	bool m_haveacted;
+	bool m_iserror;
 	Player m_me;
 	BotAPI m_bot;
 	std::deque< TaskThread::BindBasePtr > m_queue;

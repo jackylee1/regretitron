@@ -10,6 +10,7 @@ void Reconciler::setnewgame(uint64 gamenumber, Player playernum, MyCardMask card
 
 	m_me = playernum;
 	m_haveacted = false;
+	m_iserror = false;
 	m_queue.push_back( TaskThread::bind( & m_bot, & BotAPI::setnewgame, playernum, cards.Get( ), sblind, bblind, stacksize ) );
 }
 
@@ -36,6 +37,7 @@ void Reconciler::doaction(Player player, Action action, double amount)
 		}
 		catch( std::exception & e )
 		{
+			m_iserror = true;
 		}
 		m_queue.push_back( TaskThread::bind( & m_bot, & BotAPI::doaction, player, action, amount ) );
 		ExecuteQueue( );
@@ -65,7 +67,7 @@ void Reconciler::endofgame( MyCardMask cards )
 
 void Reconciler::ExecuteQueue( )
 {
-	while( ! m_queue.empty( ) )
+	while( ! m_queue.empty( ) && ! m_iserror )
 	{
 		try
 		{
@@ -73,9 +75,12 @@ void Reconciler::ExecuteQueue( )
 		}
 		catch( std::exception & e )
 		{
+			m_iserror = true;
 		}
 		m_queue.pop_front( );
 	}
+	if( m_iserror )
+		m_queue.clear( );
 }
 
 
