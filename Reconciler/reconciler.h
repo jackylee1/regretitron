@@ -8,6 +8,7 @@
 #include <string>
 #include <poker_defs.h>
 #include "MyCardMask.h"
+#include "TaskThread.h"
 using std::vector;
 using std::string;
 
@@ -18,6 +19,7 @@ public:
 			LoggerClass & botapilogger,
 			LoggerClass & botapireclog )
 		: m_forceactions( forceactions )
+		, m_haveacted( false )
 		, m_bot( reconcileagent, false, seed, botapilogger, botapireclog )
 	{ }
 	void setnewgame(uint64 gamenumber, Player playernum, MyCardMask cards, double sblind, double bblind, double stacksize);
@@ -27,8 +29,12 @@ public:
 	void endofgame( MyCardMask cards );
 	LoggerClass & GetLogger( ) { return m_bot.GetLogger( ); }
 private:
+	void ExecuteQueue( );
+
 	const bool m_forceactions;
+	bool m_haveacted;
 	Player m_me;
 	BotAPI m_bot;
+	std::deque< TaskThread::BindBasePtr > m_queue;
 };
 

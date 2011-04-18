@@ -1,68 +1,81 @@
 #include "reconciler.h"
 
 // ............................................
-// this is the logger used by Reconciler's reconciler log
-
-FileLogger reclog( "reconciler.reclog.log", false );
-//ConsoleLogger reclog;
-//NullLogger reclog;
-
-// ............................................
 void Reconciler::setnewgame(uint64 gamenumber, Player playernum, MyCardMask cards, double sblind, double bblind, double stacksize)
 {
+	if( m_haveacted )
+		ExecuteQueue( );
+	else
+		m_queue.clear( );
+
 	m_me = playernum;
-	m_bot.setnewgame( playernum, cards.Get( ), sblind, bblind, stacksize );
-	reclog( "NEW GAME P" + tostr( playernum ) + " of " + tostr( sblind ) + "/" + tostr( bblind ) + " at " + tostr( stacksize ) + " with " + tostr( cards.Get( ) ) );
+	m_haveacted = false;
+	m_queue.push_back( TaskThread::bind( & m_bot, & BotAPI::setnewgame, playernum, cards.Get( ), sblind, bblind, stacksize ) );
 }
 
 void Reconciler::setnextround(int gr, MyCardMask newboard, double newpot)
 {
-	m_bot.setnextround( gr, newboard.Get( ), newpot );
-
-	switch( gr )
-	{
-#define NEWROUNDSTRING( gr ) case gr: reclog( #gr" " + tostr( newboard.Get( ) ) + " with pot " + tostr( newpot ) ); break;
-		NEWROUNDSTRING( FLOP )
-		NEWROUNDSTRING( TURN )
-		NEWROUNDSTRING( RIVER )
-	}
+	m_queue.push_back( TaskThread::bind( & m_bot, & BotAPI::setnextround, gr, newboard.Get( ), newpot ) );
+	if( m_haveacted )
+		ExecuteQueue( );
 }
 
 void Reconciler::doaction(Player player, Action action, double amount)
 {
 	if( player == m_me ) // bot is about to go, must clear the pipes
 	{
+		ExecuteQueue( );
 		string actionstr;
 		int level;
-		if( m_forceactions )
-			m_bot.forcebotaction( action, amount, actionstr, level ); //tell the bot what to do
-		else
-			action = m_bot.getbotaction( amount ); //get an action from the bot
+		try
+		{
+			if( m_forceactions )
+				m_bot.forcebotaction( action, amount, actionstr, level ); //tell the bot what to do
+			else
+				action = m_bot.getbotaction( amount ); //get an action from the bot
+		}
+		catch( std::exception & e )
+		{
+		}
+		m_queue.push_back( TaskThread::bind( & m_bot, & BotAPI::doaction, player, action, amount ) );
+		ExecuteQueue( );
+		m_haveacted = true;
 	}
-
-	m_bot.doaction( player, action, amount );
-
-	switch( action )
-	{
-#define ACTIONSTRING( a ) case a: reclog( #a" " + tostr( amount ) + " by P" + tostr( player ) ); break;
-		ACTIONSTRING( FOLD )
-		ACTIONSTRING( CALL )
-		ACTIONSTRING( BET )
-		ACTIONSTRING( BETALLIN )
-	}
+	else
+		m_queue.push_back( TaskThread::bind( & m_bot, & BotAPI::doaction, player, action, amount ) );
 }
 
 void Reconciler::endofgame( )
 {
-	m_bot.endofgame( );
-	reclog( "GAMEOVER (opponent mucks)\n" );
+	m_queue.clear( );
+	if( m_haveacted )
+		m_queue.push_back( TaskThread::bind( & m_bot, 
+					static_cast< void( BotAPI::* )( ) >( & BotAPI::endofgame ) ) );
 }
 
 void Reconciler::endofgame( MyCardMask cards )
 {
-	m_bot.endofgame( cards.Get( ) );
-	reclog( "GAMEOVER (opponent has " + tostr( cards.Get( ) ) + ")\n" );
+	m_queue.clear( );
+	if( m_haveacted )
+		m_queue.push_back( TaskThread::bind( & m_bot, 
+					static_cast< void( BotAPI::* )( CardMask ) >( & BotAPI::endofgame ), 
+					cards.Get( ) ) );
 }
 
+
+void Reconciler::ExecuteQueue( )
+{
+	while( ! m_queue.empty( ) )
+	{
+		try
+		{
+			m_queue.front( )->run( );
+		}
+		catch( std::exception & e )
+		{
+		}
+		m_queue.pop_front( );
+	}
+}
 
 
