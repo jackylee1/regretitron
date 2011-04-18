@@ -37,6 +37,7 @@ void Reconciler::doaction(Player player, Action action, double amount)
 		}
 		catch( std::exception & e )
 		{
+			m_bot.GetLogger( )( string( "ERROR: " ) + e.what( ) );
 			m_iserror = true;
 		}
 		m_queue.push_back( TaskThread::bind( & m_bot, & BotAPI::doaction, player, action, amount ) );
@@ -75,6 +76,7 @@ void Reconciler::ExecuteQueue( )
 		}
 		catch( std::exception & e )
 		{
+			m_bot.GetLogger( )( string( "ERROR: " ) + e.what( ) );
 			m_iserror = true;
 		}
 		m_queue.pop_front( );

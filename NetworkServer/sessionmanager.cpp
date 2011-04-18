@@ -296,6 +296,7 @@ void SessionManager::UseBotNewGame( uint64 playerid, uint64 sessionid, const Mes
 	}
 	catch( std::exception & e )
 	{
+		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
 		findresult->second.iserror = true;
 		findresult->second.errorstr = e.what( );
 	}
@@ -322,6 +323,7 @@ void SessionManager::UseBotNextRound( uint64 playerid, uint64 sessionid, const M
 	}
 	catch( std::exception & e )
 	{
+		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
 		findresult->second.iserror = true;
 		findresult->second.errorstr = e.what( );
 	}
@@ -348,6 +350,7 @@ void SessionManager::UseBotDoAction( uint64 playerid, uint64 sessionid, const Me
 	}
 	catch( std::exception & e )
 	{
+		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
 		findresult->second.iserror = true;
 		findresult->second.errorstr = e.what( );
 	}
@@ -386,6 +389,7 @@ void SessionManager::UseBotGetAction( uint64 playerid, uint64 sessionid, Message
 		}
 		catch( std::exception & e )
 		{
+			findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
 			strncpy( response.message, e.what( ), 199 );
 			findresult->second.iserror = true;
 			findresult->second.errorstr = e.what( );
@@ -415,6 +419,7 @@ void SessionManager::UseBotEndGame( uint64 playerid, uint64 sessionid )
 	}
 	catch( std::exception & e )
 	{
+		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
 		findresult->second.iserror = true;
 		findresult->second.errorstr = e.what( );
 	}
@@ -440,6 +445,7 @@ void SessionManager::UseBotEndGameCards( uint64 playerid, uint64 sessionid, cons
 	}
 	catch( std::exception & e )
 	{
+		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
 		findresult->second.iserror = true;
 		findresult->second.errorstr = e.what( );
 	}
