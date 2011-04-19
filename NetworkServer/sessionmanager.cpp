@@ -4,24 +4,39 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/scoped_array.hpp>
+#include "sessionreconciler.h"
 using namespace std;
 
-const boost::filesystem::path SESSIONDIR = "/home/scott/pokerbreedinggrounds/bin/botsessions";
-const boost::filesystem::path LOGGERFILE = "botapi.logger.log";
-const boost::filesystem::path RECLOGFILE = "botapi.reclog.log";
-
-string GetBotFolder( unsigned botid )
+namespace
 {
-	ostringstream o;
-	o << "bot" << setfill( '0' ) << setw( 3 ) << botid;
-	return o.str( );
-}
 
-string GetSessionFolder( unsigned sessionid )
-{
-	ostringstream o;
-	o << "session" << setfill( '0' ) << setw( 5 ) << sessionid;
-	return o.str( );
+	const boost::filesystem::path SESSIONDIR = "/home/scott/pokerbreedinggrounds/bin/botsessions";
+	const boost::filesystem::path LOGGERFILE = "botapi.logger.log";
+	const boost::filesystem::path RECLOGFILE = "botapi.reclog.log";
+
+	string GetBotFolder( unsigned botid )
+	{
+		ostringstream o;
+		o << "bot" << setfill( '0' ) << setw( 3 ) << botid;
+		return o.str( );
+	}
+
+	string GetSessionFolder( unsigned sessionid )
+	{
+		ostringstream o;
+		o << "session" << setfill( '0' ) << setw( 5 ) << sessionid;
+		return o.str( );
+	}
+
+	void SetErrorResponse( MessageSendSessionState & response, const string & errmsg )
+	{
+		response.sessiontype = SESSION_NONE;
+		memset( response.message, 0, sizeof( response.message ) );
+		strncpy( response.message, errmsg.c_str( ), sizeof( response.message ) - 1 );
+		response.message[ sizeof( response.message ) - 1 ] = 0;
+	}
+
+
 }
 
 //return value references values in table bots
@@ -66,7 +81,9 @@ void SessionManager::Init( )
 		FileLogger * recptr = new FileLogger( ( SESSIONDIR / GetBotFolder( botid ) / GetSessionFolder( sessionid ) / RECLOGFILE ).string( ), true );
 		insertionresult.first->second.botapilogger = logptr;
 		insertionresult.first->second.botapireclog = recptr;
-		insertionresult.first->second.bot = new BotAPI( xmlpath, false, MTRand::gettimeclockseed( ), *logptr, *recptr );
+		MTRand::uint32 botseed = MTRand::gettimeclockseed( );
+		insertionresult.first->second.bot = new BotAPI( xmlpath, false, botseed, *logptr, *recptr );
+		insertionresult.first->second.botseed = botseed;
 		insertionresult.first->second.playerid = playerid;
 		insertionresult.first->second.iserror = false;
 	}
@@ -120,7 +137,9 @@ uint64 SessionManager::CreateSession( uint64 playerid, const MessageCreateNewSes
 		FileLogger * recptr = new FileLogger( ( sessionpath / RECLOGFILE ).string( ), true );
 		insertionresult.first->second.botapilogger = logptr;
 		insertionresult.first->second.botapireclog = recptr;
-		insertionresult.first->second.bot = new BotAPI( xmlpath, false, MTRand::gettimeclockseed( ), *logptr, *recptr );
+		MTRand::uint32 botseed = MTRand::gettimeclockseed( );
+		insertionresult.first->second.bot = new BotAPI( xmlpath, false, botseed, *logptr, *recptr );
+		insertionresult.first->second.botseed = botseed;
 		insertionresult.first->second.playerid = playerid;
 		insertionresult.first->second.iserror = false;
 
@@ -131,10 +150,9 @@ uint64 SessionManager::CreateSession( uint64 playerid, const MessageCreateNewSes
 	}
 	catch( std::exception & e )
 	{
+		LogError( string( __FUNCTION__ ) + ": " + e.what ( ) );
 		m_map.erase( m_nextsessionid );
-		response.sessiontype = SESSION_NONE;
-		strncpy( response.message, e.what( ), sizeof( response.message ) );
-		response.message[ sizeof( response.message ) - 1 ] = 0;
+		SetErrorResponse( response, e.what( ) );
 		return 0;
 	}
 }
@@ -145,23 +163,31 @@ uint64 SessionManager::TestSession( uint64 playerid, uint64 sessionid, MessageSe
 
 	memset( response.message, 0, 1024 );
 
-	boost::unique_lock< boost::shared_mutex > exclusivelylocked( m_maplock );
-
-	SessionMap::iterator findresult = m_map.find( sessionid );
-	if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+	try
 	{
-		response.sessiontype = SESSION_NONE;
-		strcpy( response.message, "No session was found." );
-		return 0;
+		boost::unique_lock< boost::shared_mutex > exclusivelylocked( m_maplock );
+
+		SessionMap::iterator findresult = m_map.find( sessionid );
+		if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+		{
+			SetErrorResponse( response, "No session was found." );
+			return 0;
+		}
+		else
+		{
+			otl_stream updatetests( 1, "update sessions set numtests = numtests + 1 where sessionid = :sessid<unsigned>", m_database );
+			updatetests << (unsigned)sessionid << endr;
+
+			response.sessiontype = SESSION_OPEN;
+			strcpy( response.message, "Your session was restored." );
+			return findresult->first;
+		}
 	}
-	else
+	catch( std::exception & e )
 	{
-		otl_stream updatetests( 1, "update sessions set numtests = numtests + 1 where sessionid = :sessid<unsigned>", m_database );
-		updatetests << (unsigned)sessionid << endr;
-
-		response.sessiontype = SESSION_OPEN;
-		strcpy( response.message, "Your session was restored." );
-		return findresult->first;
+		LogError( string( __FUNCTION__ ) + ": " + e.what ( ) );
+		SetErrorResponse( response, e.what( ) );
+		return 0;
 	}
 }
 
@@ -175,7 +201,8 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 	for( int i = 0; i < CLOSESESSION_MAXFILES; i++ )
 	{
 		cout << " file" << i << "='" << request.filename[ i ] << "' with size " << request.filelength[ i ];
-		totalsize += request.filelength[ i ]; }
+		totalsize += request.filelength[ i ]; 
+	}
 	cout << endl;
 
 	//read all files ahead of time so i make sure it gets done so i don't break connection
@@ -217,22 +244,65 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 			}
 		}
 
-		otl_stream killsession( 3, "update sessions set status = 'LOGGED', notes = :note<char[10000]> where sessionid = :sessid<unsigned>", m_database );
-		killsession << request.notes << (unsigned)sessionid << endr;
-
 		delete findresult->second.bot;
 		delete findresult->second.botapilogger;
 		delete findresult->second.botapireclog;
+
+		//now reconcile the session
+
+		unsigned numhandhistories = 0;
+		boost::filesystem::path handhistorypath;
+		for( int i = 0; i < CLOSESESSION_MAXFILES; i++ )
+		{
+			if( request.filelength[ i ] )
+			{
+				boost::filesystem::path thisfile = sessionpath / request.filename[ i ];
+				if( SessionReconciler::GetFileFormat( thisfile ) != SessionReconciler::FORMAT_NONE )
+				{
+					handhistorypath = thisfile;
+					numhandhistories++;
+				}
+			}
+		}
+
+		if( numhandhistories == 1 )
+		{
+			otl_stream pathgetter( 50, "select xmlpath from sessions s inner join bots b "
+					"on s.botid = b.botid where s.sessionid = :sid<unsigned>", m_database );
+			string xmlpath;
+			pathgetter << (unsigned)findresult->first << endr;
+			pathgetter >> xmlpath >> endr;
+			FileLogger reconlogger( sessionpath / "reconciler.logger.log", false );
+			FileLogger reconreclog( sessionpath / "reconciler.reclog.log", false );
+			BotAPI bot( xmlpath, false, findresult->second.botseed, reconlogger, reconreclog );
+			SessionReconciler reconciler( findresult->first );
+			reconciler.DoReconcile( handhistorypath, bot, false );
+		}
+		else
+		{
+			ostringstream o;
+			o << "Only " << numhandhistories << " hand history files found among (";
+			for( int i = 0; i < CLOSESESSION_MAXFILES; i++ )
+				if( request.filelength[ i ] )
+					o << "\"" << request.filename[ i ] << "\", ";
+			o << ") files for session #" << findresult->first;
+			LogError( o.str( ) );
+		}
+
+		//now erase and remove the session
+
 		m_map.erase( findresult );
+
+		otl_stream killsession( 3, "update sessions set status = 'LOGGED', notes = :note<char[10000]> where sessionid = :sessid<unsigned>", m_database );
+		killsession << request.notes << (unsigned)sessionid << endr;
 
 		response.sessiontype = SESSION_NONE;
 		strcpy( response.message, "Session was logged." );
 	}
 	catch( std::exception & e )
 	{
-		response.sessiontype = SESSION_NONE;
-		strncpy( response.message, e.what( ), sizeof( response.message ) );
-		response.message[ sizeof( response.message ) - 1 ] = 0;
+		LogError( string( __FUNCTION__ ) + ": " + e.what ( ) );
+		SetErrorResponse( response, e.what( ) );
 	}
 }
 
@@ -262,9 +332,8 @@ void SessionManager::CancelSession( uint64 playerid, uint64 sessionid, MessageSe
 	}
 	catch( std::exception & e )
 	{
-		response.sessiontype = SESSION_NONE;
-		strncpy( response.message, e.what( ), sizeof( response.message ) );
-		response.message[ sizeof( response.message ) - 1 ] = 0;
+		LogError( string( __FUNCTION__ ) + ": " + e.what ( ) );
+		SetErrorResponse( response, e.what( ) );
 	}
 }
 
@@ -451,4 +520,10 @@ void SessionManager::UseBotEndGameCards( uint64 playerid, uint64 sessionid, cons
 	}
 }
 
+void SessionManager::LogError( const std::string & message )
+{
+	cerr << "ERROR: " << message << endl;
+	otl_stream errinserter( 50, "insert into errorlog( id, message ) values ( NULL, :msg<char[32000]> )", m_database );
+	errinserter << message;
+}
 

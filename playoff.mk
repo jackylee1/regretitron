@@ -17,10 +17,6 @@ OUT1 := bin/playoff
 OUT1D := bin/playoffd
 OUT1P := bin/playoffp
 
-OUT2 := bin/reconciler
-OUT2D := bin/reconcilerd
-OUT2P := bin/reconcilerp
-
 OUT3 := bin/botserver
 OUT3D := bin/botserverd
 OUT3P := bin/botserverp
@@ -28,7 +24,6 @@ OUT3P := bin/botserverp
 ifeq ($(DEBUG),y)
    CFLAGS += -ggdb -D_GLIBCXX_DEBUG
    MYOUT1 := $(OUT1D)
-   MYOUT2 := $(OUT2D)
    MYOUT3 := $(OUT3D)
    CFGDIR := debug
 else 
@@ -36,13 +31,11 @@ ifeq ($(PROFILE),y)
    CFLAGS += -O3 -pg -ggdb
    LFLAGS += -pg
    MYOUT1 := $(OUT1P)
-   MYOUT2 := $(OUT2P)
    MYOUT3 := $(OUT3P)
    CFGDIR := profile
 else
    CFLAGS += -O3 -ggdb
    MYOUT1 := $(OUT1)
-   MYOUT2 := $(OUT2)
    MYOUT3 := $(OUT3)
    CFGDIR := release
 endif
@@ -62,11 +55,7 @@ SRC1 := $(wildcard PokerPlayerMFC/*.cpp PokerLibrary/*.cpp TinyXML++/*.cpp Playo
 OBJ1 := $(SRC1:%.cpp=$(CFGDIR)/%.o)
 OBJ1 += $(SRCPE:%.c=$(CFGDIR)/%.o) 
 
-SRC2 := $(wildcard PokerPlayerMFC/*.cpp PokerLibrary/*.cpp TinyXML++/*.cpp Reconciler/*.cpp HandIndexingV1/*.cpp) utility.cpp
-OBJ2 := $(SRC2:%.cpp=$(CFGDIR)/%.o)
-OBJ2 += $(SRCPE:%.c=$(CFGDIR)/%.o) 
-
-SRC3 := $(wildcard PokerPlayerMFC/*.cpp PokerLibrary/*.cpp TinyXML++/*.cpp NetworkServer/*.cpp HandIndexingV1/*.cpp) utility.cpp
+SRC3 := $(wildcard PokerPlayerMFC/*.cpp PokerLibrary/*.cpp TinyXML++/*.cpp Reconciler/*.cpp NetworkServer/*.cpp HandIndexingV1/*.cpp) utility.cpp
 OBJ3 := $(SRC3:%.cpp=$(CFGDIR)/%.o)
 OBJ3 += $(SRCPE:%.c=$(CFGDIR)/%.o) 
 
@@ -84,32 +73,26 @@ init:
 	@find $(CFGDIR)/TinyXML++ -name "*.o" -delete
 	@rm -f $(DEPFILE)
 	@touch $(DEPFILE)
-	@makedepend -Y -p$(CFGDIR)/ -f$(DEPFILE) -- $(CFLAGS) -- $(INCLUDES) $(SRC1) $(SRC2) $(SRC3) $(SRCPE) 2>/dev/null
+	@makedepend -Y -p$(CFGDIR)/ -f$(DEPFILE) -- $(CFLAGS) -- $(INCLUDES) $(SRC1) $(SRC3) $(SRCPE) 2>/dev/null
 	@touch stdafx.h
 	@$(MAKE) -f playoff.mk all -r --no-print-directory
 	@find $(CFGDIR)/TinyXML++ -name "*.o" -delete
 	@rm -f $(DEPFILE) $(DEPFILE).bak stdafx.h
 
-all: playoff reconciler botserver
+all: playoff botserver
 
 playoff: $(MYOUT1)
-
-reconciler: $(MYOUT2)
 
 botserver: $(MYOUT3)
 
 clean:
 	@echo "deleting crap..."
 	@find . -name "*.o" -delete
-	@rm -f $(OUT1) $(OUT1D) $(OUT1P) $(OUT2) $(OUT2D) $(OUT2P) $(OUT3) $(OUT3D) $(OUT3P) $(DEPFILE) $(DEPFILE).bak stdafx.h
+	@rm -f $(OUT1) $(OUT1D) $(OUT1P) $(OUT3) $(OUT3D) $(OUT3P) $(DEPFILE) $(DEPFILE).bak stdafx.h
 
 $(MYOUT1): $(OBJ1)
 	@echo "$(CPP) (object files) $(LFLAGS) -o $@"
 	@$(CPP) $(OBJ1) $(LFLAGS) -o $@
-
-$(MYOUT2): $(OBJ2)
-	@echo "$(CPP) (object files) $(LFLAGS) -o $@"
-	@$(CPP) $(OBJ2) $(LFLAGS) -o $@
 
 $(MYOUT3): $(OBJ3)
 	@echo "$(CPP) (object files) $(LFLAGS) -o $@"

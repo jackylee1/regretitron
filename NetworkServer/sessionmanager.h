@@ -30,12 +30,14 @@ public:
 
 private:
 	unsigned GetBotID( GameTypeEnum gametype );
+	void LogError( const std::string & message );
 
 	struct SessionStruct
 	{
 		BotAPI * bot;
 		FileLogger * botapilogger;
 		FileLogger * botapireclog;
+		MTRand::uint32 botseed;
 		uint64 playerid;
 		bool iserror;
 		string errorstr;

@@ -474,6 +474,7 @@ void FullTiltParser::Parse( istream & input )
 		}
 		catch( std::exception & e )
 		{
+			m_reconciler.OnError( string( "Reconciler parser error: " ) + e.what( ) );
 			m_reconciler.GetLogger( )( string( "Error: " ) + e.what( ) );
 			m_reconciler.GetLogger( )( "Game state reset, waiting for new game to start..." );
 			while( input.good( ) && ! regex_match( s, beginstring ) )

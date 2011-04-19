@@ -37,6 +37,7 @@ void Reconciler::doaction(Player player, Action action, double amount)
 		}
 		catch( std::exception & e )
 		{
+			m_errhandler.OnError( e.what( ) );
 			m_bot.GetLogger( )( string( "ERROR: " ) + e.what( ) );
 			m_iserror = true;
 		}
@@ -76,6 +77,7 @@ void Reconciler::ExecuteQueue( )
 		}
 		catch( std::exception & e )
 		{
+			m_errhandler.OnError( e.what( ) );
 			m_bot.GetLogger( )( string( "ERROR: " ) + e.what( ) );
 			m_iserror = true;
 		}

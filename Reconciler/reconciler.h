@@ -29,6 +29,7 @@ public:
 	void endofgame( );
 	void endofgame( MyCardMask cards );
 	LoggerClass & GetLogger( ) { return m_bot.GetLogger( ); }
+	void OnError( const std::string & errmsg ) { m_errhandler.OnError( errmsg ); }
 private:
 	void ExecuteQueue( );
 
