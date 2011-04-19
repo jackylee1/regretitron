@@ -1,5 +1,6 @@
 #include "../utility.h"
 #include "fulltiltparser.h"
+#include "reconcilerhelper.h"
 #include <sstream>
 #include <iomanip>
 #include <boost/scoped_array.hpp>
@@ -37,58 +38,11 @@ int main( int argc, char ** argv )
 			// this is the logger used by BotAPI's reconciler log
 			FileLogger botapireclog( "reconciler.reclog.log", false );
 
-			Reconciler reconciler( argv[ 2 ], actionchooserseed, forceactions,
-					botapilogger,
-					botapireclog );
-			FullTiltParser parser( reconciler );
+			BotAPI bot( argv[ 2 ], false, actionchooserseed, botapilogger, botapireclog );
 
-			// open input log file
+			ReconcilerHelper rechelper;
 
-			ifstream input( argv[ 1 ], ios::in | ios::binary | ios::ate );
-			if( ! input.good( ) )
-				throw Exception( "Input file " + string( argv[ 1 ] ) + " could not be opened." );
-			const size_t sizebytes = input.tellg( );
-			input.seekg( 0, ios::beg );
-			uint8 firstbytes[ 2 ];
-			input.read( (char*)firstbytes, 2 );
-			if( ( firstbytes[ 0 ] == 0xff && firstbytes[ 1 ] == 0xfe )
-			 || ( firstbytes[ 0 ] == 0xfe && firstbytes[ 1 ] == 0xff ) )
-			{
-				if( sizebytes % 2 != 0 )
-					throw Exception( "found BOM but not even bytes!" );
-
-				const size_t nchars = ( sizebytes - 2 ) / 2;
-
-				string filestr;
-				filestr.reserve( nchars );
-
-				for( size_t i = 0; i < nchars; i++ )
-				{
-					char byte1, byte2;
-					input.read( & byte1, 1 );
-					input.read( & byte2, 1 );
-
-					if( firstbytes[ 0 ] == 0xfe && firstbytes[ 1 ] == 0xff )
-						swap( byte1, byte2 );
-
-					if( byte2 != 0 )
-						throw Exception( "non-zero second byte detected!" );
-
-					if( byte1 == '\r' )
-						continue;
-
-					filestr += byte1;
-				}
-
-				istringstream filestream( filestr );
-				parser.Parse( filestream );
-			}
-			else
-			{
-				input.close( );
-				input.open( argv[ 1 ] );
-				parser.Parse( input );
-			}
+			rechelper.DoReconcile( argv[ 1 ], bot, forceactions );
 
 			return 0;
 		}

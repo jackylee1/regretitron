@@ -9,19 +9,19 @@
 #include <poker_defs.h>
 #include "MyCardMask.h"
 #include "TaskThread.h"
+#include "reconcilerhelper.h"
 using std::vector;
 using std::string;
 
 class Reconciler
 {
 public:
-	Reconciler( const std::string & reconcileagent, MTRand::uint32 seed, bool forceactions,
-			LoggerClass & botapilogger,
-			LoggerClass & botapireclog )
-		: m_forceactions( forceactions )
+	Reconciler( BotAPI & bot, bool forceactions, ReconcilerHelper & errhandler )
+		: m_errhandler( errhandler )
+		, m_forceactions( forceactions )
 		, m_haveacted( false )
 		, m_iserror( false )
-		, m_bot( reconcileagent, false, seed, botapilogger, botapireclog )
+		, m_bot( bot )
 	{ }
 	void setnewgame(uint64 gamenumber, Player playernum, MyCardMask cards, double sblind, double bblind, double stacksize);
 	void setnextround(int gr, MyCardMask newboard, double newpot);
@@ -32,11 +32,12 @@ public:
 private:
 	void ExecuteQueue( );
 
+	ReconcilerHelper & m_errhandler;
 	const bool m_forceactions;
 	bool m_haveacted;
 	bool m_iserror;
 	Player m_me;
-	BotAPI m_bot;
+	BotAPI & m_bot;
 	std::deque< TaskThread::BindBasePtr > m_queue;
 };
 
