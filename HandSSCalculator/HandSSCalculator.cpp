@@ -432,10 +432,11 @@ void determinebins(vector<CompressedHand> &myhands, const int n_bins, const int6
 	if(currentbinsize != n_hands_left) //this would just be a bug
 		REPORT("Did not bin the right amount of hands!");
 	if(currentbin != n_bins-1) //as mentioned in comments, this is possible
-		REPORT("\n"+tostring(n_bins)+" is too many bins; we used "+tostring(currentbin+1)+". Could not find enough hands to fill them. "
-				+"We were binning "+tostring(total_hands)+" hands. ("+tostring(compressed_size)+" compressed).",WARN);
+		cout << "\nWarning: "+tostring(n_bins)+" is too many bins; we used "+tostring(currentbin+1)+". Could not find enough hands to fill them. "
+				+"We were binning "+tostring(total_hands)+" hands. ("+tostring(compressed_size)+" compressed)." << endl;
 	if(chunky)
-		REPORT("\nThis binning process has produced chunky bins, report follows:\n"+status.str(),WARN);
+		cout << endl << "Warning: This binning process has produced chunky bins, report follows:\n"
+			<< status.str() << endl;
 	if(print)
 		cout << endl << status.str() << flush;
 }
@@ -611,7 +612,7 @@ void dopflopbins(int n_bins)
 	PackedBinFile packedbins(n_bins, INDEX2_MAX);
 	if(n_bins == INDEX2_MAX) // that's all of 'em!
 	{
-		REPORT("Bypassing calculatebins, setting preflop bin to it's index...",INFO);
+		cout << "Bypassing calculatebins, setting preflop bin to it's index..." << endl;
 		for(int i=0; i<INDEX2_MAX; i++)
 			packedbins.store(i, i);
 	}
@@ -671,8 +672,8 @@ void doflophistorybins(int n_pflop, int n_flop)
 		});
 
 		if(i < (1/chunky_bin_tolerance)*expected || i > chunky_bin_tolerance*expected)
-			REPORT("found "+tostring(i)+" hands ("+tostring(100.0*i/expected)
-					+"% of expected) for preflop bin "+tostring(mypflopbin), WARN);
+			cout << "\nWarning: found "+tostring(i)+" hands ("+tostring(100.0*i/expected)
+					+"% of expected) for preflop bin "+tostring(mypflopbin) << endl;
 		if(i-1>=hand_list.size())
 			REPORT("...and that overflowed hand_list. make fewer bins for less granularity or make hand_list bigger.");
 
@@ -742,9 +743,9 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 			});
 
 			if(i < (1/chunky_bin_tolerance)*expected || i > chunky_bin_tolerance*expected)
-				REPORT("found "+tostring(i)+" hands ("+tostring(100.0*i/expected)
+				cout << "\nWarning: found "+tostring(i)+" hands ("+tostring(100.0*i/expected)
 						+"% of expected) for preflop/flop bin "+tostring(mypflopbin)
-						+'/'+tostring(myflopbin), WARN);
+						+'/'+tostring(myflopbin) << endl;
 			if(i-1>=hand_list.size())
 				REPORT("...and that overflowed hand_list. make fewer bins for less granularity or make hand_list bigger.");
 
@@ -815,9 +816,9 @@ void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
 				});
 			
 				if(i < (1/chunky_bin_tolerance)*expected || i > chunky_bin_tolerance*expected)
-					REPORT("found "+tostring(i)+" hands ("+tostring(100.0*i/expected)
+					cout << "\nWarning: found "+tostring(i)+" hands ("+tostring(100.0*i/expected)
 							+"% of expected) for preflop/flop/turn bin "+tostring(mypflopbin)
-							+'/'+tostring(myflopbin)+'/'+tostring(myturnbin), WARN);
+							+'/'+tostring(myflopbin)+'/'+tostring(myturnbin) << endl;
 				if(i-1>=hand_list.size())
 					REPORT("...and that overflowed hand_list. make fewer bins for less granularity or make hand_list bigger.");
 
