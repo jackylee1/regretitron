@@ -46,7 +46,7 @@ void ConnectionThreadProc( SocketPtr sock, SessionManager & sessionmanager )
 			ReadStruct( *sock, header );
 
 			if( header.protocolversion != SERVER_PROTOCOL_VERSION )
-				throw Exception( "Client has protocol version " + tostr( (int)header.protocolversion ) + " but the server version is " + tostr( (int)SERVER_PROTOCOL_VERSION ) );
+				throw Exception( "Client (player #" + tostr( header.playerid ) + ") has protocol version " + tostr( (int)header.protocolversion ) + " but the server version is " + tostr( (int)SERVER_PROTOCOL_VERSION ) );
 
 			switch( header.messagetype )
 			{
