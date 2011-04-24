@@ -25,11 +25,12 @@ class CardMachine
 {
 public:
 	//opens the bin files, putting them into memory
-	CardMachine(cardsettings_t cardsettings, bool issolver, bool seedrand = false, int seedwith = 0);
+	CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uint32 = MTRand::gettimeclockseed( ) );
 	~CardMachine();
 
 	inline const cardsettings_t& getparams() const { return myparams; }
 	inline int getcardsimax(int gr) const { return cardsi_max[gr]; }
+	inline MTRand::uint32 getrandseed( ) const { return m_randseed; }
 
 	void getnewgame(int cardsi[4][2], int &twoprob0wins);
 	int getindices(int gr, const vector<CardMask> &cards, vector<int> &handi, int &boardi); //returns cardsi
@@ -62,6 +63,7 @@ private:
 	static const int FLOPALYZER_MAX[4]; //must be initialized in the cpp file, as it is an array (not integral data member)
 	vector<PackedBinFile *> binfiles;
 	bool solving; //is CardMachine being used by Solver or by BotAPI?
+	MTRand::uint32 m_randseed;
 	MTRand randforsolver;
 	MTRand randforexamplehands;
 };

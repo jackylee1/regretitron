@@ -21,7 +21,7 @@ class Solver
 {
 public:
 	Solver() {} //does nothing - all data is initialized before each loop in threadloop()
-	static void initsolver( const treesettings_t &, const cardsettings_t & ); //called once before doing anything ever
+	static void initsolver( const treesettings_t &, const cardsettings_t &, MTRand::uint32 ); //called once before doing anything ever
 	static void destructsolver();
 	static boost::tuple<
 		double, //time taken

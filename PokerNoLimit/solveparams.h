@@ -21,8 +21,6 @@ const bool MEMORY_OVER_SPEED = false; //must be true for __float128 to work due 
 #define NUM_THREADS 1
 #define N_LOOK 3 //affects threading performance
 const double AGGRESSION_FACTOR = 0; //0 = "calm old man", 7 = "crazed, cocaine-driven maniac with an ax"
-const bool SEED_RAND = false;
-const int  SEED_WITH = 3;
 const bool THREADLOOPTRACE = false; //prints out debugging
 const bool WALKERDEBUG = false; //debug print
 

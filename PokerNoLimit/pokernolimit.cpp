@@ -84,13 +84,14 @@ int main(int argc, char* argv[])
 	vector< uint64 > iterlist;
 	vector< uint64 >::iterator lastiter, nextiter;
 
-	//the logic to generate this is now a global function in treenolimit.h
-	treesettings_t treesettings;
-
-	//the logic to generate this is now a static function of CardMachine
-	cardsettings_t cardsettings;
-
 	{
+		//the logic to generate this is now a global function in treenolimit.h
+		treesettings_t treesettings;
+		//the logic to generate this is now a static function of CardMachine
+		cardsettings_t cardsettings;
+		//potentially override with settings
+		MTRand::uint32 randseed;
+
 		namespace po = boost::program_options;
 
 		po::options_description myoptions( "Solver settings" );
@@ -121,6 +122,8 @@ int main(int argc, char* argv[])
 			  "number of river bins" )
 			( "useflopalyzer", po::value< bool >( )->default_value( false )->required( ),
 			  "use the cardmachine's flopalyzer or not" )
+			( "seed", po::value< MTRand::uint32 >( ),
+			  "seed to provide to card generator (optional)" )
 			;
 
 		bool askingforhelp = false;
@@ -155,6 +158,13 @@ int main(int argc, char* argv[])
 					nextiter != iterlist.end( ); lastiter++, nextiter++ )
 				if( *lastiter >= *nextiter )
 					throw Exception( "invalid iterlist elements" );
+			if( varmap.count( "seed" ) > 0 )
+			{
+				randseed = varmap[ "seed" ].as< MTRand::uint32 >( );
+				cout << setw( 30 ) << right << "Using seed:  " << randseed << endl;
+			}
+			else
+				randseed = MTRand::gettimeclockseed( );
 
 			//tree settings
 
@@ -183,7 +193,7 @@ int main(int argc, char* argv[])
 			//initialize the solver, open bin files and grab all memory
 
 			cout << endl;
-			Solver::initsolver( treesettings, cardsettings );
+			Solver::initsolver( treesettings, cardsettings, randseed );
 		}
 		catch( std::exception & e )
 		{

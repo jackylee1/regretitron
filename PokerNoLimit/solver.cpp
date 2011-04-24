@@ -46,14 +46,14 @@ void Solver::control_c(int sig)
 	}
 }
 
-void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings )
+void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings, MTRand::uint32 randseed )
 {
 	signal(SIGINT, control_c); // Register the signal handler for the SIGINT signal (Ctrl+C)
 
 	tree = new BettingTree(treesettings); //the settings are taken from solveparams.h
 	ConsoleLogger treelogger;
 	treeroot = createtree(*tree, MAX_ACTIONS_SOLVER, treelogger);
-	cardmachine = new CardMachine(cardsettings, true, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
+	cardmachine = new CardMachine(cardsettings, true, randseed); //settings taken from solveparams.h
 	memory = new MemoryManager(*tree, *cardmachine);
 	inittime = getdoubletime();
 
@@ -144,10 +144,8 @@ void Solver::save(const string &filename, bool writedata)
 
 	//rand seed and computer used
 
-	if(SEED_RAND)
-		run->SetAttribute("randseededwith", SEED_WITH);
-	else
-		run->SetAttribute("randseededwith", "time & clock");
+	run->SetAttribute("randseededwith", cardmachine->getrandseed( ) );
+
 	run->SetAttribute("numthreads", NUM_THREADS);
 #if _WIN32
 	run->SetAttribute("system", "win32");

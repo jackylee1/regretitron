@@ -12,21 +12,17 @@ using namespace std;
 //static non-integral data member initialization
 const int CardMachine::FLOPALYZER_MAX[4]= { 1, 6, 17, 37 };
 
-CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, bool seedrand, int seedwith) : 
+CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uint32 randseed ) :
 	myparams(cardsettings),
 	cardsi_max(4, -1),
 	binfiles(4, (PackedBinFile*)NULL),
 	solving(issolver),
-	randforsolver(), //seeds with time and shit
-	randforexamplehands() //same here
+	m_randseed( randseed ),
+	randforsolver( randseed ),
+	randforexamplehands() //seeds with time and clock
 {
 
 	checkdataformat(); //magic number test
-
-	//seed rand if requested
-
-	if(seedrand)
-		randforsolver.seed(seedwith);
 
 	//for each bin file..
 
