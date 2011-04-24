@@ -86,6 +86,7 @@ typedef boost::graph_traits<BettingTree>::degree_size_type Size;
 //functions provided here to manipulate the trees
 
 //assumes tree object exists already, with settings inside. checks to make sure you don't have more actions than max actions
+treesettings_t makelimittreesettings( int sblind, int bblind, int stacksize );
 Vertex createtree(BettingTree &tree, const int max_actions, LoggerClass & treelogger); 
 string actionstring(const BettingTree &tree, const Edge &edge, double multiplier);
 inline int playerindex(NodeType nodetype)

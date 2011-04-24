@@ -792,6 +792,60 @@ int CardMachine::rivalyzer(const CardMask flop, const CardMask turn, const CardM
 	}
 }
 
+// static function used to replace the code in solveparams.h with code that can
+// be used at runtime (old code in solveparams.h generated a cardsettings_t
+// at compiletime
+cardsettings_t CardMachine::makecardsettings( int pfbin, int fbin, int tbin, int rbin,
+		bool usehistory, bool useflopalyzer )
+{
+	cardsettings_t historyretval =
+	{
+		{ pfbin, fbin, tbin, rbin },
+		{
+			"bins/preflop"+tostring(pfbin),
+			"bins/flop"+tostring(pfbin)+"-"+tostring(fbin),
+			"bins/turn"+tostring(pfbin)+"-"+tostring(fbin)+"-"+tostring(tbin),
+			"bins/river"+tostring(pfbin)+"-"+tostring(fbin)+"-"+tostring(tbin)+"-"+tostring(rbin),
+		},
+		{
+			PackedBinFile::numwordsneeded(pfbin, INDEX2_MAX)*8,
+			PackedBinFile::numwordsneeded(fbin, INDEX23_MAX)*8,
+			PackedBinFile::numwordsneeded(tbin, INDEX231_MAX)*8,
+			PackedBinFile::numwordsneeded(rbin, INDEX2311_MAX)*8
+		},
+		true, //use history
+		useflopalyzer //use flopalyzer
+	};
+
+	/* default values I had for no-history (imperfect recall) bin amounts:
+		#define FBIN 256
+		#define TBIN 90
+		#define RBIN 90
+	 */
+
+	cardsettings_t nohistoryretval =
+	{
+		{ INDEX2_MAX, fbin, tbin, rbin },
+		{
+			"",
+			"bins/flop" + tostring( fbin ),
+			"bins/turn" + tostring( tbin ),
+			"bins/river" + tostring( rbin ),
+		},
+		{
+			0,
+			PackedBinFile::numwordsneeded(fbin, INDEX23_MAX)*8,
+			PackedBinFile::numwordsneeded(tbin, INDEX24_MAX)*8,
+			PackedBinFile::numwordsneeded(rbin, INDEX25_MAX)*8
+		},
+		false, //use history
+		false //use flopalyzer
+	};
+
+	return ( usehistory ? historyretval : nohistoryretval );
+}
+
+
 #if COMPILE_FLOPALYZER_TESTCODE
 #include <iostream>
 using std::cout;

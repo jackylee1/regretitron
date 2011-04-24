@@ -8,8 +8,13 @@
 #include <sstream>
 #include <iomanip>
 #include <boost/tuple/tuple.hpp>
+#include <boost/program_options.hpp>
 using namespace std;
 using boost::tuple;
+
+const int64 THOUSAND = 1000;
+const int64 MILLION = THOUSAND * THOUSAND;
+const int64 BILLION = THOUSAND * MILLION;
 
 string iterstring(int64 iter)
 {
@@ -72,42 +77,129 @@ void simulate(int64 iter)
 		<< 100.0*compacttotal/Solver::gettotaltime() << "%) compacting." << endl;
 }
 
+
 int main(int argc, char* argv[])
 {
-	turnloggingon("cout");
+	string savename;
+	vector< uint64 > iterlist;
 
-	cout << "Save file: " << SAVENAME << endl;
-	Solver::initsolver();
-	cout << "starting work..." << endl;
+	//the logic to generate this is now a global function in treenolimit.h
+	treesettings_t treesettings;
 
-	//do TESTING_AMT and then STARTING_AMT iterations
+	//the logic to generate this is now a static function of CardMachine
+	cardsettings_t cardsettings;
 
-	int64 plateau_counter = 0;
-	int64 current_iter_amount=STARTING_AMT;
-	simulate(TESTING_AMT);
-	simulate(current_iter_amount-TESTING_AMT);
-
-	while(1)
 	{
-		//save the solution
+		namespace po = boost::program_options;
 
-		if(Solver::gettotal() >= SAVEAFTER)
-			Solver::save(SAVENAME+"-"+iterstring(Solver::gettotal()), SAVESTRAT);
+		po::options_description myoptions( "Solver settings" );
 
-		//stop if we've reached our iter goal
+		myoptions.add_options( )
+			( "help", "produce this help message" )
 
-		if(Solver::gettotal() >= STOPAFTER) 
-			break;
+			( "file", po::value< string >( & savename )->required( ), 
+			  "base of save filename" )
 
-		//update the current iteration amount and do more iterations
+			( "saveat", po::value< vector< uint64 > >( & iterlist )->multitoken( )->required( ),
+			  "save the strategy after this many iterations (can be specified more than once)" )
 
-		if(++plateau_counter == PLATEAU_AMT)
+			( "sblind", po::value< int >( )->required( ),
+			  "small blind size (integer value)" )
+			( "bblind", po::value< int >( )->required( ),
+			  "big blind size (integer value)" )
+			( "stacksize", po::value< int >( )->required( ),
+			  "stacksize (integer value)" )
+
+			( "pfbin", po::value< int >( )->required( ),
+			  "number of preflop bins" )
+			( "fbin", po::value< int >( )->required( ),
+			  "number of flop bins" )
+			( "tbin", po::value< int >( )->required( ),
+			  "number of turn bins" )
+			( "rbin", po::value< int >( )->required( ),
+			  "number of river bins" )
+			( "useflopalyzer", po::value< bool >( )->default_value( false )->required( ),
+			  "use the cardmachine's flopalyzer or not" )
+			;
+
+		bool askingforhelp = false;
+
+		try
 		{
-			current_iter_amount *= MULTIPLIER;
-			plateau_counter = 1; //1 for the previous iterations done at lower scale
-		}
+			po::variables_map varmap;
+			po::store( po::parse_command_line( argc, argv, myoptions ), varmap );
+			askingforhelp = ( varmap.count( "help" ) || argc == 1 );
+			//the notify function will throw if any of my required params above are not
+			//specified. so I need to keep track of this help flap to properly do
+			//"--help" and use the built-in 'required' functionality
+			po::notify( varmap );
 
-		simulate(current_iter_amount);
+			cout << boolalpha;
+
+			cout << setw( 30 ) << right << "Save file basename: " << savename << endl;
+
+			sort( iterlist.begin( ), iterlist.end( ) );
+			cout << setw( 30 ) << right << "Saving after iterations: ";
+			copy( iterlist.begin( ), iterlist.end( ), ostream_iterator< uint64 >( cout, " " ) );
+			cout << endl;
+			cout << endl;
+
+			treesettings = makelimittreesettings( 
+					varmap[ "sblind" ].as< int >( ),
+					varmap[ "bblind" ].as< int >( ),
+					varmap[ "stacksize" ].as< int >( ) );
+			cout << setw( 30 ) << right << "Blinds: " << treesettings.sblind << " / " << treesettings.bblind << endl;
+			cout << setw( 30 ) << right << "Stacksize: " << treesettings.stacksize << " (" << fixed << setprecision( 2 ) << (double)treesettings.stacksize / treesettings.bblind << " big blinds)" << endl;
+
+			cout << endl;
+
+			cardsettings = CardMachine::makecardsettings( 
+					varmap[ "pfbin" ].as< int >( ),
+					varmap[ "fbin" ].as< int >( ),
+					varmap[ "tbin" ].as< int >( ),
+					varmap[ "rbin" ].as< int >( ),
+					true, //use history
+					varmap[ "useflopalyzer" ].as< bool >( ) );
+			cout << setw( 30 ) << right << "Preflop bins: " << cardsettings.bin_max[ 0 ] << " (" << cardsettings.filename[ 0 ] << ")" << endl;
+			cout << setw( 30 ) << right << "Flop bins: " << cardsettings.bin_max[ 1 ] << " (" << cardsettings.filename[ 1 ] << ")" << endl;
+			cout << setw( 30 ) << right << "Turn bins: " << cardsettings.bin_max[ 2 ] << " (" << cardsettings.filename[ 2 ] << ")" << endl;
+			cout << setw( 30 ) << right << "River bins: " << cardsettings.bin_max[ 3 ] << " (" << cardsettings.filename[ 3 ] << ")" << endl;
+			cout << setw( 30 ) << right << "Using flopalyzer: " << cardsettings.useflopalyzer << endl;
+
+		}
+		catch( std::exception & e )
+		{
+			if( askingforhelp )
+			{
+				cout << myoptions;
+				return 0;
+			}
+			else
+			{
+				cerr << "FAILURE: " << e.what( ) << endl;
+				return -1;
+			}
+		}
+	}
+
+	Solver::initsolver( treesettings, cardsettings );
+	cout << "Starting work..." << endl;
+
+	iterlist.insert( iterlist.begin( ), 0 );
+	vector< uint64 >::iterator lastiter, nextiter;
+
+	if( iterlist.size( ) < 2 )
+		REPORT( "invalid iterlist size" );
+	for( lastiter = iterlist.begin( ), nextiter = iterlist.begin( )++; 
+			nextiter != iterlist.end( ); lastiter++, nextiter++ )
+		if( *lastiter >= *nextiter )
+			REPORT( "invalid iterlist elements" );
+
+	for( lastiter = iterlist.begin( ), nextiter = iterlist.begin( )++; 
+			nextiter != iterlist.end( ); lastiter++, nextiter++ )
+	{
+		simulate( *nextiter - *lastiter );
+		Solver::save( savename + "-" + iterstring( Solver::gettotal( ) ), true);
 	}
 
 	//clean up and close down

@@ -5,7 +5,7 @@ CFLAGS := -Wall -DTIXML_USE_STL -march=native -Wno-deprecated
 # linker flags:
 # define library paths in addition to /usr/lib with -L
 # define any libraries to link into executable with -l
-LFLAGS := -lpthread -rdynamic -march=native -lrt -lm -lboost_system
+LFLAGS := -lpthread -rdynamic -march=native -lrt -lm -lboost_system -lboost_program_options
 
 ifeq ($(PEDANTIC),y)
    CPP += -ansi -pedantic -Wextra -Wno-long-long
@@ -80,9 +80,6 @@ OBJ3 += $(SRCPE:%.c=$(CFGDIR)/%.o)
 .PHONY:	clean all init solver binmaker altsolver
 
 init:
-ifdef CMD_LINE_VAR
-	@touch PokerNoLimit/solveparams.h
-endif
 	@mkdir -p $(CFGDIR)/AltSolver
 	@mkdir -p $(CFGDIR)/HandSSCalculator
 	@mkdir -p $(CFGDIR)/PokerLibrary

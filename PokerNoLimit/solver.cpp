@@ -25,14 +25,14 @@ MemoryManager * Solver::memory = NULL;
 pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t Solver::signaler = PTHREAD_COND_INITIALIZER;
 list<Solver::iteration_data_t> Solver::dataqueue(N_LOOKAHEAD);
-bitset<PFLOP_CARDSI_MAX> Solver::dataguardpflopp0; //default constructor sets these to all false
-bitset<PFLOP_CARDSI_MAX> Solver::dataguardpflopp1;
-bitset<RIVER_CARDSI_MAX> Solver::dataguardriver; //needed for memory contention in HugeBuffer, works for imperfect recall too
+vector< bool > Solver::dataguardpflopp0;
+vector< bool > Solver::dataguardpflopp1;
+vector< bool > Solver::dataguardriver; //needed for memory contention in HugeBuffer, works for imperfect recall too
 #if IMPERFECT_RECALL /*then we need to account for all data in use, not just first round*/
-bitset<FLOP_CARDSI_MAX> Solver::dataguardflopp0;
-bitset<FLOP_CARDSI_MAX> Solver::dataguardflopp1;
-bitset<TURN_CARDSI_MAX> Solver::dataguardturnp0;
-bitset<TURN_CARDSI_MAX> Solver::dataguardturnp1;
+vector< bool > Solver::dataguardflopp0;
+vector< bool > Solver::dataguardflopp1;
+vector< bool > Solver::dataguardturnp0;
+vector< bool > Solver::dataguardturnp1;
 #endif
 #endif
 
@@ -46,17 +46,32 @@ void Solver::control_c(int sig)
 	}
 }
 
-void Solver::initsolver()
+void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings )
 {
 	signal(SIGINT, control_c); // Register the signal handler for the SIGINT signal (Ctrl+C)
 
-	tree = new BettingTree(TREESETTINGS); //the settings are taken from solveparams.h
-	treeroot = createtree(*tree, MAX_ACTIONS_SOLVER);
-	cardmachine = new CardMachine(CARDSETTINGS, true, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
+	tree = new BettingTree(treesettings); //the settings are taken from solveparams.h
+	ConsoleLogger treelogger;
+	treeroot = createtree(*tree, MAX_ACTIONS_SOLVER, treelogger);
+	cardmachine = new CardMachine(cardsettings, true, SEED_RAND, SEED_WITH); //settings taken from solveparams.h
 	memory = new MemoryManager(*tree, *cardmachine);
 	inittime = getdoubletime();
 
 #ifdef DO_THREADS
+	//if these were bitsets, the default constructor set these to all false
+	//but now they are vector<bool>'s, so that I can use more runtime settings,
+	//and initialize their size here and set them all to false
+	dataguardpflopp0.resize( cardmachine->getcardsimax( PREFLOP ), false ); 
+	dataguardpflopp1.resize( cardmachine->getcardsimax( PREFLOP ), false ); 
+	dataguardriver.resize( cardmachine->getcardsimax( RIVER ), false );
+#if IMPERFECT_RECALL /*then we need to account for all data in use, not just first round*/
+	dataguardflopp0.resize( cardmachine->getcardsimax( FLOP ), false ); 
+	dataguardflopp1.resize( cardmachine->getcardsimax( FLOP ), false ); 
+	dataguardturnp0.resize( cardmachine->getcardsimax( TURN ), false ); 
+	dataguardturnp1.resize( cardmachine->getcardsimax( TURN ), false ); 
+#endif
+
+
 	for(list<iteration_data_t>::iterator data = dataqueue.begin(); data!=dataqueue.end(); data++)
 		cardmachine->getnewgame(data->cardsi, data->twoprob0wins); //get new data
 #endif

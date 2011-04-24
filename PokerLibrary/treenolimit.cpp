@@ -6,6 +6,106 @@
 #include <iomanip>
 using namespace boost;
 
+treesettings_t makelimittreesettings( int sblind, int bblind, int stacksize )
+{
+	// in this data struct, all I need to set (that is relevant for limit)
+	//is smallblind, bigblind, and stacksize (all are ints)
+	//for no-limit, I have all my old settings I used to use for no-limit below
+	// ( this all used to be in solveparams.h )
+	treesettings_t limitsettings = 
+	{
+		sblind, bblind, //smallblind, bigblind
+		{0,0,0,0,0,0},   //B1 - B6
+		{{0,0,0,0,0,0},  //R11 - R16
+		 {0,0,0,0,0,0},  //R21 - R26
+		 {0,0,0,0,0,0},  //R31 - R36
+		 {0,0,0,0,0,0},  //R41 - R46
+		 {0,0,0,0,0,0},  //R51 - R56
+		 {0,0,0,0,0,0}}, //R61 - R66
+		stacksize, false, true //stacksize, pushfold, limit
+	};
+	return limitsettings;
+
+	//I keep the following settings here for posterity, as they used to be in solveparams.h
+	// They all apply to no-limit, and represent a historical record 
+	// of the settings that I was using at one time for that game
+#if 0
+#if PUSHFOLD
+
+	SB, BB, //smallblind, bigblind
+	{99,99,99,99,99,99},   //B1 - B6
+	{{99,99,99,99,99,99},  //R11 - R16
+	 {99,99,99,99,99,99},  //R21 - R26
+	 {99,99,99,99,99,99},  //R31 - R36
+	 {99,99,99,99,99,99},  //R41 - R46
+	 {99,99,99,99,99,99},  //R51 - R56
+	 {99,99,99,99,99,99}}, //R61 - R66
+	SS, true, false //stacksize, pushfold, limit
+
+#elif SS<=8 //all possible options are represented
+
+	SB, BB,
+	{2, 4, 6, 8, 10,12}, //Bn
+	{{4, 6, 8, 10,12,14}, //R1n
+	 {8, 12,16,20,24,28}, //R2n
+	 {12,18,24,30,36,42}, //R3n
+	 {16,24,32,40,48,56}, //R4n
+	 {20,30,40,50,60,70}, //R5n
+	 {24,36,48,60,72,84}}, //R6n
+	SS, false, false
+
+#elif SS==13
+	
+#if 1 //most options possible
+	SB, BB,
+	{2, 4, 8, 12,16,20},
+	{{4, 6, 10,14,18,22},
+	 {8, 16,20,24,28,32},
+	 {16,24,32,40,48,99},
+	 {24,36,48,99,99,99},
+	 {32,48,99,99,99,99},
+	 {40,99,99,99,99,99}},
+	SS, false, false
+#else //smaller tree (same as used for prototype?)
+	SB, BB,
+	{2, 6, 12,20,99,99}, //B
+	{6, 12,20,99,99,99}, //R1
+	{12,18,99,99,99,99}, //R2
+	{24,99,99,99,99,99}, //R3
+	{99,99,99,99,99,99}, //R4
+	{99,99,99,99,99,99}, //R5
+	{99,99,99,99,99,99}, //R6
+	SS, false, false
+#endif
+
+#elif SS>=25 && SS<35
+
+	SB, BB,
+	{2, 6, 12,20,34,48}, //B
+	{6, 12,20,30,42,56}, //R1
+	{12,20,32,44,58,99}, //R2
+	{20,34,46,60,99,99}, //R3
+	{34,48,60,99,99,99}, //R4
+	{48,60,99,99,99,99}, //R5
+	{60,99,99,99,99,99}, //R6
+	SS, false, false
+
+#elif SS>=35
+
+	SB, BB,
+	4, 12,24,36,50,66,
+	12,24,36,50,66,99,
+	24,36,50,66,99,99,
+	36,50,66,99,99,99,
+	50,66,99,99,99,99,
+	66,99,99,99,99,99,
+	99,99,99,99,99,99,
+	SS, false, false
+
+#endif
+#endif
+
+}
 
 //
 //  functions to create a bitchin limit tree.

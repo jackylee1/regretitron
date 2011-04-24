@@ -43,6 +43,9 @@ public:
 	static void testflopalyzer();
 #endif
 
+	static cardsettings_t makecardsettings( int pfbin, int fbin, int tbin, int rbin,
+			        bool usehistory, bool useflopalyzer );
+
 private:
 	//we do not support copying.
 	CardMachine(const CardMachine& rhs);

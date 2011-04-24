@@ -13,15 +13,15 @@
 using std::string;
 #include <list>
 using std::list;
-#include <bitset>
-using std::bitset;
+#include <vector>
+using std::vector;
 
 //each is a thread. static means shared among threads
 class Solver
 {
 public:
 	Solver() {} //does nothing - all data is initialized before each loop in threadloop()
-	static void initsolver(); //called once before doing anything ever
+	static void initsolver( const treesettings_t &, const cardsettings_t & ); //called once before doing anything ever
 	static void destructsolver();
 	static boost::tuple<
 		double, //time taken
@@ -74,14 +74,14 @@ private:
 	static pthread_mutex_t threaddatalock;
 	static pthread_cond_t signaler;
 	static list<iteration_data_t> dataqueue;
-	static bitset<PFLOP_CARDSI_MAX> dataguardpflopp0;
-	static bitset<PFLOP_CARDSI_MAX> dataguardpflopp1;
-	static bitset<RIVER_CARDSI_MAX> dataguardriver; //needed for memory contention in HugeBuffer, works for imperfect recall too
+	static vector< bool > dataguardpflopp0;
+	static vector< bool > dataguardpflopp1;
+	static vector< bool > dataguardriver; //needed for memory contention in HugeBuffer, works for imperfect recall too
 #if IMPERFECT_RECALL /*then we need to account for all data in use, not just first round*/
-	static bitset<FLOP_CARDSI_MAX> dataguardflopp0;
-	static bitset<FLOP_CARDSI_MAX> dataguardflopp1;
-	static bitset<TURN_CARDSI_MAX> dataguardturnp0;
-	static bitset<TURN_CARDSI_MAX> dataguardturnp1;
+	static vector< bool > dataguardflopp0;
+	static vector< bool > dataguardflopp1;
+	static vector< bool > dataguardturnp0;
+	static vector< bool > dataguardturnp1;
 #endif
 #endif
 };
