@@ -82,6 +82,7 @@ int main(int argc, char* argv[])
 {
 	string savename;
 	vector< uint64 > iterlist;
+	vector< uint64 >::iterator lastiter, nextiter;
 
 	//the logic to generate this is now a global function in treenolimit.h
 	treesettings_t treesettings;
@@ -136,22 +137,35 @@ int main(int argc, char* argv[])
 
 			cout << boolalpha;
 
-			cout << setw( 30 ) << right << "Save file basename: " << savename << endl;
+			// general solver settings
+
+			cout << "using settings:" << endl;
+
+			cout << setw( 30 ) << right << "Save file basename:  " << savename << endl;
 
 			sort( iterlist.begin( ), iterlist.end( ) );
-			cout << setw( 30 ) << right << "Saving after iterations: ";
+			cout << setw( 30 ) << right << "Saving after iterations:  ";
 			copy( iterlist.begin( ), iterlist.end( ), ostream_iterator< uint64 >( cout, " " ) );
 			cout << endl;
-			cout << endl;
+			iterlist.insert( iterlist.begin( ), 0 );
+
+			if( iterlist.size( ) < 2 )
+				throw Exception( "invalid iterlist size" );
+			for( lastiter = iterlist.begin( ), nextiter = ++iterlist.begin( ); 
+					nextiter != iterlist.end( ); lastiter++, nextiter++ )
+				if( *lastiter >= *nextiter )
+					throw Exception( "invalid iterlist elements" );
+
+			//tree settings
 
 			treesettings = makelimittreesettings( 
 					varmap[ "sblind" ].as< int >( ),
 					varmap[ "bblind" ].as< int >( ),
 					varmap[ "stacksize" ].as< int >( ) );
-			cout << setw( 30 ) << right << "Blinds: " << treesettings.sblind << " / " << treesettings.bblind << endl;
-			cout << setw( 30 ) << right << "Stacksize: " << treesettings.stacksize << " (" << fixed << setprecision( 2 ) << (double)treesettings.stacksize / treesettings.bblind << " big blinds)" << endl;
+			cout << setw( 30 ) << right << "Blinds:  " << treesettings.sblind << " / " << treesettings.bblind << endl;
+			cout << setw( 30 ) << right << "Stacksize:  " << treesettings.stacksize << " (" << fixed << setprecision( 2 ) << (double)treesettings.stacksize / treesettings.bblind << " big blinds)" << endl;
 
-			cout << endl;
+			//card settings
 
 			cardsettings = CardMachine::makecardsettings( 
 					varmap[ "pfbin" ].as< int >( ),
@@ -160,12 +174,16 @@ int main(int argc, char* argv[])
 					varmap[ "rbin" ].as< int >( ),
 					true, //use history
 					varmap[ "useflopalyzer" ].as< bool >( ) );
-			cout << setw( 30 ) << right << "Preflop bins: " << cardsettings.bin_max[ 0 ] << " (" << cardsettings.filename[ 0 ] << ")" << endl;
-			cout << setw( 30 ) << right << "Flop bins: " << cardsettings.bin_max[ 1 ] << " (" << cardsettings.filename[ 1 ] << ")" << endl;
-			cout << setw( 30 ) << right << "Turn bins: " << cardsettings.bin_max[ 2 ] << " (" << cardsettings.filename[ 2 ] << ")" << endl;
-			cout << setw( 30 ) << right << "River bins: " << cardsettings.bin_max[ 3 ] << " (" << cardsettings.filename[ 3 ] << ")" << endl;
-			cout << setw( 30 ) << right << "Using flopalyzer: " << cardsettings.useflopalyzer << endl;
+			cout << setw( 30 ) << right << "Preflop bins:  " << cardsettings.bin_max[ 0 ] << " (" << cardsettings.filename[ 0 ] << ")" << endl;
+			cout << setw( 30 ) << right << "Flop bins:  " << cardsettings.bin_max[ 1 ] << " (" << cardsettings.filename[ 1 ] << ")" << endl;
+			cout << setw( 30 ) << right << "Turn bins:  " << cardsettings.bin_max[ 2 ] << " (" << cardsettings.filename[ 2 ] << ")" << endl;
+			cout << setw( 30 ) << right << "River bins:  " << cardsettings.bin_max[ 3 ] << " (" << cardsettings.filename[ 3 ] << ")" << endl;
+			cout << setw( 30 ) << right << "Using flopalyzer:  " << cardsettings.useflopalyzer << endl;
 
+			//initialize the solver, open bin files and grab all memory
+
+			cout << endl;
+			Solver::initsolver( treesettings, cardsettings );
 		}
 		catch( std::exception & e )
 		{
@@ -181,21 +199,9 @@ int main(int argc, char* argv[])
 			}
 		}
 	}
+	cout << endl << "starting work..." << endl << endl;
 
-	Solver::initsolver( treesettings, cardsettings );
-	cout << "Starting work..." << endl;
-
-	iterlist.insert( iterlist.begin( ), 0 );
-	vector< uint64 >::iterator lastiter, nextiter;
-
-	if( iterlist.size( ) < 2 )
-		REPORT( "invalid iterlist size" );
-	for( lastiter = iterlist.begin( ), nextiter = iterlist.begin( )++; 
-			nextiter != iterlist.end( ); lastiter++, nextiter++ )
-		if( *lastiter >= *nextiter )
-			REPORT( "invalid iterlist elements" );
-
-	for( lastiter = iterlist.begin( ), nextiter = iterlist.begin( )++; 
+	for( lastiter = iterlist.begin( ), nextiter = ++iterlist.begin( ); 
 			nextiter != iterlist.end( ); lastiter++, nextiter++ )
 	{
 		simulate( *nextiter - *lastiter );

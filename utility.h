@@ -233,8 +233,7 @@ class Exception : public std::exception
 #ifdef _WIN32
 				strncpy_s( m_message, BUFFSIZE, message.c_str( ), BUFFSIZE );
 #else
-				const std::string mymessage = message + "\n\n" + getbacktracestring();
-				strncpy( m_message, mymessage.c_str( ), BUFFSIZE );
+				strncpy( m_message, message.c_str( ), BUFFSIZE );
 #endif
 				m_message[ BUFFSIZE - 1 ] = '\0';
 			}

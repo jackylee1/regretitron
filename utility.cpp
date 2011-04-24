@@ -159,7 +159,10 @@ string getbacktracestring()
 
 void REPORT(string infomsg, report_t killswitch)
 {
-	throw Exception( infomsg );
+	if( killswitch == KNOWN )
+		throw Exception( infomsg );
+	else
+		throw Exception( infomsg + "\n\n" + getbacktracestring( ) );
 
 //	switch(killswitch)
 //	{
