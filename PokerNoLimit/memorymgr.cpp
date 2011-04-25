@@ -38,6 +38,17 @@ class PooledArray;
 
 //must be macro to be used in switch case statements
 #define flagswitch(flags, numa) (2*(flags)+((numa)-2))
+#if !defined(DYNAMIC_ALLOC_STRATN) || !defined(DYNAMIC_ALLOC_REGRET) || !defined(DYNAMIC_ALLOC_COUNTS)
+#error "You need to define these things"
+#endif
+#if DYNAMIC_ALLOC_COUNTS
+#if !DYNAMIC_ALLOC_STRATN && !DYNAMIC_ALLOC_REGRET
+#error "Counts require dynamic allocation"
+#endif
+#define DO_IF_COUNTS(x) x
+#else
+#define DO_IF_COUNTS(x)
+#endif
 
 //global variables
 HugeBuffer* hugebuffer = NULL;
@@ -169,9 +180,15 @@ BOOST_STATIC_ASSERT(sizeof(PooledArray**) == 8);
 enum AllocType
 {
 	NO_ALLOC,
+#if DYNAMIC_ALLOC_STRATN
 	STRATN_ONLY,
+#endif
+#if DYNAMIC_ALLOC_REGRET
 	REGRET_ONLY,
+#endif
+#if DYNAMIC_ALLOC_STRATN && DYNAMIC_ALLOC_REGRET
 	FULL_ALLOC,
+#endif
 	ALLOCTYPE_MAX
 };
 
@@ -198,6 +215,7 @@ BOOST_STATIC_ASSERT(sizeof(IndexData) == 2); //typedefed at top of file as forwa
 // ====================================================================== edit here
 //  constructors in these define which data types can be promotedto which other data types (nice!)
 //  a default constructor means that data type can be promoted from null
+#if DYNAMIC_ALLOC_STRATN
 template <int NUMA> class StratnData
 {
 public:
@@ -207,7 +225,9 @@ private:
 	StratnData(const StratnData&);
 	StratnData& operator=(const StratnData&);
 } __attribute__((packed));
+#endif
 
+#if DYNAMIC_ALLOC_REGRET
 template <int NUMA> class RegretData
 {
 public:
@@ -217,7 +237,9 @@ private:
 	RegretData(const RegretData&);
 	RegretData& operator=(const RegretData&);
 } __attribute__((packed));
+#endif
 
+#if DYNAMIC_ALLOC_REGRET && DYNAMIC_ALLOC_STRATN
 template <int NUMA> class FullData
 {
 	FullData() { for(int i=0; i<NUMA; i++) stratn[i] = regret[i] = 0; } //do not allow promoted from null
@@ -230,6 +252,7 @@ private:
 	FullData(const FullData&);
 	FullData& operator=(const FullData&);
 } __attribute__((packed));
+#endif
 
 //---------------------------------------------------------------------
 
@@ -262,18 +285,41 @@ struct CardsiContainer
 	CardsiContainer();
 	IndexArray indexarr;
 	BOOST_STATIC_ASSERT(MAX_ACTIONS_SOLVER == 3);
+#if DYNAMIC_ALLOC_STRATN
 	TypedPooledArray< StratnData<2> > stratnarr2;
-	TypedPooledArray< RegretData<2> > regretarr2;
-	TypedPooledArray< FullData<2> > fullarr2;
 	TypedPooledArray< StratnData<3> > stratnarr3;
+#endif
+#if DYNAMIC_ALLOC_REGRET
+	TypedPooledArray< RegretData<2> > regretarr2;
 	TypedPooledArray< RegretData<3> > regretarr3;
+#endif
+#if DYNAMIC_ALLOC_STRATN && DYNAMIC_ALLOC_REGRET
+	TypedPooledArray< FullData<2> > fullarr2;
 	TypedPooledArray< FullData<3> > fullarr3;
+#endif
+#if DYNAMIC_ALLOC_COUNTS
 	TypedPooledArray<int> readregretcount;
 	TypedPooledArray<int> writeregretcount;
 	TypedPooledArray<int> writestratncount;
+#endif
 };
+
 //keep up to date so printed info to screen is good
-const int EXTRA_CARDSI_BYTES_PER_NODE = 3*sizeof(int); //beyond stratn and regret data
+#if DYNAMIC_ALLOC_STRATN && DYNAMIC_ALLOC_REGRET
+const int64 EXTRA_SLACK_PER_CC = 6 * BYTES_ALLOWED_SLACK_IN_POOLEDARRAY;
+#elif DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET
+const int64 EXTRA_SLACK_PER_CC = 2 * BYTES_ALLOWED_SLACK_IN_POOLEDARRAY;
+#else
+const int64 EXTRA_SLACK_PER_CC = 0;
+#endif
+
+#if DYNAMIC_ALLOC_COUNTS
+const int64 EXTRA_COUNT_BYTES_PER_NODE = 3 * sizeof(int); //beyond stratn and regret data
+#endif
+
+#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET
+const int64 EXTRA_INDEX_BYTES_PER_NODE = sizeof( IndexData ); //beyond stratn and regret data
+#endif
 
 //----------------------------------------------------------------------------
 
@@ -482,23 +528,33 @@ template <class T> template <typename P1> uint16 TypedPooledArray<T>::AddNewNode
 // allocate all indexarray values. Also set the flags for any given array.
 
 CardsiContainer::CardsiContainer()
-	: indexarr( memory->riveractionimax() , 0), 
-	  stratnarr2 ( memory->getactmax(3,2) / 3 , 1 << flagswitch( STRATN_ONLY, 2 ) ), 
-	  regretarr2 ( memory->getactmax(3,2) / 3 , 1 << flagswitch( REGRET_ONLY, 2 ) ), 
-	  fullarr2   ( memory->getactmax(3,2) / 3 , 1 << flagswitch( FULL_ALLOC,  2 ) ),
-	  stratnarr3 ( memory->getactmax(3,3) / 3 , 1 << flagswitch( STRATN_ONLY, 3 ) ), 
-	  regretarr3 ( memory->getactmax(3,3) / 3 , 1 << flagswitch( REGRET_ONLY, 3 ) ),  
-	  fullarr3   ( memory->getactmax(3,3) / 3 , 1 << flagswitch( FULL_ALLOC,  3 ) ),
-	  readregretcount( memory->riveractionimax() , 0), 
-	  writeregretcount( memory->riveractionimax() , 0), 
-	  writestratncount( memory->riveractionimax() , 0)
+	: indexarr( memory->riveractionimax() , 0)
+#if DYNAMIC_ALLOC_STRATN
+	, stratnarr2 ( memory->getactmax(3,2) / 3 , 1 << flagswitch( STRATN_ONLY, 2 ) ) 
+	, stratnarr3 ( memory->getactmax(3,3) / 3 , 1 << flagswitch( STRATN_ONLY, 3 ) ) 
+#endif
+#if DYNAMIC_ALLOC_REGRET
+	, regretarr2 ( memory->getactmax(3,2) / 3 , 1 << flagswitch( REGRET_ONLY, 2 ) ) 
+	, regretarr3 ( memory->getactmax(3,3) / 3 , 1 << flagswitch( REGRET_ONLY, 3 ) )
+#endif
+#if DYNAMIC_ALLOC_STRATN && DYNAMIC_ALLOC_REGRET
+	, fullarr2   ( memory->getactmax(3,2) / 3 , 1 << flagswitch( FULL_ALLOC,  2 ) )
+	, fullarr3   ( memory->getactmax(3,3) / 3 , 1 << flagswitch( FULL_ALLOC,  3 ) )
+#endif
+#if DYNAMIC_ALLOC_COUNTS
+	, readregretcount( memory->riveractionimax() , 0) 
+	, writeregretcount( memory->riveractionimax() , 0) 
+	, writestratncount( memory->riveractionimax() , 0)
+#endif
 { 
 	for(int i=0; i<memory->getactmax(3,2)+memory->getactmax(3,3); i++)
 	{
 	   indexarr.AddNewNode(); // adds new nodes with the default constructor
+#if DYNAMIC_ALLOC_COUNTS
 	   readregretcount.AddNewNode(0); //inits all counts to 0
 	   writeregretcount.AddNewNode(0);
 	   writestratncount.AddNewNode(0);
+#endif
 	}
 }
 
@@ -542,7 +598,7 @@ void computestratt(Working_type * stratt, T * regret, int numa)
 
 	if (totalregret > 0)
 		for(int i=0; i<numa; i++)
-			stratt[i] = (regret[i]>0) ? regret[i] / totalregret : 0;
+			stratt[i] = (regret[i]>0) ? (Working_type)regret[i] / totalregret : 0;
 	else
 		for(int i=0; i<numa; i++)
 			stratt[i] = (Working_type)1/(Working_type)numa;
@@ -570,7 +626,7 @@ void computeprobs(unsigned char * buffer, unsigned char &checksum, T const * con
 			//then cast to int. almost always all values will get rounded down,
 			//But max_value will never round down. we change 256 to 255.
 
-			int temp = int(256.0 * stratn[a] / max_value);
+			int temp = int(256.0 * (Working_type)stratn[a] / max_value);
 			if(temp == 256) temp = 255;
 			if(temp < 0 || temp > 255)
 				REPORT("failure to divide");
@@ -620,66 +676,74 @@ T2 & promote( uint16 oldindex, TypedPooledArray<T1> & oldarray, TypedPooledArray
 //functions that solver calls to do its work
 void MemoryManager::readstratt( Working_type * stratt, int gr, int numa, int actioni, int cardsi )
 {
-	if (gr==3 && MEMORY_OVER_SPEED)
+	if (gr==3)
 	{
+#if DYNAMIC_ALLOC_REGRET
 		const int fullindex = riveractioni(numa, actioni);
 		uint16 allocindex;
 		AllocType flags;
 		riverdata[cardsi].indexarr[fullindex].GetData(allocindex, flags);
 		switch(flagswitch(flags, numa))
 		{
-		case flagswitch(NO_ALLOC, 2):
-		case flagswitch(NO_ALLOC, 3):
-		case flagswitch(STRATN_ONLY, 2):
-		case flagswitch(STRATN_ONLY, 3):
-			for(int i=0; i<numa; i++)
-				stratt[i] = (Working_type)1/(Working_type)numa;
-			break;
+			case flagswitch(NO_ALLOC, 2):
+			case flagswitch(NO_ALLOC, 3):
+#if DYNAMIC_ALLOC_STRATN
+			case flagswitch(STRATN_ONLY, 2):
+			case flagswitch(STRATN_ONLY, 3):
+#endif
+				for(int i=0; i<numa; i++)
+					stratt[i] = (Working_type)1/(Working_type)numa;
+				break;
 
-		case flagswitch(REGRET_ONLY, 2):
-			computestratt(stratt, riverdata[cardsi].regretarr2[allocindex].regret, numa);
-			riverdata[cardsi].readregretcount[fullindex]++;
-			break;
+			case flagswitch(REGRET_ONLY, 2):
+				computestratt(stratt, riverdata[cardsi].regretarr2[allocindex].regret, numa);
+				DO_IF_COUNTS( riverdata[cardsi].readregretcount[fullindex]++ );
+				break;
 
-		case flagswitch(REGRET_ONLY, 3):
-			computestratt(stratt, riverdata[cardsi].regretarr3[allocindex].regret, numa);
-			riverdata[cardsi].readregretcount[fullindex]++;
-			break;
+			case flagswitch(REGRET_ONLY, 3):
+				computestratt(stratt, riverdata[cardsi].regretarr3[allocindex].regret, numa);
+				DO_IF_COUNTS( riverdata[cardsi].readregretcount[fullindex]++ );
+				break;
 
-		case flagswitch(FULL_ALLOC, 2):
-			computestratt(stratt, riverdata[cardsi].fullarr2[allocindex].regret, numa);
-			riverdata[cardsi].readregretcount[fullindex]++;
-			break;
+#if DYNAMIC_ALLOC_STRATN
+			case flagswitch(FULL_ALLOC, 2):
+				computestratt(stratt, riverdata[cardsi].fullarr2[allocindex].regret, numa);
+				DO_IF_COUNTS( riverdata[cardsi].readregretcount[fullindex]++ );
+				break;
 
-		case flagswitch(FULL_ALLOC, 3):
-			computestratt(stratt, riverdata[cardsi].fullarr3[allocindex].regret, numa);
-			riverdata[cardsi].readregretcount[fullindex]++;
-			break;
+			case flagswitch(FULL_ALLOC, 3):
+				computestratt(stratt, riverdata[cardsi].fullarr3[allocindex].regret, numa);
+				DO_IF_COUNTS( riverdata[cardsi].readregretcount[fullindex]++ );
+				break;
+#endif
 
-		default: REPORT("catastrophic error: flags="+tostring(flags)+" numa="+tostring(numa));
+			default: REPORT("catastrophic error: flags="+tostring(flags)+" numa="+tostring(numa));
 		}
-	}
-	else if (gr==3 && !MEMORY_OVER_SPEED)
-	{
+#elif DYNAMIC_ALLOC_STRATN /*stratn dynamic, regret is not*/
+		RiverRegret_type * regret;
+		riverdata_regret[numa]->getdata(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		computestratt(stratt, regret, numa);
+#else /*stratn not dynamic, regret not dynamic*/
 		RiverRegret_type * regret;
 		riverdata_oldmethod[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computestratt(stratt, regret, numa);
+#endif
 	}
 	else if (gr == 2)
 	{
-		TurnStore_type * regret;
+		TurnRegret_type * regret;
 		turndata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computestratt(stratt, regret, numa);
 	}
 	else if (gr == 1)
 	{
-		FlopStore_type * regret;
+		FlopRegret_type * regret;
 		flopdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computestratt(stratt, regret, numa);
 	}
 	else if (gr == 0)
 	{
-		PFlopStore_type * regret;
+		PFlopRegret_type * regret;
 		pflopdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computestratt(stratt, regret, numa);
 	}
@@ -688,8 +752,9 @@ void MemoryManager::readstratt( Working_type * stratt, int gr, int numa, int act
 
 void MemoryManager::readstratn( unsigned char * buffer, unsigned char & checksum, int gr, int numa, int actioni, int cardsi )
 {
-	if (gr == 3 && MEMORY_OVER_SPEED)
+	if (gr == 3)
 	{
+#if DYNAMIC_ALLOC_STRATN
 		const int fullindex = riveractioni(numa, actioni);
 		uint16 allocindex;
 		AllocType flags;
@@ -698,8 +763,10 @@ void MemoryManager::readstratn( unsigned char * buffer, unsigned char & checksum
 		{
 		case flagswitch(NO_ALLOC, 2):
 		case flagswitch(NO_ALLOC, 3):
+#if DYNAMIC_ALLOC_REGRET
 		case flagswitch(REGRET_ONLY, 2):
 		case flagswitch(REGRET_ONLY, 3):
+#endif
 			checksum = 0;
 			for(int i=0; i<numa; i++)
 				checksum += buffer[i] = 1;
@@ -712,37 +779,42 @@ void MemoryManager::readstratn( unsigned char * buffer, unsigned char & checksum
 			computeprobs( buffer, checksum, riverdata[cardsi].stratnarr3[allocindex].stratn, numa );
 			break;
 
+#if DYNAMIC_ALLOC_REGRET
 		case flagswitch(FULL_ALLOC, 2):
 			computeprobs( buffer, checksum, riverdata[cardsi].fullarr2[allocindex].stratn, numa );
 			break;
 		case flagswitch(FULL_ALLOC, 3):
 			computeprobs( buffer, checksum, riverdata[cardsi].fullarr3[allocindex].stratn, numa );
 			break;
+#endif
 	
 		default: REPORT("catastrophic error: flags="+tostring(flags)+" numa="+tostring(numa));
 		}
-	}
-	else if (gr == 3 && !MEMORY_OVER_SPEED)
-	{
-		RiverRegret_type * stratn;
+#elif DYNAMIC_ALLOC_REGRET /*stratn not dynamic, but regret is*/
+		RiverStratn_type * stratn;
+		riverdata_stratn[numa]->getdata( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
+		computeprobs( buffer, checksum, stratn, numa );
+#else /*stratn not dynamic, regret not dynamic*/
+		RiverStratn_type * stratn;
 		riverdata_oldmethod[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
 		computeprobs( buffer, checksum, stratn, numa );
+#endif
 	}
 	else if (gr == 2)
 	{
-		TurnStore_type * stratn;
+		TurnStratn_type * stratn;
 		turndata[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa );
 		computeprobs( buffer, checksum, stratn, numa );
 	}
 	else if (gr == 1)
 	{
-		FlopStore_type * stratn;
+		FlopStratn_type * stratn;
 		flopdata[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa );
 		computeprobs( buffer, checksum, stratn, numa );
 	}
 	else if (gr == 0)
 	{
-		PFlopStore_type * stratn;
+		PFlopStratn_type * stratn;
 		pflopdata[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa );
 		computeprobs( buffer, checksum, stratn, numa );
 	}
@@ -750,10 +822,11 @@ void MemoryManager::readstratn( unsigned char * buffer, unsigned char & checksum
 
 void MemoryManager::writestratn( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type * stratt )
 {
-	if (gr == 3 && MEMORY_OVER_SPEED)
+	if (gr == 3)
 	{
+#if DYNAMIC_ALLOC_STRATN
 		const int fullindex = riveractioni(numa, actioni);
-		riverdata[cardsi].writestratncount[fullindex]++;
+		DO_IF_COUNTS( riverdata[cardsi].writestratncount[fullindex]++ );
 		IndexData & myindexdata = riverdata[cardsi].indexarr[fullindex];
 		uint16 allocindex;
 		AllocType flags;
@@ -782,6 +855,7 @@ void MemoryManager::writestratn( int gr, int numa, int actioni, int cardsi, Work
 			computestratn(riverdata[cardsi].stratnarr3[allocindex].stratn, prob, stratt, numa);
 			break;
 
+#if DYNAMIC_ALLOC_REGRET
 		case flagswitch(REGRET_ONLY, 2):
 		{
 			FullData<2> & newnode = 
@@ -805,31 +879,35 @@ void MemoryManager::writestratn( int gr, int numa, int actioni, int cardsi, Work
 		case flagswitch(FULL_ALLOC, 3):
 			computestratn(riverdata[cardsi].fullarr3[allocindex].stratn, prob, stratt, numa);
 			break;
+#endif
 
 		default: REPORT("catastrophic error: flags="+tostring(flags)+" numa="+tostring(numa));
 		}
-	}
-	else if (gr == 3 && !MEMORY_OVER_SPEED)
-	{
-		RiverRegret_type * stratn;
+#elif DYNAMIC_ALLOC_REGRET /*regret is dynamic, stratn is not */
+		RiverStratn_type * stratn;
+		riverdata_stratn[numa]->getdata(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
+		computestratn(stratn, prob, stratt, numa);
+#else /*nothing is dynamic*/
+		RiverStratn_type * stratn;
 		riverdata_oldmethod[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
 		computestratn(stratn, prob, stratt, numa);
+#endif
 	}
 	else if (gr == 2)
 	{
-		TurnStore_type * stratn;
+		TurnStratn_type * stratn;
 		turndata[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
 		computestratn(stratn, prob, stratt, numa);
 	}
 	else if (gr == 1)
 	{
-		FlopStore_type * stratn;
+		FlopStratn_type * stratn;
 		flopdata[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
 		computestratn(stratn, prob, stratt, numa);
 	}
 	else if (gr == 0)
 	{
-		PFlopStore_type * stratn;
+		PFlopStratn_type * stratn;
 		pflopdata[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
 		computestratn(stratn, prob, stratt, numa);
 	}
@@ -839,10 +917,11 @@ template < int P >
 inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cardsi, 
 		Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility )
 {
-	if (gr == 3 && MEMORY_OVER_SPEED)
+	if (gr == 3)
 	{
+#if DYNAMIC_ALLOC_REGRET
 		const int fullindex = riveractioni(numa, actioni);
-		riverdata[cardsi].writeregretcount[fullindex]++;
+		DO_IF_COUNTS( riverdata[cardsi].writeregretcount[fullindex]++ );
 		IndexData & myindexdata = riverdata[cardsi].indexarr[fullindex];
 		uint16 allocindex;
 		AllocType flags;
@@ -863,6 +942,7 @@ inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cards
 			break;
 		}
 
+#if DYNAMIC_ALLOC_STRATN
 		case flagswitch(STRATN_ONLY, 2):
 		{
 			FullData<2> & newnode = 
@@ -878,6 +958,7 @@ inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cards
 			computeregret<P> ( newnode.regret, prob, avgutility, utility, numa );
 		}
 		break;
+#endif
 
 		case flagswitch(REGRET_ONLY, 2):
 			computeregret<P> ( riverdata[cardsi].regretarr2[allocindex].regret, prob, avgutility, utility, numa );
@@ -887,6 +968,7 @@ inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cards
 			computeregret<P> ( riverdata[cardsi].regretarr3[allocindex].regret, prob, avgutility, utility, numa );
 			break;
 
+#if DYNAMIC_ALLOC_STRATN
 		case flagswitch(FULL_ALLOC, 2):
 			computeregret<P> ( riverdata[cardsi].fullarr2[allocindex].regret, prob, avgutility, utility, numa );
 			break;
@@ -894,31 +976,35 @@ inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cards
 		case flagswitch(FULL_ALLOC, 3):
 			computeregret<P> ( riverdata[cardsi].fullarr3[allocindex].regret, prob, avgutility, utility, numa );
 			break;
+#endif
 
 		default: REPORT("catastrophic error: flags="+tostring(flags)+" numa="+tostring(numa));
 		}
-	}
-	else if (gr == 3 && !MEMORY_OVER_SPEED)
-	{
+#elif DYNAMIC_ALLOC_STRATN /*regret is not dynamic, but stratn is*/
+		RiverRegret_type * regret;
+		riverdata_regret[numa]->getdata(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		computeregret<P>(regret, prob, avgutility, utility, numa);
+#else /*nothing is dynamic*/
 		RiverRegret_type * regret;
 		riverdata_oldmethod[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computeregret<P>(regret, prob, avgutility, utility, numa);
+#endif
 	}
 	else if (gr == 2)
 	{
-		TurnStore_type * regret;
+		TurnRegret_type * regret;
 		turndata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computeregret<P>(regret, prob, avgutility, utility, numa);
 	}
 	else if (gr == 1)
 	{
-		FlopStore_type * regret;
+		FlopRegret_type * regret;
 		flopdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computeregret<P>(regret, prob, avgutility, utility, numa);
 	}
 	else if (gr == 0)
 	{
-		PFlopStore_type * regret;
+		PFlopRegret_type * regret;
 		pflopdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computeregret<P>(regret, prob, avgutility, utility, numa);
 	}
@@ -941,99 +1027,261 @@ void MemoryManager::writeregret1( int gr, int numa, int actioni, int cardsi,
 }
 
 //used for outputting info in MemoryManager ctor only
-int getsize(int r, int nacts)
+double getsize(int r)
 {
 	switch(r)
 	{
-		case 3: return nacts*2*(sizeof(RiverStratn_type)+sizeof(RiverRegret_type))/2;
-		case 2: return nacts*2*sizeof(TurnStore_type);
-		case 1: return nacts*2*sizeof(FlopStore_type);
-		case 0: return nacts*2*sizeof(PFlopStore_type);
+		case 3: return sizeof( RiverStratn_type ) + sizeof( RiverRegret_type );
+		case 2: return sizeof( TurnStratn_type ) + sizeof( TurnRegret_type );
+		case 1: return sizeof( FlopStratn_type ) + sizeof( FlopRegret_type );
+		case 0: return sizeof( PFlopStratn_type ) + sizeof( PFlopRegret_type );
 		default: REPORT("bad r"); return 0;
 	}
 }
 	
 //cout how much memory will use, then allocate it
 MemoryManager::MemoryManager(const BettingTree &bettingtree, const CardMachine &cardmachine)
-	: cardmach( cardmachine ), tree( bettingtree ),
-	pflopdata( boost::extents[boost::multi_array_types::extent_range(2,10)] ),
-	flopdata( boost::extents[boost::multi_array_types::extent_range(2,10)] ),
-	turndata( boost::extents[boost::multi_array_types::extent_range(2,10)] ),
-	riverdata_oldmethod( boost::extents[boost::multi_array_types::extent_range(2,10)] ),
-	riverdata( NULL ), mastercompactflag( false )
+	: cardmach( cardmachine )
+	, tree( bettingtree )
+	, pflopdata( boost::extents[boost::multi_array_types::extent_range(2,10)] )
+	, flopdata( boost::extents[boost::multi_array_types::extent_range(2,10)] )
+	, turndata( boost::extents[boost::multi_array_types::extent_range(2,10)] )
+#if !DYNAMIC_ALLOC_STRATN && !DYNAMIC_ALLOC_REGRET /*both use old method*/
+	, riverdata_oldmethod( boost::extents[boost::multi_array_types::extent_range(2,10)] )
+#elif !DYNAMIC_ALLOC_STRATN /*only stratn uses old method*/
+	, riverdata_stratn( boost::extents[boost::multi_array_types::extent_range(2,10)] )
+#elif !DYNAMIC_ALLOC_REGRET /*only regret uses old method*/
+	, riverdata_regret( boost::extents[boost::multi_array_types::extent_range(2,10)] )
+#endif
+#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET /*at least one uses the new method*/
+	, riverdata( NULL )
+	, mastercompactflag( false )
+#endif
 {
-	//print out space requirements, then pause
+	for(int gr=0; gr<4; gr++) 
+		for(int a=2; a<=MAX_ACTIONS; a++)
+			if( (int64)getactmax( gr, a ) * (int64)cardmach.getcardsimax( gr ) > 0x000000007fffffffLL )
+				REPORT("your indices may overflow. fix that.");
+
+	//print out data types that are used and their sizes
 
 	for(unsigned i=0; i<sizeof(TYPENAMES)/sizeof(TYPENAMES[0]); i++)
-		cout << "floating point type " << TYPENAMES[i][0] << " is " << TYPENAMES[i][1] << "." << endl;
+		cout << "floating point type " << TYPENAMES[i][0] << " is " << TYPENAMES[i][1] << " (" << space( TYPESIZES[i] ) << ")." << endl;
 
-	int64 totalbytes = 0;
-	int64 riverbytes = 0;
+	//print a table of where what memory is used where
 
-	for(int gr=0; gr<4; gr++)
+	cout << endl << "STATICALLY ALLOCATED:" << endl;
+
+	const int c = 18;
+	cout << endl
+		<< setw(c) << "GAMEROUND" 
+		<< setw(c) << "N ACTS"
+		<< setw(c) << "N NODES" 
+		<< setw(c) << "N BINS" 
+		<< setw(c) << "SPACE"
+		<< endl;
+
+	//print out space requirements by game round for preflop flop and turn, track total space used
+
+	int64 totalbytes = 0; //only statically allocated
+
+#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET /*if anything is dynamic*/
+	for(int gr=0; gr<3; gr++) 
+#else /*if both are static*/
+	for(int gr=0; gr<4; gr++) 
+#endif
 	{
-		cout << "round " << gr << " uses " << cardmach.getcardsimax(gr) << " card indexings..." << endl;
+		int64 totalactsthisround = 0;
+		int64 totalbytesthisround = 0;
 
 		for(int a=2; a<=MAX_ACTIONS; a++)
 		{
-			if((int64)getactmax(gr,a)*(int64)cardmach.getcardsimax(gr) > 0x000000007fffffffLL)
-				REPORT("your indices may overflow. fix that.");
-			int64 mybytes = getactmax(gr,a)*getsize(gr,a)*cardmach.getcardsimax(gr);
-			if(mybytes>0)
-			{
-				totalbytes += mybytes;
-				cout << "round " << gr << " uses " << getactmax(gr,a) << " nodes with " << a << " members for a total of " << space(mybytes) << endl;
-			}
-			if(gr==3) riverbytes += mybytes;
+			if( getactmax( gr, a ) == 0 )
+				continue;
+
+			int64 thisbytes = getactmax( gr, a ) * a * getsize( gr ) * cardmach.getcardsimax( gr );
+			totalactsthisround += getactmax( gr, a );
+			totalbytesthisround += thisbytes;
+
+			cout 
+				<< setw( c ) << gameroundstring( gr )
+				<< setw( c ) << a
+				<< setw( c ) << getactmax( gr, a )
+				<< setw( c ) << cardmach.getcardsimax( gr )
+				<< setw( c ) << space( thisbytes )
+				<< endl;
 		}
+		cout
+			<< setw( c ) << gameroundstring( gr )
+			<< setw( c ) << "TOTAL"
+			<< setw( c ) << totalactsthisround
+			<< setw( c ) << cardmach.getcardsimax( gr )
+			<< setw( c ) << space( totalbytesthisround ) << '*'
+			<< endl;
+
+		totalbytes += totalbytesthisround;
 	}
 
-	for(int gr=1; gr<4; gr++)
+#if ( DYNAMIC_ALLOC_STRATN && !DYNAMIC_ALLOC_REGRET ) || ( DYNAMIC_ALLOC_REGRET && !DYNAMIC_ALLOC_STRATN ) /*if exactly one thing is static*/
 	{
-		cout << cardmach.getparams().bin_max[gr] << " rnd" << gr << " bins use: " << space(cardmach.getparams().filesize[gr]) << endl;
-		totalbytes += cardmach.getparams().filesize[gr];
-	}
+		int64 totalactsthisround = 0;
+		int64 totalbytesthisround = 0;
 
-	if(MEMORY_OVER_SPEED)
+		for(int a=2; a<=MAX_ACTIONS; a++)
+		{
+			if( getactmax( 3, a ) == 0 )
+				continue;
+
+#if !DYNAMIC_ALLOC_STRATN
+			int64 thisbytes = getactmax( 3, a ) * ( 1 * a ) * sizeof( RiverStratn_type ) * cardmach.getcardsimax( 3 );
+#else
+			int64 thisbytes = getactmax( 3, a ) * ( 1 * a ) * sizeof( RiverRegret_type ) * cardmach.getcardsimax( 3 );
+#endif
+			totalactsthisround += getactmax( 3, a );
+			totalbytesthisround += thisbytes;
+
+			cout 
+#if !DYNAMIC_ALLOC_STRATN
+				<< setw( c ) << "River Stratn"
+#else
+				<< setw( c ) << "River Regret"
+#endif
+				<< setw( c ) << a
+				<< setw( c ) << getactmax( 3, a )
+				<< setw( c ) << cardmach.getcardsimax( 3 )
+				<< setw( c ) << space( thisbytes )
+				<< endl;
+		}
+		cout
+#if !DYNAMIC_ALLOC_STRATN
+			<< setw( c ) << "River Stratn"
+#else
+			<< setw( c ) << "River Regret"
+#endif
+			<< setw( c ) << "TOTAL"
+			<< setw( c ) << totalactsthisround
+			<< setw( c ) << cardmach.getcardsimax( 3 )
+			<< setw( c ) << space( totalbytesthisround ) << '*'
+			<< endl;
+
+		totalbytes += totalbytesthisround;
+	}
+#endif
+	
+	//print space used by bin files
+
+	cout << endl
+		<< setw( c ) << "GAMEROUND"
+		<< setw( c ) << "BIN MAX"
+		<< setw( c ) << "BIN FILE SPACE"
+		<< endl;
+
+	for(int gr=0; gr<4; gr++)
 	{
-		cout << "CardsiContainers use " << sizeof(CardsiContainer) << " bytes each for total of " << space(cardmach.getcardsimax(3)*sizeof(CardsiContainer)) << endl;
-		totalbytes += cardmach.getcardsimax(3)*sizeof(CardsiContainer);
-
-		cout << "Extra counts per node are " << EXTRA_CARDSI_BYTES_PER_NODE << " bytes amounting to " 
-			<< space(cardmach.getcardsimax(3)*(getactmax(3,2)+getactmax(3,3))*EXTRA_CARDSI_BYTES_PER_NODE) << " in the hugebuffer." << endl;
-		totalbytes += cardmach.getcardsimax(3)*(getactmax(3,2)+getactmax(3,3))*EXTRA_CARDSI_BYTES_PER_NODE;
-
-		cout << "River nodes use " << space(riverbytes) << " when fully allocated using datatype of size " << space(getsize(3,2)/(2*2)) << endl;
+		cout 
+			<< setw( c ) << gameroundstring( gr )
+			<< setw( c ) << cardmach.getparams().bin_max[ gr ]
+			<< setw( c ) << space( cardmach.getparams().filesize[ gr ] ) 
+			<< endl;
+		totalbytes += cardmach.getparams().filesize[ gr ];
 	}
 
-	cout << "total: " << space(totalbytes) << endl;
+	//print out total bytes used
+
+	cout << endl << "TOTAL BYTES STATICALLY ACCOUNTED FOR: " << space(totalbytes) << endl;
+
+	//print out space possibly used by dynamic allocator
+
+#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET /*at least one uses the new method*/
+	cout << endl << "DYNAMICALLY ALLOCATED (River only):" << endl;
+
+	cout << endl
+		<< setw( c ) << "THING"
+		<< setw( c ) << "SIZE EACH"
+		<< setw( c ) << "HOW MANY"
+		<< setw( c ) << "TOTAL"
+		<< endl;
+
+	cout << setw( c ) << "CardsiContainers" << setw( c ) << space( sizeof( CardsiContainer ) ) << setw( c ) << cardmach.getcardsimax( 3 ) 
+		<< setw( c ) << space( cardmach.getcardsimax( 3 ) * sizeof( CardsiContainer ) ) << endl;
+	totalbytes += cardmach.getcardsimax( 3 ) * sizeof( CardsiContainer );
+
+	cout << setw( c ) << "Extra Slack per CC" << setw( c ) << space( EXTRA_SLACK_PER_CC ) << setw( c ) << cardmach.getcardsimax( 3 ) 
+		<< setw( c ) << space( cardmach.getcardsimax( 3 ) * EXTRA_SLACK_PER_CC ) << endl;
+	totalbytes += cardmach.getcardsimax( 3 ) * EXTRA_SLACK_PER_CC;
+
+	cout 
+		<< setw( c ) << "IndexData" << setw( c ) << space( EXTRA_INDEX_BYTES_PER_NODE )
+		<< setw( c ) << cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) + getactmax( 3, 3 ) )
+		<< setw( c ) << space( cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) + getactmax( 3, 3 ) ) * EXTRA_INDEX_BYTES_PER_NODE ) 
+		<< endl; 
+	totalbytes += cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) + getactmax( 3, 3 ) ) * EXTRA_INDEX_BYTES_PER_NODE;
+#endif
+
+#if DYNAMIC_ALLOC_COUNTS
+	cout 
+		<< setw( c ) << "Diagnostic counts" << setw( c ) << space( EXTRA_COUNT_BYTES_PER_NODE )
+		<< setw( c ) << cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) + getactmax( 3, 3 ) )
+		<< setw( c ) << space( cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) + getactmax( 3, 3 ) ) * EXTRA_COUNT_BYTES_PER_NODE ) 
+		<< endl; 
+	totalbytes += cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) + getactmax( 3, 3 ) ) * EXTRA_COUNT_BYTES_PER_NODE;
+#endif
+
+#if DYNAMIC_ALLOC_STRATN
+	cout 
+		<< setw( c ) << "Stratn @ 100%" << setw( c ) << space( sizeof( RiverStratn_type ) )
+		<< setw( c ) << (int64) cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) * 2 + getactmax( 3, 3 ) * 3 )
+		<< setw( c ) << space( (int64) cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) * 2 + getactmax( 3, 3 ) * 3 ) * sizeof( RiverStratn_type ) )
+		<< endl;
+#endif
+
+#if DYNAMIC_ALLOC_REGRET
+	cout 
+		<< setw( c ) << "Regret @ 100%" << setw( c ) << space( sizeof( RiverRegret_type ) )
+		<< setw( c ) << (int64) cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) * 2 + getactmax( 3, 3 ) * 3 )
+		<< setw( c ) << space( (int64) cardmach.getcardsimax( 3 ) * ( getactmax( 3, 2 ) * 2 + getactmax( 3, 3 ) * 3 ) * sizeof( RiverRegret_type ) )
+		<< endl;
+#endif
 
 	//allocate for river
 
-	if(MEMORY_OVER_SPEED)
-	{
-		cout << endl << "How much memory (in GB) would you like? ";
-		double gigabytes;
-		cin >> gigabytes;
-		int64 nbytes = (int64)(gigabytes*1024.0*1024.0*1024.0) + 1;
-		nbytes = (nbytes >> 23) << 23; //round down to nearest 8 MB
-		cout << "Very well. I shall allocate " << nbytes << " bytes." << endl;
+#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET /*at least one uses the new method*/
+	cout << endl << "How much memory (in GB) would you like? ";
+	double gigabytes;
+	cin >> gigabytes;
+	int64 nbytes = (int64)(gigabytes*1024.0*1024.0*1024.0) + 1;
+	nbytes = (nbytes >> 23) << 23; //round down to nearest 8 MB
+	cout << "Very well. I shall allocate " << nbytes << " bytes." << endl;
 
-		for(int n=2; n<10; n++) riverdata_oldmethod[n] = NULL; //not initialized in constructor
-		hugebuffer = new HugeBuffer( nbytes ); //global, HugeBuffer must exist ant this set before CardiContainer's is created
-		memory = this; //global, must be set before CardiContainer constructor is run. (next line)
-		riverdata = new CardsiContainer[ cardmach.getcardsimax(3) ] ( );
-	}
-	else
-	{
-		for(int n=2; n<10; n++) riverdata_oldmethod[n] = getactmax(3,n) > 0 ? new DataContainer<RiverRegret_type>(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
-	}
+	hugebuffer = new HugeBuffer( nbytes ); //global, HugeBuffer must exist ant this set before CardiContainer's is created
+	memory = this; //global, must be set before CardiContainer constructor is run. (next line)
+	riverdata = new CardsiContainer[ cardmach.getcardsimax(3) ] ( );
+#else
+	// pause();
+#endif
+#if !DYNAMIC_ALLOC_STRATN && !DYNAMIC_ALLOC_REGRET /*both use old method*/
+#if SEPARATE_STRATN_REGRET
+	for(int n=2; n<10; n++) riverdata_oldmethod[n] = getactmax(3,n) > 0 ? new DataContainer< RiverStratn_type, RiverRegret_type >(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
+#else
+	for(int n=2; n<10; n++) riverdata_oldmethod[n] = getactmax(3,n) > 0 ? new DataContainer< RiverStratn_type >(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
+#endif
+#elif !DYNAMIC_ALLOC_STRATN /*only stratn uses old method*/
+	for(int n=2; n<10; n++) riverdata_stratn[n] = getactmax(3,n) > 0 ? new DataContainerSingle<RiverStratn_type>(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
+#elif !DYNAMIC_ALLOC_REGRET /*only regret uses old method*/
+	for(int n=2; n<10; n++) riverdata_regret[n] = getactmax(3,n) > 0 ? new DataContainerSingle<RiverRegret_type>(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
+#endif
 
 	//allocate for preflop, flop, and turn.
 
-	for(int n=2; n<10; n++) pflopdata[n] = getactmax(0,n) > 0 ? new DataContainer<PFlopStore_type>(n, getactmax(0,n)*cardmach.getcardsimax(0)) : NULL;
-	for(int n=2; n<10; n++) flopdata[n] = getactmax(1,n) > 0 ? new DataContainer<FlopStore_type>(n, getactmax(1,n)*cardmach.getcardsimax(1)) : NULL;
-	for(int n=2; n<10; n++) turndata[n] = getactmax(2,n) > 0 ? new DataContainer<TurnStore_type>(n, getactmax(2,n)*cardmach.getcardsimax(2)) : NULL;
+#if SEPARATE_STRATN_REGRET
+	for(int n=2; n<10; n++) pflopdata[n] = getactmax(0,n) > 0 ? new DataContainer< PFlopStratn_type, PFlopRegret_type >(n, getactmax(0,n)*cardmach.getcardsimax(0)) : NULL;
+	for(int n=2; n<10; n++) flopdata[n] = getactmax(1,n) > 0 ? new DataContainer< FlopStratn_type, FlopRegret_type >(n, getactmax(1,n)*cardmach.getcardsimax(1)) : NULL;
+	for(int n=2; n<10; n++) turndata[n] = getactmax(2,n) > 0 ? new DataContainer< TurnStratn_type, TurnRegret_type >(n, getactmax(2,n)*cardmach.getcardsimax(2)) : NULL;
+#else
+	for(int n=2; n<10; n++) pflopdata[n] = getactmax(0,n) > 0 ? new DataContainer<PFlopStratn_type>(n, getactmax(0,n)*cardmach.getcardsimax(0)) : NULL;
+	for(int n=2; n<10; n++) flopdata[n] = getactmax(1,n) > 0 ? new DataContainer<FlopStratn_type>(n, getactmax(1,n)*cardmach.getcardsimax(1)) : NULL;
+	for(int n=2; n<10; n++) turndata[n] = getactmax(2,n) > 0 ? new DataContainer<TurnStratn_type>(n, getactmax(2,n)*cardmach.getcardsimax(2)) : NULL;
+#endif
 }
 
 MemoryManager::~MemoryManager()
@@ -1041,11 +1289,21 @@ MemoryManager::~MemoryManager()
 	for(int n=2; n<10; n++) if(pflopdata[n] != NULL) delete pflopdata[n];
 	for(int n=2; n<10; n++) if(flopdata[n] != NULL) delete flopdata[n];
 	for(int n=2; n<10; n++) if(turndata[n] != NULL) delete turndata[n];
+#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET /*at least one uses the new method*/
+	delete[] riverdata;
+	delete hugebuffer;
+#endif
+#if !DYNAMIC_ALLOC_STRATN && !DYNAMIC_ALLOC_REGRET /*both use old method*/
 	for(int n=2; n<10; n++) if(riverdata_oldmethod[n] != NULL) delete riverdata_oldmethod[n];
-	if(riverdata != NULL) delete[] riverdata;
-	if(hugebuffer != NULL) delete hugebuffer;
+#elif !DYNAMIC_ALLOC_STRATN /*only stratn uses old method*/
+	for(int n=2; n<10; n++) if(riverdata_stratn[n] != NULL) delete riverdata_stratn[n];
+#elif !DYNAMIC_ALLOC_REGRET /*only regret uses old method*/
+	for(int n=2; n<10; n++) if(riverdata_regret[n] != NULL) delete riverdata_regret[n];
+#endif
+
 }
 
+#if DYNAMIC_ALLOC_COUNTS
 void MemoryManager::savecounts(const string & filename)
 {
 	cout << "Saving counts..." << endl;
@@ -1066,11 +1324,11 @@ void MemoryManager::savecounts(const string & filename)
 		}
 	}
 }
+#endif
 
 int64 MemoryManager::save(const string &filename)
 {
-	if(MEMORY_OVER_SPEED)
-		savecounts(filename);
+	DO_IF_COUNTS( savecounts(filename) );
 
 	cout << "Saving strategy data file..." << endl;
 
@@ -1115,12 +1373,18 @@ int64 MemoryManager::save(const string &filename)
 //provide access to HugeBuffer functions via public MemoryManager functions, these are used by Solver
 int64 MemoryManager::CompactMemory()
 {
-	if(MEMORY_OVER_SPEED) return hugebuffer->CompactData();
-	else return -1;
+#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET
+	return hugebuffer->CompactData();
+#else
+	return -1;
+#endif
 }
 
 int64 MemoryManager::GetHugeBufferSize()
 {
-	if(MEMORY_OVER_SPEED) return hugebuffer->GetSize();
-	else return -1;
+#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET
+	return hugebuffer->GetSize();
+#else
+	return -1;
+#endif
 }

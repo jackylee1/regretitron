@@ -7,17 +7,35 @@
 #include "../PokerLibrary/binstorage.h" //to determine bin filesize
 #include "../utility.h" // for TOSTRING()
 #include <boost/preprocessor.hpp>
+#include "floatingpoint.h"
 
 //solver settings
-#define MYTYPE double
-#define SOLVER_TYPES (6, ( \
-( Working_type, MYTYPE ), \
-( PFlopStore_type, MYTYPE ), \
-( FlopStore_type, MYTYPE ), \
-( TurnStore_type, MYTYPE ), \
-( RiverStratn_type, MYTYPE ), \
-( RiverRegret_type, MYTYPE )))
-const bool MEMORY_OVER_SPEED = false; //must be true for __float128 to work due to alignment issues
+/* Note FloatCustom ranges: can usually use 5 or 6
+   expbits = 4, 512
+   expbits = 5, 131072
+   expbits = 6, 8.6e9
+   expbits = 7, 3.7e19
+   *******/
+
+typedef FloatCustomUnsigned< uint16, 6, true > FloatCustomUnsigned_uint16_6_true;
+typedef FloatCustomSigned< uint8, 5, true > FloatCustomSigned_uint8_5_true;
+typedef FloatCustomSigned< uint16, 5, true > FloatCustomSigned_uint16_5_true;
+#define SOLVER_TYPES (9, ( \
+( Working_type, float ), \
+( PFlopStratn_type, double ), \
+( FlopStratn_type, double ), \
+( TurnStratn_type, double ), \
+( RiverStratn_type, float ), \
+( PFlopRegret_type, float ), \
+( FlopRegret_type, float ), \
+( TurnRegret_type, float ), \
+( RiverRegret_type, float )))
+
+#define SEPARATE_STRATN_REGRET 1
+#define DYNAMIC_ALLOC_STRATN 0 /*must be false for __float128 to work due to alignment issues*/
+#define DYNAMIC_ALLOC_REGRET 0 /*must be false for __float128 to work due to alignment issues*/
+#define DYNAMIC_ALLOC_COUNTS 0
+
 #define DO_THREADS /*undefine this to disable threading use*/
 const double AGGRESSION_FACTOR = 0; //0 = "calm old man", 7 = "crazed, cocaine-driven maniac with an ax"
 const bool THREADLOOPTRACE = false; //prints out debugging
@@ -44,15 +62,20 @@ const int MAX_ACTIONS_SOLVER = MAX_ACTIONS; //defined in PokerLibrary/constants.
 
 //tuples are ( name, type ), otherwise this is COMPLETE MAGIC
 #define TYPEDEF( tuple ) typedef BOOST_PP_TUPLE_ELEM(2,1,tuple) BOOST_PP_TUPLE_ELEM(2,0,tuple);
-#define ARRAYELEM( tuple ) { BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2,0,tuple)), BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2,1,tuple)) }
+#define ARRAYELEM_TN( tuple ) { BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2,0,tuple)), BOOST_PP_STRINGIZE(BOOST_PP_TUPLE_ELEM(2,1,tuple)) }
+#define ARRAYELEM_TS( tuple ) sizeof( BOOST_PP_TUPLE_ELEM(2,0,tuple) )
 #define MACROTD(r, state) TYPEDEF(BOOST_PP_ARRAY_ELEM( BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_TUPLE_ELEM(2,1,state)))
-#define MACROARR(r, state) ARRAYELEM(BOOST_PP_ARRAY_ELEM( BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_TUPLE_ELEM(2,1,state))) \
+#define MACROARR_TN(r, state) ARRAYELEM_TN(BOOST_PP_ARRAY_ELEM( BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_TUPLE_ELEM(2,1,state))) \
+	BOOST_PP_IIF( BOOST_PP_EQUAL( BOOST_PP_INC(BOOST_PP_TUPLE_ELEM(2,0,state)), BOOST_PP_ARRAY_SIZE( BOOST_PP_TUPLE_ELEM(2,1,state))), \
+	BOOST_PP_EMPTY, BOOST_PP_COMMA )()
+#define MACROARR_TS(r, state) ARRAYELEM_TS(BOOST_PP_ARRAY_ELEM( BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_TUPLE_ELEM(2,1,state))) \
 	BOOST_PP_IIF( BOOST_PP_EQUAL( BOOST_PP_INC(BOOST_PP_TUPLE_ELEM(2,0,state)), BOOST_PP_ARRAY_SIZE( BOOST_PP_TUPLE_ELEM(2,1,state))), \
 	BOOST_PP_EMPTY, BOOST_PP_COMMA )()
 #define PRED(r, state) BOOST_PP_NOT_EQUAL(BOOST_PP_TUPLE_ELEM(2,0,state), BOOST_PP_ARRAY_SIZE(BOOST_PP_TUPLE_ELEM(2,1,state)))
 #define OP(r, state) (BOOST_PP_INC(BOOST_PP_TUPLE_ELEM(2,0,state)), BOOST_PP_TUPLE_ELEM(2,1,state))
 BOOST_PP_FOR( (0, SOLVER_TYPES), PRED, OP, MACROTD) //defines all my typedefs
-const char* const TYPENAMES[][2] = { BOOST_PP_FOR( (0, SOLVER_TYPES), PRED, OP, MACROARR) }; //defines key, value strings
+const char* const TYPENAMES[][2] = { BOOST_PP_FOR( (0, SOLVER_TYPES), PRED, OP, MACROARR_TN) }; //defines key, value strings
+const int TYPESIZES[] = { BOOST_PP_FOR( ( 0, SOLVER_TYPES ), PRED, OP, MACROARR_TS ) }; //an array of sizes
 #undef TYPEDEF
 #undef ARRAYELEM
 #undef MACROTD
