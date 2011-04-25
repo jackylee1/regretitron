@@ -161,7 +161,7 @@ void Solver::save(const string &filename, bool writedata)
 
 	//rand seed and computer used
 
-	run->SetAttribute("randseededwith", cardmachine->getrandseed( ) );
+	run->SetAttribute("randseededwith", tostr( cardmachine->getrandseed( ) ) );
 
 	run->SetAttribute("numthreads", num_threads);
 #if _WIN32
