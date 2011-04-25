@@ -9,6 +9,7 @@
 #include <pthread.h>
 #endif
 #include <boost/tuple/tuple.hpp>
+#include <boost/scoped_array.hpp>
 #include <string>
 using std::string;
 #include <list>
@@ -21,7 +22,8 @@ class Solver
 {
 public:
 	Solver() {} //does nothing - all data is initialized before each loop in threadloop()
-	static void initsolver( const treesettings_t &, const cardsettings_t &, MTRand::uint32 ); //called once before doing anything ever
+	static void initsolver( const treesettings_t &, const cardsettings_t &, 
+			MTRand::uint32, unsigned, unsigned ); //called once before doing anything ever
 	static void destructsolver();
 	static boost::tuple<
 		double, //time taken
@@ -70,6 +72,9 @@ private:
 	static BettingTree * tree;
 	static Vertex treeroot;
 	static MemoryManager * memory;
+	static boost::scoped_array< Solver > solvers;
+	static unsigned num_threads; //used only when DO_THREADS but defined nonetheless
+	static unsigned n_lookahead; //used only when DO_THREADS but defined nonetheless
 #ifdef DO_THREADS
 	static pthread_mutex_t threaddatalock;
 	static pthread_cond_t signaler;

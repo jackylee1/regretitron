@@ -21,10 +21,13 @@ CardMachine * Solver::cardmachine = NULL;
 BettingTree * Solver::tree = NULL;
 Vertex Solver::treeroot;
 MemoryManager * Solver::memory = NULL;
+boost::scoped_array< Solver > Solver::solvers;
+unsigned Solver::num_threads = 0;
+unsigned Solver::n_lookahead = 0;
 #ifdef DO_THREADS
 pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t Solver::signaler = PTHREAD_COND_INITIALIZER;
-list<Solver::iteration_data_t> Solver::dataqueue(N_LOOKAHEAD);
+list<Solver::iteration_data_t> Solver::dataqueue;
 vector< bool > Solver::dataguardpflopp0;
 vector< bool > Solver::dataguardpflopp1;
 vector< bool > Solver::dataguardriver; //needed for memory contention in HugeBuffer, works for imperfect recall too
@@ -46,8 +49,19 @@ void Solver::control_c(int sig)
 	}
 }
 
-void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings, MTRand::uint32 randseed )
+void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings, MTRand::uint32 randseed, unsigned nthreads, unsigned nlook )
 {
+	num_threads = nthreads;
+	n_lookahead = nlook;
+
+	if( num_threads == 0 || num_threads > 100 )
+		REPORT( "trying to use " + tostr( num_threads ) + " threads...", KNOWN );
+	if( n_lookahead == 0 || n_lookahead > 3000 )
+		REPORT( "trying to use " + tostr( n_lookahead ) + " for n_lookahead...", KNOWN );
+
+	boost::scoped_array< Solver > solver_temp( new Solver[ num_threads ] );
+	solvers.swap( solver_temp );
+
 	signal(SIGINT, control_c); // Register the signal handler for the SIGINT signal (Ctrl+C)
 
 	tree = new BettingTree(treesettings); //the settings are taken from solveparams.h
@@ -71,9 +85,12 @@ void Solver::initsolver( const treesettings_t & treesettings, const cardsettings
 	dataguardturnp1.resize( cardmachine->getcardsimax( TURN ), false ); 
 #endif
 
-
-	for(list<iteration_data_t>::iterator data = dataqueue.begin(); data!=dataqueue.end(); data++)
-		cardmachine->getnewgame(data->cardsi, data->twoprob0wins); //get new data
+	for( unsigned i = 0; i < n_lookahead; i++ )
+	{
+		dataqueue.push_back( iteration_data_t( ) );
+		iteration_data_t & data = dataqueue.back( );
+		cardmachine->getnewgame(data.cardsi, data.twoprob0wins); //get new data
+	}
 #endif
 }
 
@@ -146,7 +163,7 @@ void Solver::save(const string &filename, bool writedata)
 
 	run->SetAttribute("randseededwith", cardmachine->getrandseed( ) );
 
-	run->SetAttribute("numthreads", NUM_THREADS);
+	run->SetAttribute("numthreads", num_threads);
 #if _WIN32
 	run->SetAttribute("system", "win32");
 #elif __GNUC__
@@ -236,8 +253,6 @@ void Solver::save(const string &filename, bool writedata)
 	doc.SaveFile((filename+".xml").c_str());
 }
 
-Solver solvers[NUM_THREADS]; //global so threadlooptrace can work
-
 //function called by main()
 tuple<
 	double, //time taken
@@ -252,29 +267,37 @@ Solver::solve(int64 iter)
 	double starttime = getdoubletime();
 	double secondscompactingstarted = secondscompacting;
 	int64 ncompactingsstarted = numbercompactings;
-	total += iter - N_LOOKAHEAD; 
-	iterations = iter - N_LOOKAHEAD;
+	if( iter <= n_lookahead )
+	{
+		total += iter;
+		iterations = iter;
+		solvers[0].threadloop();
+	}
+	else
+	{
+		total += iter - n_lookahead; 
+		iterations = iter - n_lookahead;
 
-	//Solver solvers[NUM_THREADS];
 #ifdef DO_THREADS
-	pthread_t threads[NUM_THREADS-1];
-	for(int i=0; i<NUM_THREADS-1; i++)
-		if(pthread_create(&threads[i], NULL, callthreadloop, &solvers[i+1]))
-			REPORT("error creating thread");
+		boost::scoped_array< pthread_t > threads( new pthread_t[ num_threads - 1 ] );
+		for(unsigned i=0; i<num_threads-1; i++)
+			if(pthread_create(&threads[i], NULL, callthreadloop, &solvers[i+1]))
+				REPORT("error creating thread");
 #endif
-	//use current thread too
-	solvers[0].threadloop();
+		//use current thread too
+		solvers[0].threadloop();
 #ifdef DO_THREADS
-	//wait for them all to return
-	for(int i=0; i<NUM_THREADS-1; i++)
-		if(pthread_join(threads[i],NULL))
-			REPORT("error joining thread");
+		//wait for them all to return
+		for(unsigned i=0; i<num_threads-1; i++)
+			if(pthread_join(threads[i],NULL))
+				REPORT("error joining thread");
 #endif
 
-	//do the last few unthreaded for consistency (to clear the queue)
-	total += N_LOOKAHEAD; 
-	iterations = N_LOOKAHEAD;
-	solvers[0].threadloop();
+		//do the last few unthreaded for consistency (to clear the queue)
+		total += n_lookahead; 
+		iterations = n_lookahead;
+		solvers[0].threadloop();
+	}
 
 	//return much useful data
 	return boost::make_tuple(
@@ -347,7 +370,17 @@ cannot_skip:
 bool Solver::isalldataclear()
 {
 	//if the preflop is clear then everything should be clear
-	return (dataguardpflopp0.none() && dataguardpflopp1.none());
+	vector< bool >::iterator i;
+	for( i = dataguardpflopp0.begin( ); i != dataguardpflopp0.end( ); i++ )
+		if( * i )
+			return false;
+	for( i = dataguardpflopp1.begin( ); i != dataguardpflopp1.end( ); i++ )
+		if( * i )
+			return false;
+	return true;
+
+	//this is my old bitset logic: (does the same thing)
+	//return (dataguardpflopp0.none() && dataguardpflopp1.none());
 }
 
 /***********
@@ -387,10 +420,10 @@ inline void Solver::ThreadDebug(string debugstring)
 {
 	if(THREADLOOPTRACE)
 	{
-		const int myindex = (this - solvers);
+		const int myindex = ( this - & solvers[ 0 ] );
 		string star = "                 ";
 		star[myindex] = '*';
-		cout << "Thread " << myindex+1 << " <" << star.substr(0, NUM_THREADS) << "> : " << debugstring << endl;
+		cout << "Thread " << myindex+1 << " <" << star.substr(0, num_threads) << "> : " << debugstring << endl;
 	}
 }
 

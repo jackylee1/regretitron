@@ -18,8 +18,7 @@
 ( RiverStratn_type, MYTYPE ), \
 ( RiverRegret_type, MYTYPE )))
 const bool MEMORY_OVER_SPEED = false; //must be true for __float128 to work due to alignment issues
-#define NUM_THREADS 1
-#define N_LOOK 3 //affects threading performance
+#define DO_THREADS /*undefine this to disable threading use*/
 const double AGGRESSION_FACTOR = 0; //0 = "calm old man", 7 = "crazed, cocaine-driven maniac with an ax"
 const bool THREADLOOPTRACE = false; //prints out debugging
 const bool WALKERDEBUG = false; //debug print
@@ -42,16 +41,6 @@ const int MAX_ACTIONS_SOLVER = MAX_ACTIONS; //defined in PokerLibrary/constants.
 
 //do not pollute and do not allow use
 #undef LIMIT
-
-//turn off threads for windows
-#if __GNUC__ && NUM_THREADS > 1
-#define DO_THREADS
-const int N_LOOKAHEAD = N_LOOK;
-#else
-#undef NUM_THREADS
-#define NUM_THREADS 1
-const int N_LOOKAHEAD = 0;
-#endif
 
 //tuples are ( name, type ), otherwise this is COMPLETE MAGIC
 #define TYPEDEF( tuple ) typedef BOOST_PP_TUPLE_ELEM(2,1,tuple) BOOST_PP_TUPLE_ELEM(2,0,tuple);

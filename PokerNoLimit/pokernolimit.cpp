@@ -89,8 +89,9 @@ int main(int argc, char* argv[])
 		treesettings_t treesettings;
 		//the logic to generate this is now a static function of CardMachine
 		cardsettings_t cardsettings;
-		//potentially override with settings
 		MTRand::uint32 randseed;
+		unsigned nthreads;
+		unsigned nlook;
 
 		namespace po = boost::program_options;
 
@@ -103,7 +104,15 @@ int main(int argc, char* argv[])
 			  "base of save filename" )
 
 			( "saveat", po::value< vector< uint64 > >( & iterlist )->multitoken( )->required( ),
-			  "save the strategy after this many iterations (can be specified more than once)" )
+			  "save the strategy after this many iterations "
+			  "(can be specified more than once)" )
+#ifdef DO_THREADS
+			( "nthread", po::value< unsigned >( & nthreads )->required( )->default_value( 1 ),
+			  "number of threads to use when solving" )
+			( "nlook", po::value< unsigned >( & nlook )->required( )->default_value( 1 ),
+			  "amount to consider ahead for out of order solving when running "
+			  "with more than one thread (may reduce contention)" )
+#endif
 
 			( "sblind", po::value< int >( )->required( ),
 			  "small blind size (integer value)" )
@@ -123,7 +132,7 @@ int main(int argc, char* argv[])
 			( "useflopalyzer", po::value< bool >( )->default_value( false )->required( ),
 			  "use the cardmachine's flopalyzer or not" )
 			( "seed", po::value< MTRand::uint32 >( ),
-			  "seed to provide to card generator (optional)" )
+			  "seed to provide to card generator (optional, uses time and clock if not set)" )
 			;
 
 		bool askingforhelp = false;
@@ -166,6 +175,14 @@ int main(int argc, char* argv[])
 			else
 				randseed = MTRand::gettimeclockseed( );
 
+#ifdef DO_THREADS
+			cout << setw( 30 ) << right << "Threads:  " << nthreads << 
+				" (nlook = " << nlook << ")" << endl;
+#else
+			nthreads = 1;
+			nlook = 1;
+#endif
+
 			//tree settings
 
 			treesettings = makelimittreesettings( 
@@ -193,7 +210,7 @@ int main(int argc, char* argv[])
 			//initialize the solver, open bin files and grab all memory
 
 			cout << endl;
-			Solver::initsolver( treesettings, cardsettings, randseed );
+			Solver::initsolver( treesettings, cardsettings, randseed, nthreads, nlook );
 		}
 		catch( std::exception & e )
 		{
