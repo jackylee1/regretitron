@@ -39,11 +39,40 @@ namespace
 
 }
 
+SessionManager::SessionStruct::SessionStruct( unsigned botid, unsigned sessionid, const string & xmlpath, unsigned myplayerid )
+{
+	const boost::filesystem::path botpath = SESSIONDIR / GetBotFolder( botid );
+	const boost::filesystem::path sessionpath = botpath / GetSessionFolder( sessionid );
+
+	//may already exist but doesn't throw to try again
+	boost::filesystem::create_directory( botpath );
+	boost::filesystem::create_directory( sessionpath );
+
+	//should be new files but doesn't hurt to append
+	FileLogger * logptr = new FileLogger( ( sessionpath / LOGGERFILE ).string( ), true );
+	FileLogger * recptr = new FileLogger( ( sessionpath / RECLOGFILE ).string( ), true );
+
+	botapilogger = logptr;
+	botapireclog = recptr;
+	botseed = MTRand::gettimeclockseed( );
+	bot = new BotAPI( xmlpath, false, botseed, *logptr, *recptr );
+	playerid = playerid;
+	iserror = false;
+}
+
+SessionManager::SessionStruct::~SessionStruct( )
+{
+	delete bot; //must delete bot first (uses logs)
+	delete botapilogger;
+	delete botapireclog;
+}
+
+
 //return value references values in table bots
-unsigned SessionManager::GetBotID( GameTypeEnum gametype )
+unsigned SessionManager::GetBotID( GameTypeEnum gametype, otl_connect & database )
 {
 	unsigned botid = -1;
-	otl_stream getbotid( 3, "select botid from botmapping where gametype = :gmtp<int>", m_database );
+	otl_stream getbotid( 3, "select botid from botmapping where gametype = :gmtp<int>", database );
 	getbotid << (int)gametype << endr;
 	getbotid >> botid >> endr;
 	if( botid == (unsigned)-1 )
@@ -53,7 +82,8 @@ unsigned SessionManager::GetBotID( GameTypeEnum gametype )
 
 void SessionManager::Init( )
 {
-	otl_stream getsessionid( 3, "select max( sessionid ) + 1 from sessions", m_database );
+	otl_connect localdatabase( MYSQL_CONNECT_STRING );
+	otl_stream getsessionid( 3, "select max( sessionid ) + 1 from sessions", localdatabase );
 	unsigned nextsessionid = 0;
 	getsessionid >> nextsessionid >> endr;
 	if( nextsessionid == 0 )
@@ -61,7 +91,7 @@ void SessionManager::Init( )
 	m_nextsessionid = nextsessionid;
 
 	otl_stream sessionloader( 50, "select sessionid, playerid, s.botid, xmlpath from "
-			"sessions s inner join bots b on s.botid = b.botid where status = 'ACTIVE'", m_database );
+			"sessions s inner join bots b on s.botid = b.botid where status = 'ACTIVE'", localdatabase );
 
 	while( ! sessionloader.eof( ) )
 	{
@@ -72,20 +102,15 @@ void SessionManager::Init( )
 			throw Exception( "0 stuff found" );
 
 		pair< SessionMap::iterator, bool > insertionresult
-			= m_map.insert( SessionMap::value_type( sessionid, SessionStruct( ) ) );
+			= m_map.insert( SessionMap::value_type( sessionid, SessionPtr( ) ) );
 
 		if( ! insertionresult.second )
 			throw Exception( "Error creating session (already there)" );
 
-		FileLogger * logptr = new FileLogger( ( SESSIONDIR / GetBotFolder( botid ) / GetSessionFolder( sessionid ) / LOGGERFILE ).string( ), true );
-		FileLogger * recptr = new FileLogger( ( SESSIONDIR / GetBotFolder( botid ) / GetSessionFolder( sessionid ) / RECLOGFILE ).string( ), true );
-		insertionresult.first->second.botapilogger = logptr;
-		insertionresult.first->second.botapireclog = recptr;
-		MTRand::uint32 botseed = MTRand::gettimeclockseed( );
-		insertionresult.first->second.bot = new BotAPI( xmlpath, false, botseed, *logptr, *recptr );
-		insertionresult.first->second.botseed = botseed;
-		insertionresult.first->second.playerid = playerid;
-		insertionresult.first->second.iserror = false;
+		insertionresult.first->second 
+			= SessionPtr( new SessionStruct( botid, sessionid, xmlpath, playerid ) );
+		insertionresult.first->second->database 
+			= std::auto_ptr< otl_connect >( new otl_connect( MYSQL_CONNECT_STRING ) );
 	}
 
 	cout << "loaded " << sessionloader.get_rpc( ) << " sessions..." << endl;
@@ -101,7 +126,9 @@ uint64 SessionManager::CreateSession( uint64 playerid, const MessageCreateNewSes
 	{
 		boost::unique_lock< boost::shared_mutex > exclusivelylocked( m_maplock );
 
-		otl_stream checkplayer( 3, "select enabled from players where playerid = :plid<unsigned> ", m_database );
+		std::auto_ptr< otl_connect > newdatabase( new otl_connect( MYSQL_CONNECT_STRING ) );
+
+		otl_stream checkplayer( 3, "select enabled from players where playerid = :plid<unsigned> ", * newdatabase );
 		checkplayer << (unsigned)playerid << endr;
 		if( checkplayer.get_prefetched_row_count( ) != 1 )
 			throw Exception( "Playerid not found." );
@@ -110,43 +137,30 @@ uint64 SessionManager::CreateSession( uint64 playerid, const MessageCreateNewSes
 		if( ! isenabled )
 			throw Exception( "Playerid disabled." );
 
-		const unsigned botid = GetBotID( (GameTypeEnum)request.gametype );
+		const unsigned botid = GetBotID( (GameTypeEnum)request.gametype, * newdatabase );
 
-		otl_stream makesession( 3, "insert into sessions ( sessionid, playerid, botid, status, gametype ) values ( :sessid<unsigned>, :plid<unsigned>, :btid<unsigned>, 'ACTIVE', :gtp<int> )", m_database );
+		otl_stream makesession( 3, "insert into sessions ( sessionid, playerid, botid, status, gametype ) values ( :sessid<unsigned>, :plid<unsigned>, :btid<unsigned>, 'ACTIVE', :gtp<int> )", * newdatabase );
 		makesession << (unsigned)m_nextsessionid << (unsigned)playerid << botid
 			<< (int)request.gametype << endr;
 
 		pair< SessionMap::iterator, bool > insertionresult
-			= m_map.insert( SessionMap::value_type( m_nextsessionid, SessionStruct( ) ) );
+			= m_map.insert( SessionMap::value_type( m_nextsessionid, SessionPtr( ) ) );
 
 		if( ! insertionresult.second )
 			throw Exception( "Error creating session (already there)" );
 
 		string xmlpath;
-		otl_stream getpath( 3, "select xmlpath from bots where botid = :btid<unsigned>", m_database );
+		otl_stream getpath( 3, "select xmlpath from bots where botid = :btid<unsigned>", * newdatabase );
 		getpath << botid << endr;
 		getpath >> xmlpath >> endr;
 
-		const boost::filesystem::path botpath = SESSIONDIR / GetBotFolder( botid );
-		const boost::filesystem::path sessionpath = botpath / GetSessionFolder( m_nextsessionid );
-		boost::filesystem::create_directory( botpath );
-		boost::filesystem::create_directory( sessionpath );
-
-		//should be new files but doesn't hurt to append
-		FileLogger * logptr = new FileLogger( ( sessionpath / LOGGERFILE ).string( ), true );
-		FileLogger * recptr = new FileLogger( ( sessionpath / RECLOGFILE ).string( ), true );
-		insertionresult.first->second.botapilogger = logptr;
-		insertionresult.first->second.botapireclog = recptr;
-		MTRand::uint32 botseed = MTRand::gettimeclockseed( );
-		insertionresult.first->second.bot = new BotAPI( xmlpath, false, botseed, *logptr, *recptr );
-		insertionresult.first->second.botseed = botseed;
-		insertionresult.first->second.playerid = playerid;
-		insertionresult.first->second.iserror = false;
+		insertionresult.first->second 
+			= SessionPtr( new SessionStruct( botid, m_nextsessionid, xmlpath, playerid ) );
+		insertionresult.first->second->database = newdatabase; //pass ownership over to the SessionStruct
 
 		response.sessiontype = SESSION_OPEN;
 		strcpy( response.message, "Session created." );
-		m_nextsessionid++;
-		return insertionresult.first->first;
+		return m_nextsessionid++;
 	}
 	catch( std::exception & e )
 	{
@@ -168,14 +182,15 @@ uint64 SessionManager::TestSession( uint64 playerid, uint64 sessionid, MessageSe
 		boost::unique_lock< boost::shared_mutex > exclusivelylocked( m_maplock );
 
 		SessionMap::iterator findresult = m_map.find( sessionid );
-		if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+		if( findresult == m_map.end( ) || findresult->second->playerid != playerid )
 		{
 			SetErrorResponse( response, "No session was found." );
 			return 0;
 		}
 		else
 		{
-			otl_stream updatetests( 1, "update sessions set numtests = numtests + 1 where sessionid = :sessid<unsigned>", m_database );
+			otl_connect localdatabase( MYSQL_CONNECT_STRING ); //don't know if session connection will still work
+			otl_stream updatetests( 1, "update sessions set numtests = numtests + 1 where sessionid = :sessid<unsigned>", localdatabase );
 			updatetests << (unsigned)sessionid << endr;
 
 			response.sessiontype = SESSION_OPEN;
@@ -214,11 +229,15 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 		boost::unique_lock< boost::shared_mutex > exclusivelylocked( m_maplock );
 
 		SessionMap::iterator findresult = m_map.find( sessionid );
-		if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+		if( findresult == m_map.end( ) || findresult->second->playerid != playerid )
 			throw Exception( "That session was not found." );
 
+		//log the session
+
+		otl_connect localdatabase( MYSQL_CONNECT_STRING ); //don't know if session connection will still work
+
 		unsigned botid = 0;
-		otl_stream getbotid( 3, "select botid from sessions where sessionid = :sessid<unsigned>", m_database );
+		otl_stream getbotid( 3, "select botid from sessions where sessionid = :sessid<unsigned>", localdatabase );
 		getbotid << (unsigned)sessionid << endr;
 		getbotid >> botid >> endr;
 		if( botid == 0 )
@@ -244,10 +263,6 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 			}
 		}
 
-		delete findresult->second.bot;
-		delete findresult->second.botapilogger;
-		delete findresult->second.botapireclog;
-
 		//now reconcile the session
 
 		unsigned numhandhistories = 0;
@@ -268,13 +283,13 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 		if( numhandhistories == 1 )
 		{
 			otl_stream pathgetter( 50, "select xmlpath from sessions s inner join bots b "
-					"on s.botid = b.botid where s.sessionid = :sid<unsigned>", m_database );
+					"on s.botid = b.botid where s.sessionid = :sid<unsigned>", localdatabase );
 			string xmlpath;
 			pathgetter << (unsigned)findresult->first << endr;
 			pathgetter >> xmlpath >> endr;
 			FileLogger reconlogger( sessionpath / "reconciler.logger.log", false );
 			FileLogger reconreclog( sessionpath / "reconciler.reclog.log", false );
-			BotAPI bot( xmlpath, false, findresult->second.botseed, reconlogger, reconreclog );
+			BotAPI bot( xmlpath, false, findresult->second->botseed, reconlogger, reconreclog );
 			SessionReconciler reconciler( findresult->first );
 			reconciler.DoReconcile( handhistorypath, bot, false );
 		}
@@ -289,11 +304,11 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 			LogError( o.str( ) );
 		}
 
-		//now erase and remove the session
+		//erase and remove the session from db
 
 		m_map.erase( findresult );
 
-		otl_stream killsession( 3, "update sessions set status = 'LOGGED', notes = :note<char[10000]> where sessionid = :sessid<unsigned>", m_database );
+		otl_stream killsession( 3, "update sessions set status = 'LOGGED', notes = :note<char[10000]> where sessionid = :sessid<unsigned>", localdatabase );
 		killsession << request.notes << (unsigned)sessionid << endr;
 
 		response.sessiontype = SESSION_NONE;
@@ -301,6 +316,7 @@ void SessionManager::CloseSession( uint64 playerid, uint64 sessionid, tcp::socke
 	}
 	catch( std::exception & e )
 	{
+		m_map.erase( sessionid );
 		LogError( string( __FUNCTION__ ) + ": " + e.what ( ) );
 		SetErrorResponse( response, e.what( ) );
 	}
@@ -317,21 +333,21 @@ void SessionManager::CancelSession( uint64 playerid, uint64 sessionid, MessageSe
 		boost::unique_lock< boost::shared_mutex > exclusivelylocked( m_maplock );
 
 		SessionMap::iterator findresult = m_map.find( sessionid );
-		if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+		if( findresult == m_map.end( ) || findresult->second->playerid != playerid )
 			throw Exception( "That session was not found." );
 
-		otl_stream killsession( 3, "update sessions set status = 'CANCELLED' where sessionid = :sessid<unsigned>", m_database );
+		m_map.erase( findresult );
+
+		otl_connect localdatabase( MYSQL_CONNECT_STRING ); //don't know if session connection will still work
+		otl_stream killsession( 3, "update sessions set status = 'CANCELLED' where sessionid = :sessid<unsigned>", localdatabase );
 		killsession << (unsigned)sessionid << endr;
 
-		delete findresult->second.bot;
-		delete findresult->second.botapilogger;
-		delete findresult->second.botapireclog;
-		m_map.erase( findresult );
 		response.sessiontype = SESSION_NONE;
 		strcpy( response.message, "Session cancelled." );
 	}
 	catch( std::exception & e )
 	{
+		m_map.erase( sessionid );
 		LogError( string( __FUNCTION__ ) + ": " + e.what ( ) );
 		SetErrorResponse( response, e.what( ) );
 	}
@@ -341,13 +357,10 @@ void SessionManager::UseBotNewGame( uint64 playerid, uint64 sessionid, const Mes
 {
 	cout << "bot setnewgame with playreid=" << playerid << " sessionid=" << sessionid << " sblind=" << request.sblind << " bblind=" << request.bblind << " stacksize=" << request.stacksize << " myhand=" << tostr( request.myhand ) << " playernum=" << (int)request.playernum << endl;
 
-	//exclusively lock so that otl_database object doesn't get fucked.
-	//I could use a second lock so that I am more efficient. (blocking all other uses of bot during this)
-	boost::unique_lock< boost::shared_mutex > exclusivelylocked( m_maplock );
-	//boost::shared_lock< boost::shared_mutex > sharinglock( m_maplock );
+	boost::shared_lock< boost::shared_mutex > sharinglock( m_maplock );
 
 	SessionMap::iterator findresult = m_map.find( sessionid );
-	if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+	if( findresult == m_map.end( ) || findresult->second->playerid != playerid )
 	{
 		cout << "Playerid " << playerid << " attempted to use invalid session " << sessionid << endl;
 		return;
@@ -355,19 +368,19 @@ void SessionManager::UseBotNewGame( uint64 playerid, uint64 sessionid, const Mes
 
 	try
 	{
-		otl_stream incrgames( 3, "update sessions set numgames = numgames + 1, lasttime = NOW() where sessionid = :sessid<unsigned>", m_database );
+		otl_stream incrgames( 3, "update sessions set numgames = numgames + 1, lasttime = NOW() where sessionid = :sessid<unsigned>", * findresult->second->database );
 		incrgames << (unsigned)sessionid << endr;
 
-		findresult->second.iserror = false;
-		findresult->second.errorstr = "";
-		findresult->second.bot->setnewgame( (Player)request.playernum,
+		findresult->second->iserror = false;
+		findresult->second->errorstr = "";
+		findresult->second->bot->setnewgame( (Player)request.playernum,
 				request.myhand, request.sblind, request.bblind, request.stacksize );
 	}
 	catch( std::exception & e )
 	{
-		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
-		findresult->second.iserror = true;
-		findresult->second.errorstr = e.what( );
+		findresult->second->bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
+		findresult->second->iserror = true;
+		findresult->second->errorstr = e.what( );
 	}
 }
 
@@ -378,7 +391,7 @@ void SessionManager::UseBotNextRound( uint64 playerid, uint64 sessionid, const M
 	boost::shared_lock< boost::shared_mutex > sharinglock( m_maplock );
 
 	SessionMap::iterator findresult = m_map.find( sessionid );
-	if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+	if( findresult == m_map.end( ) || findresult->second->playerid != playerid )
 	{
 		cout << "Playerid " << playerid << " attempted to use invalid session " << sessionid << endl;
 		return;
@@ -386,15 +399,15 @@ void SessionManager::UseBotNextRound( uint64 playerid, uint64 sessionid, const M
 
 	try
 	{
-		if( ! findresult->second.iserror )
-			findresult->second.bot->setnextround( request.gr,
+		if( ! findresult->second->iserror )
+			findresult->second->bot->setnextround( request.gr,
 					request.newboard, request.newpot );
 	}
 	catch( std::exception & e )
 	{
-		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
-		findresult->second.iserror = true;
-		findresult->second.errorstr = e.what( );
+		findresult->second->bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
+		findresult->second->iserror = true;
+		findresult->second->errorstr = e.what( );
 	}
 }
 
@@ -405,7 +418,7 @@ void SessionManager::UseBotDoAction( uint64 playerid, uint64 sessionid, const Me
 	boost::shared_lock< boost::shared_mutex > sharinglock( m_maplock );
 
 	SessionMap::iterator findresult = m_map.find( sessionid );
-	if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+	if( findresult == m_map.end( ) || findresult->second->playerid != playerid )
 	{
 		cout << "Playerid " << playerid << " attempted to use invalid session " << sessionid << endl;
 		return;
@@ -413,15 +426,15 @@ void SessionManager::UseBotDoAction( uint64 playerid, uint64 sessionid, const Me
 
 	try
 	{
-		if( ! findresult->second.iserror )
-			findresult->second.bot->doaction( (Player)request.player,
+		if( ! findresult->second->iserror )
+			findresult->second->bot->doaction( (Player)request.player,
 					(Action)request.action, request.amount );
 	}
 	catch( std::exception & e )
 	{
-		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
-		findresult->second.iserror = true;
-		findresult->second.errorstr = e.what( );
+		findresult->second->bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
+		findresult->second->iserror = true;
+		findresult->second->errorstr = e.what( );
 	}
 }
 
@@ -438,30 +451,30 @@ void SessionManager::UseBotGetAction( uint64 playerid, uint64 sessionid, Message
 	boost::shared_lock< boost::shared_mutex > sharinglock( m_maplock );
 
 	SessionMap::iterator findresult = m_map.find( sessionid );
-	if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+	if( findresult == m_map.end( ) || findresult->second->playerid != playerid )
 	{
 		strncpy( response.message, "Invalid session.", 199 );
 	}
-	else if( findresult->second.iserror )
+	else if( findresult->second->iserror )
 	{
-		strncpy( response.message, findresult->second.errorstr.c_str( ), 199 );
+		strncpy( response.message, findresult->second->errorstr.c_str( ), 199 );
 	}
 	else
 	{
 		try
 		{
 			string actionstr;
-			response.action = findresult->second.bot->getbotaction( 
+			response.action = findresult->second->bot->getbotaction( 
 					response.amount, actionstr, response.level );
 			response.iserror = 0;
 			strncpy( response.message, actionstr.c_str( ), 199 );
 		}
 		catch( std::exception & e )
 		{
-			findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
+			findresult->second->bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
 			strncpy( response.message, e.what( ), 199 );
-			findresult->second.iserror = true;
-			findresult->second.errorstr = e.what( );
+			findresult->second->iserror = true;
+			findresult->second->errorstr = e.what( );
 		}
 	}
 
@@ -475,7 +488,7 @@ void SessionManager::UseBotEndGame( uint64 playerid, uint64 sessionid )
 	boost::shared_lock< boost::shared_mutex > sharinglock( m_maplock );
 
 	SessionMap::iterator findresult = m_map.find( sessionid );
-	if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+	if( findresult == m_map.end( ) || findresult->second->playerid != playerid )
 	{
 		cout << "Playerid " << playerid << " attempted to use invalid session " << sessionid << endl;
 		return;
@@ -483,14 +496,14 @@ void SessionManager::UseBotEndGame( uint64 playerid, uint64 sessionid )
 
 	try
 	{
-		if( ! findresult->second.iserror )
-			findresult->second.bot->endofgame( );
+		if( ! findresult->second->iserror )
+			findresult->second->bot->endofgame( );
 	}
 	catch( std::exception & e )
 	{
-		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
-		findresult->second.iserror = true;
-		findresult->second.errorstr = e.what( );
+		findresult->second->bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
+		findresult->second->iserror = true;
+		findresult->second->errorstr = e.what( );
 	}
 }
 
@@ -501,7 +514,7 @@ void SessionManager::UseBotEndGameCards( uint64 playerid, uint64 sessionid, cons
 	boost::shared_lock< boost::shared_mutex > sharinglock( m_maplock );
 
 	SessionMap::iterator findresult = m_map.find( sessionid );
-	if( findresult == m_map.end( ) || findresult->second.playerid != playerid )
+	if( findresult == m_map.end( ) || findresult->second->playerid != playerid )
 	{
 		cout << "Playerid " << playerid << " attempted to use invalid session " << sessionid << endl;
 		return;
@@ -509,21 +522,22 @@ void SessionManager::UseBotEndGameCards( uint64 playerid, uint64 sessionid, cons
 
 	try
 	{
-		if( ! findresult->second.iserror )
-			findresult->second.bot->endofgame( request.opponentcards );
+		if( ! findresult->second->iserror )
+			findresult->second->bot->endofgame( request.opponentcards );
 	}
 	catch( std::exception & e )
 	{
-		findresult->second.bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
-		findresult->second.iserror = true;
-		findresult->second.errorstr = e.what( );
+		findresult->second->bot->GetLogger( )( string( "ERROR: " ) + e.what( ) );
+		findresult->second->iserror = true;
+		findresult->second->errorstr = e.what( );
 	}
 }
 
 void SessionManager::LogError( const std::string & message )
 {
+	otl_connect localdatabase( MYSQL_CONNECT_STRING );
 	cerr << "ERROR: " << message << endl;
-	otl_stream errinserter( 50, "insert into errorlog( id, message ) values ( NULL, :msg<char[32000]> )", m_database );
+	otl_stream errinserter( 50, "insert into errorlog( id, message ) values ( NULL, :msg<char[32000]> )", localdatabase );
 	errinserter << message;
 }
 

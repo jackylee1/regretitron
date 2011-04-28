@@ -13,7 +13,6 @@ class SessionManager
 {
 public:
 	SessionManager( )
-		: m_database( MYSQL_CONNECT_STRING )
 	{ }
 
 	void Init( );
@@ -29,11 +28,14 @@ public:
 	void UseBotEndGameCards( uint64 playerid, uint64 sessionid, const MessageEndOfGameCards & request );
 
 private:
-	unsigned GetBotID( GameTypeEnum gametype );
+	unsigned GetBotID( GameTypeEnum gametype, otl_connect & database );
 	void LogError( const std::string & message );
 
 	struct SessionStruct
 	{
+		SessionStruct( unsigned botid, unsigned sessionid, const string & xmlpath, unsigned myplayerid );
+		~SessionStruct( );
+
 		BotAPI * bot;
 		FileLogger * botapilogger;
 		FileLogger * botapireclog;
@@ -41,13 +43,13 @@ private:
 		uint64 playerid;
 		bool iserror;
 		string errorstr;
+		std::auto_ptr< otl_connect > database;
 	};
-	typedef std::map< uint64, SessionStruct > SessionMap;
+	typedef boost::shared_ptr< SessionStruct > SessionPtr;
+	typedef std::map< uint64, SessionPtr > SessionMap;
 
 	uint64 m_nextsessionid;
 
 	SessionMap m_map;
 	boost::shared_mutex m_maplock;
-
-	otl_connect m_database;
 };
