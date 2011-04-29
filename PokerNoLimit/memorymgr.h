@@ -27,6 +27,28 @@ using boost::tuple;
   across iterations. for that reason, Stratn's should ALWAYS be doubles for preflop flop
   and turn. No reason to use more than doubles, and very marginal utility in selectively
   using less than doubles, so the best policy is always doubles preflop, flop, and turn.
+  On the river, I see no loss in playoff scores by using 2 byte floats for stratn.
+
+  Regret's:
+
+  Regret's are approximate. This is important to understanding the algorithm. No datatype
+  is large enough to keep the regrets from becoming approximate after a few iterations
+  because the are *read* back into the algorithm, and the errors grow exponentially.
+  For that reason, I use floats *everywhere* for the regrets, *including* the working
+  type. This took me a while to realize, I used to think using a precise working type
+  and less precise store type was a way to cheat the system. This is not so. On the river,
+  I see no loss in playoff scores by using 2 byte floats, and marginal (1 mbb/hand) loss
+  by using 1 byte floats for regret. If there is any trend with increasing bin sizes, it
+  is that the 1 mbb/hand penalty becomes *smaller* as I go from 5 -> 6 -> 8 -> 10 -> 12
+  bins per round.
+
+  ******************/
+
+
+  /******* OLD COMMENT:
+
+  Stratn's (continued from above):
+
   On the river, the simplest policy is to use floats. River nodes get hit less often, and 
   for that reason, it is possible to use floats. Two extra actions can be taken in this
   case. (1) A 16-bit counter can be used to upgrade the stratn's to doubles when they have

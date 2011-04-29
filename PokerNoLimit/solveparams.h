@@ -17,19 +17,22 @@
    expbits = 7, 3.7e19
    *******/
 
+//this one is good for river stratn
 typedef FloatCustomUnsigned< uint16, 6, true > FloatCustomUnsigned_uint16_6_true;
+//these are good for river regret
 typedef FloatCustomSigned< uint8, 5, true > FloatCustomSigned_uint8_5_true;
 typedef FloatCustomSigned< uint16, 5, true > FloatCustomSigned_uint16_5_true;
+//stratn's are write only
 #define SOLVER_TYPES (9, ( \
 ( Working_type, float ), \
 ( PFlopStratn_type, double ), \
 ( FlopStratn_type, double ), \
 ( TurnStratn_type, double ), \
-( RiverStratn_type, float ), \
+( RiverStratn_type, FloatCustomUnsigned_uint16_6_true ), \
 ( PFlopRegret_type, float ), \
 ( FlopRegret_type, float ), \
 ( TurnRegret_type, float ), \
-( RiverRegret_type, float )))
+( RiverRegret_type, FloatCustomSigned_uint8_5_true )))
 
 #define SEPARATE_STRATN_REGRET 1
 #define DYNAMIC_ALLOC_STRATN 0 /*must be false for __float128 to work due to alignment issues*/
