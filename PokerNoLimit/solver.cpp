@@ -159,6 +159,16 @@ void Solver::save(const string &filename, bool writedata)
 		timestr << elapsed << " secs";
 	run->SetAttribute("totaltime", timestr.str());
 
+	//date and time solved
+
+	time_t rawtime;
+	struct tm * timeinfo;
+	time( & rawtime );
+	timeinfo = localtime( & rawtime );
+	char * currtime = asctime( timeinfo );
+	currtime[ strlen( currtime ) - 1 ] = 0; //remove the \n
+	run->SetAttribute("currtime", currtime);
+
 	//rand seed and computer used
 
 	run->SetAttribute("randseededwith", tostr( cardmachine->getrandseed( ) ) );
