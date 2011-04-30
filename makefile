@@ -5,7 +5,7 @@ CFLAGS := -Wall -DTIXML_USE_STL -march=native -Wno-deprecated
 # linker flags:
 # define library paths in addition to /usr/lib with -L
 # define any libraries to link into executable with -l
-LFLAGS := -lpthread -rdynamic -march=native -lrt -lm -lboost_system -lboost_program_options
+LFLAGS := -lpthread -rdynamic -march=native -lrt -lm -lboost_system -lboost_program_options -lboost_filesystem
 
 ifeq ($(PEDANTIC),y)
    CPP += -ansi -pedantic -Wextra -Wno-long-long

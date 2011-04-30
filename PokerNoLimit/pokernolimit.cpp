@@ -149,6 +149,14 @@ int main(int argc, char* argv[])
 
 			cout << boolalpha;
 
+			// check if strategy folder exists
+			if( ! boost::filesystem::is_directory( "strategy" ) )
+				throw Exception( "Directory 'strategy' not found in current working directory. solver must be run from the directory to save in." );
+
+			// check for slash in savename
+			if( savename.find_first_of( "/\\" ) != string::npos )
+				throw Exception( "Directory delimiter found in savename, solver must be run from the directory to save in." );
+
 			// general solver settings
 
 			cout << "using settings:" << endl;
