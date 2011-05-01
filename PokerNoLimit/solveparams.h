@@ -36,7 +36,7 @@
    the river to keep them from overflowing. (5, 6, 8, 10, 10 bins)
 
    for full stacksizes and a bigblind value of 10, a MAXEXPNEEDED of 16 is insufficient for regrets on 
-   the river to keep them from overflowing. (5 bins)
+   the river to keep them from overflowing. (5 bins) (failed around 60M iterations)
 
    for full stacksizes and a bigblind value of 10, a MAXEXPNEEDED of 18 is sufficient for regrets on
    the river to keep them from overflowing. (5 bins)
