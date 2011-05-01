@@ -10,29 +10,55 @@
 #include "floatingpoint.h"
 
 //solver settings
-/* Note FloatCustom ranges: can usually use 5 or 6
-   expbits = 4, 512
-   expbits = 5, 131072
-   expbits = 6, 8.6e9
-   expbits = 7, 3.7e19
-   *******/
+
+/* MAXEXPNEEDED:
+   the third template parameter in a FloatCustom is the MAXEXPNEEDED. This number defines the maximum 
+   exponent representable by the floating point number representation. It is a way of specifying
+   the EXPBIAS used in the representatian. In principle, it could be anything, in practice, it is only 
+   bounded by the master type (float or double usually) which is used for all calculations.
+   
+   if MAXEXPNEEDED is zero, then the maximum number representable by a FloatCustum would be just less
+   than 2.0 (base-10), or more exactly 1.1111... (base-2) where the number of ones after the decimal 
+   point is the same as the number of mantissa bits, naturally. The EXPBITS (in this case) would represent
+   the exponent <= 0 by which a 2 raised to that exponent would multiply the mantissa. 
+
+   This formula shows the effects of the MAXEXPNEEDED. For example, if MAXEXPNEEDED = 0, then the maximum
+   representable number is just under 2.
+
+   maximal representable number is just under: 
+   			2^( 1 + MAXEXPNEEDED )
+
+   EXPBITS then defines the amount of exponent space that is used for negative exponents. For example, 
+   if EXPBITS is 3, and MAXEXPNEEDED is 4, then raw exponent value 1 to 7 would represent actual
+   exponent values -2 to 4. A raw exponent value of 0 represents a denormalized number.
+
+   for full stacksizes and a bigblind value of 2, a MAXEXPNEEDED of 16 is sufficient for regrets on 
+   the river to keep them from overflowing. (5, 6, 8, 10, 10 bins)
+
+   for full stacksizes and a bigblind value of 10, a MAXEXPNEEDED of 16 is insufficient for regrets on 
+   the river to keep them from overflowing. (5 bins)
+
+   for full stacksizes and a bigblind value of 10, a MAXEXPNEEDED of 18 is sufficient for regrets on
+   the river to keep them from overflowing. (5 bins)
+   */
+
 
 //this one is good for river stratn
-typedef FloatCustomUnsigned< uint16, 6, true > FloatCustomUnsigned_uint16_6_true;
+typedef FloatCustomUnsigned< uint16, 6, 32, true > FloatCustomUnsigned_uint16_6_32_true;
 //these are good for river regret
-typedef FloatCustomSigned< uint8, 5, true > FloatCustomSigned_uint8_5_true;
-typedef FloatCustomSigned< uint16, 5, true > FloatCustomSigned_uint16_5_true;
+typedef FloatCustomSigned< uint8, 5, 18, true > FloatCustomSigned_uint8_5_18_true;
+typedef FloatCustomSigned< uint16, 5, 18, true > FloatCustomSigned_uint16_5_18_true;
 //stratn's are write only
 #define SOLVER_TYPES (9, ( \
 ( Working_type, float ), \
 ( PFlopStratn_type, double ), \
 ( FlopStratn_type, double ), \
 ( TurnStratn_type, double ), \
-( RiverStratn_type, FloatCustomUnsigned_uint16_6_true ), \
+( RiverStratn_type, FloatCustomUnsigned_uint16_6_32_true ), \
 ( PFlopRegret_type, float ), \
 ( FlopRegret_type, float ), \
 ( TurnRegret_type, float ), \
-( RiverRegret_type, FloatCustomSigned_uint8_5_true )))
+( RiverRegret_type, FloatCustomSigned_uint8_5_18_true )))
 
 #define SEPARATE_STRATN_REGRET 1
 #define DYNAMIC_ALLOC_STRATN 0 /*must be false for __float128 to work due to alignment issues*/

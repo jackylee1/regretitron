@@ -27,14 +27,14 @@
 #error
 #endif
 
-template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR >
+template < typename INTTYPE, int EXPBITS, int MAXEXPNEEDED, bool OVERFLOWISERROR >
 class ClassName
 {
 public:
-	ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR>( ) { Set( 0 ); }
-	ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR>( const MASTER_T init ) { Set( init ); }
-	inline ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR> & operator= ( const MASTER_T source ) { Set( source ); return *this; }
-	inline ClassName<INTTYPE,EXPBITS,OVERFLOWISERROR> & operator+= ( const MASTER_T other ) { Set( Get() + other ); return *this; }
+	ClassName<INTTYPE,EXPBITS,MAXEXPNEEDED,OVERFLOWISERROR>( ) { Set( 0 ); }
+	ClassName<INTTYPE,EXPBITS,MAXEXPNEEDED,OVERFLOWISERROR>( const MASTER_T init ) { Set( init ); }
+	inline ClassName<INTTYPE,EXPBITS,MAXEXPNEEDED,OVERFLOWISERROR> & operator= ( const MASTER_T source ) { Set( source ); return *this; }
+	inline ClassName<INTTYPE,EXPBITS,MAXEXPNEEDED,OVERFLOWISERROR> & operator+= ( const MASTER_T other ) { Set( Get() + other ); return *this; }
 	inline operator MASTER_T () const { return Get(); }
 
 private:
@@ -48,8 +48,8 @@ private:
 #endif
 	static const int MANTBITS = 8*sizeof(INTTYPE) - SIGNBITS - EXPBITS;
 	static const int TRUNCATEDBITS = SUPER_MANTBITS - MANTBITS;
-	static const INTTYPE EXPBIAS = (INTTYPE)0xFFFFFFFFU >> ( 8*sizeof(INTTYPE) - EXPBITS + 1 );
-	static const INTTYPE EXPMAX = (EXPBIAS << 1) | 1;
+	static const INTTYPE EXPMAX = (INTTYPE)0xFFFFFFFFU >> ( 8*sizeof(INTTYPE) - EXPBITS ); //all 1's
+	static const int EXPBIAS = (int)EXPMAX - MAXEXPNEEDED;
 	static const INTTYPE MANTMAX = (INTTYPE)0xFFFFFFFFU >> ( 8*sizeof(INTTYPE) - MANTBITS );
 	static const uint64 TRUNCATEDMAX = ( 1ULL << TRUNCATEDBITS ); // truncated in in range [0..TRUNCATEDMAX)
 	static const MASTER_T DENORMALIZED_MULTIPLIER;
@@ -73,19 +73,19 @@ private:
     ***/
 
 	BOOST_STATIC_ASSERT( 1 <= EXPBITS && EXPBITS <= 8 * sizeof( MASTER_T ) - SUPER_MANTBITS - 1 ); //8 * sizeof( MASTER_T ) - SUPER_MANTBITS - 1 expbits in a MASTER_T
-	BOOST_STATIC_ASSERT( MASTERTYPE_BIAS >= EXPBIAS );
-	BOOST_STATIC_ASSERT( MASTERTYPE_BIAS >> ( 8 * sizeof( MASTER_T ) - SUPER_MANTBITS - 1 - EXPBITS ) == EXPBIAS );
+	BOOST_STATIC_ASSERT( ( ( MASTERTYPE_BIAS << 1 ) | 1 )/*expmax*/ - MASTERTYPE_BIAS >= (int)EXPMAX - EXPBIAS ); //make sure mastertype has at least the range
+	BOOST_STATIC_ASSERT( 0 - (int)MASTERTYPE_BIAS <= 0 - EXPBIAS ); //make sure mastertype has at least the range
 	BOOST_STATIC_ASSERT( SIGNBITS + MANTBITS + EXPBITS == 8*sizeof( INTTYPE ) );
 } __attribute__((packed));
 
 //static non-integral members
 
-template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR > //rediculous templates
-uint64 ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::ran = ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::TRUNCATEDMAX / 4;
-template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR > // divide by 2^( -EXPBIAS + 1 ), multiply by 2^MANTBITS
-const MASTER_T ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::DENORMALIZED_MULTIPLIER = calc_denorm_multiplier( );
-template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR >
-MASTER_T ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::calc_denorm_multiplier( )
+template < typename INTTYPE, int EXPBITS, int MAXEXPNEEDED, bool OVERFLOWISERROR > //rediculous templates
+uint64 ClassName< INTTYPE, EXPBITS, MAXEXPNEEDED, OVERFLOWISERROR >::ran = ClassName< INTTYPE, EXPBITS, MAXEXPNEEDED, OVERFLOWISERROR >::TRUNCATEDMAX / 4;
+template < typename INTTYPE, int EXPBITS, int MAXEXPNEEDED, bool OVERFLOWISERROR > // divide by 2^( -EXPBIAS + 1 ), multiply by 2^MANTBITS
+const MASTER_T ClassName< INTTYPE, EXPBITS, MAXEXPNEEDED, OVERFLOWISERROR >::DENORMALIZED_MULTIPLIER = calc_denorm_multiplier( );
+template < typename INTTYPE, int EXPBITS, int MAXEXPNEEDED, bool OVERFLOWISERROR >
+MASTER_T ClassName< INTTYPE, EXPBITS, MAXEXPNEEDED, OVERFLOWISERROR >::calc_denorm_multiplier( )
 {
 	MY_IEEE754 myf;
 	myf.ieee.negative = 0;
@@ -103,8 +103,8 @@ MASTER_T ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::calc_denorm_multiplier(
 // conversion functions
 //  see summary table: http://steve.hollasch.net/cgindex/coding/ieeefloat.html
 
-template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR >
-void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source )
+template < typename INTTYPE, int EXPBITS, int MAXEXPNEEDED, bool OVERFLOWISERROR >
+void ClassName< INTTYPE, EXPBITS, MAXEXPNEEDED, OVERFLOWISERROR >::Set( const MASTER_T source )
 {
 	MY_IEEE754 myf;
 	myf.f = source;
@@ -119,7 +119,7 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 
 	if( isnan(source) || isinf(source) )
 		{ REPORT( "Detected a NAN or an INF (" + tostring(source) + ") while setting a FloatCustom" ); exit(-1); }
-	else if( (int)myf.ieee.exponent - (int)MASTERTYPE_BIAS > (int)EXPMAX - (int)EXPBIAS )
+	else if( (int)myf.ieee.exponent - (int)MASTERTYPE_BIAS > (int)EXPMAX - EXPBIAS )
 	{   
 		//overflow: infinity
 
@@ -135,7 +135,7 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 			m = MANTMAX;
 		}
 	}
-	else if( (int)myf.ieee.exponent - (int)MASTERTYPE_BIAS <= (int)0 - (int)EXPBIAS )
+	else if( (int)myf.ieee.exponent - (int)MASTERTYPE_BIAS <= (int)0 - EXPBIAS )
 	{   
 		//my denormalized: use the mantissa to store the number on a scale from 0 to 2^( -EXPBIAS + 1 )
 
@@ -155,7 +155,7 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 	{   
 		//regular flow, loss of precision
 
-		exponent = (INTTYPE)( (int)myf.ieee.exponent - (int)MASTERTYPE_BIAS + (int)EXPBIAS );
+		exponent = (INTTYPE)( (int)myf.ieee.exponent - (int)MASTERTYPE_BIAS + EXPBIAS );
 		m = myf.ieee.mantissa >> ( SUPER_MANTBITS - MANTBITS );
 		uint64 truncatedpart = myf.ieee.mantissa & ( 0xFFFFFFFFFFFFFFFFULL >> ( 64 - TRUNCATEDBITS ) );
 		/*******
@@ -207,8 +207,8 @@ void ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Set( const MASTER_T source 
 		mantissa = m;
 }
 
-template < typename INTTYPE, int EXPBITS, bool OVERFLOWISERROR >
-MASTER_T ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Get( ) const
+template < typename INTTYPE, int EXPBITS, int MAXEXPNEEDED, bool OVERFLOWISERROR >
+MASTER_T ClassName< INTTYPE, EXPBITS, MAXEXPNEEDED, OVERFLOWISERROR >::Get( ) const
 {
 	MY_IEEE754 myf;
 
@@ -222,7 +222,7 @@ MASTER_T ClassName< INTTYPE, EXPBITS, OVERFLOWISERROR >::Get( ) const
 	else
 	{
 		// my number is regular
-		myf.ieee.exponent = (int)exponent - (int)EXPBIAS + (int)MASTERTYPE_BIAS;
+		myf.ieee.exponent = (int)exponent - EXPBIAS + (int)MASTERTYPE_BIAS;
 		myf.ieee.mantissa = ( (uint64)mantissa ) << TRUNCATEDBITS;
 	}
 
