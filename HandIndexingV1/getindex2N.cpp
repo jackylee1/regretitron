@@ -25,7 +25,7 @@ inline bool operator < (const suitrep &a, const suitrep &b)
 //will return 0 when k>n or when n==0
 inline int nchoosek(const int n, const int k)
 {
-	if(!(n>=0 && k>=0)) REPORT("invalid n choose k");
+	assert( n >= 0 && k >= 0 );
 	int ans=1;
 	for(int i=0; i<k; i++)
 	{

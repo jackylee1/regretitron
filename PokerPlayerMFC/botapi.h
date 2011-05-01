@@ -26,6 +26,8 @@ class DiagnosticsPage; //forward declaration
 class BotAPI
 {
 public:
+	static NullLogger botapinulllogger;
+
 	BotAPI( string xmlfile, bool preload, MTRand::uint32 randseed, 
 			LoggerClass & botapilogger,
 			LoggerClass & botapireclog );

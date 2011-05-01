@@ -16,6 +16,8 @@
 
 const bool debug = true;
 
+NullLogger BotAPI::botapinulllogger;
+
 inline bool playerequal(Player player, NodeType nodetype)
 {
 	return ((player == P0 && nodetype == P0Plays) || (player == P1 && nodetype == P1Plays));
@@ -116,7 +118,8 @@ BotAPI::~BotAPI()
 void BotAPI::setnewgame(Player playernum, CardMask myhand, 
 						double sblind, double bblind, double stacksize)
 {
-	m_reclog( "NEW GAME P" + tostr( playernum ) + " of " + tostr( sblind ) + "/" + tostr( bblind ) + " at " + tostr( stacksize ) + " with " + tostr( myhand ) );
+	if( & m_reclog != & botapinulllogger )
+		m_reclog( "NEW GAME P" + tostr( playernum ) + " of " + tostr( sblind ) + "/" + tostr( bblind ) + " at " + tostr( stacksize ) + " with " + tostr( myhand ) );
 
 	if(playernum != P0 && playernum != P1)
 		REPORT("invalid myplayer number in BotAPI::setnewgame()");
@@ -187,14 +190,17 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 
 	//finally log things
 
-	m_logger( "\n\n\n************" );
-	m_logger( "*** New Game: Player " + tostr( myplayer ) + " (" + ( myplayer ? "SB" : "BB" )
-			+ "), with SB = $" + tostr2( multiplier * actualinv[ 1 ] )
-			+ " and BB = $" + tostr2( multiplier * actualinv[ 0 ] ) );
-	m_logger( "**  The smaller pre-betting stacksize is: $" + tostr2( multiplier * truestacksize ) );
-	m_logger( "*   Using Strategy: " + currstrat->getfilename() + '\n' );
+	if( & m_logger != & botapinulllogger )
+	{
+		m_logger( "\n\n\n************" );
+		m_logger( "*** New Game: Player " + tostr( myplayer ) + " (" + ( myplayer ? "SB" : "BB" )
+				+ "), with SB = $" + tostr2( multiplier * actualinv[ 1 ] )
+				+ " and BB = $" + tostr2( multiplier * actualinv[ 0 ] ) );
+		m_logger( "**  The smaller pre-betting stacksize is: $" + tostr2( multiplier * truestacksize ) );
+		m_logger( "*   Using Strategy: " + currstrat->getfilename() + '\n' );
 
-	m_logger( ">>> Bot has hole cards: " + tostr( cards[ PREFLOP ] ) + '\n' );
+		m_logger( ">>> Bot has hole cards: " + tostr( cards[ PREFLOP ] ) + '\n' );
+	}
 
 	processmyturn();
 }
@@ -204,12 +210,15 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 //newpot - this is the pot for just ONE player
 void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just needed for error checking*/)
 {
-	switch( gr )
+	if( & m_reclog != & botapinulllogger )
 	{
+		switch( gr )
+		{
 #define NEWROUNDSTRING( gr ) case gr: m_reclog( #gr" " + tostr( newboard ) + " with pot " + tostr( newpot ) ); break;
-		NEWROUNDSTRING( FLOP )
-		NEWROUNDSTRING( TURN )
-		NEWROUNDSTRING( RIVER )
+			NEWROUNDSTRING( FLOP )
+			NEWROUNDSTRING( TURN )
+			NEWROUNDSTRING( RIVER )
+		}
 	}
 
 	//check input parameters
@@ -220,8 +229,9 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 	if (perceivedinv[0] != perceivedinv[1]) REPORT("perceived state is messed up");
 	if (!fpequal(actualpot+actualinv[0], newpot/multiplier)) REPORT("your new pot is unexpected.");
 
-	m_logger( ">>> " + gameroundstring( gr ) + " comes: " + tostring( newboard ) 
-			+ " (pot is $" + tostr2( 2 * newpot ) + ")\n" ); //newpot is actual (post multiplier), but for 1 person
+	if( & m_logger != & botapinulllogger )
+		m_logger( ">>> " + gameroundstring( gr ) + " comes: " + tostring( newboard ) 
+				+ " (pot is $" + tostr2( 2 * newpot ) + ")\n" ); //newpot is actual (post multiplier), but for 1 person
 
 	//Update the state of our private data members
 
@@ -262,16 +272,19 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 //amount fold - the total amount that player is forfeiting for this round
 void BotAPI::doaction(Player pl, Action a, double amount)
 {
-	switch( a )
+	if( & m_reclog != & botapinulllogger )
 	{
+		switch( a )
+		{
 #define ACTIONSTRING( a ) case a: m_reclog( #a" " + tostr( amount ) + " by P" + tostr( pl ) ); break;
-		ACTIONSTRING( FOLD )
-		ACTIONSTRING( CALL )
-		ACTIONSTRING( BET )
-		ACTIONSTRING( BETALLIN )
+			ACTIONSTRING( FOLD )
+			ACTIONSTRING( CALL )
+			ACTIONSTRING( BET )
+			ACTIONSTRING( BETALLIN )
+		}
 	}
 
-	if( debug )
+	if( debug && ( & m_logger != & botapinulllogger ) )
 		m_logger( "BotAPI::doaction( player=" + tostr( pl ) + ", a=" + tostr( a ) + ", amount=" + tostr( amount ) + " )"
 				+ "\nmultiplier = " + tostr( multiplier )
 				+ "\nmultiplied values:"
@@ -425,6 +438,7 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 
 	//do the logging
 
+	if( & m_logger != & botapinulllogger )
 	{
 		m_logger( "Bot considers action (gameround = " + tostr( currentgr ) + ", cardsi = " + tostr( currstrat->getcardmach( ).getcardsi( currentgr, cards ) ) + ", actioni = " + tostr( ( currstrat->gettree( ) )[ currentnode ].actioni ) + ")" );
 		ostringstream o;
@@ -545,7 +559,8 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 					amount = multiplier * ((currstrat->gettree())[*eanswer].potcontrib + actualinv[1-myplayer]-perceivedinv[1-myplayer]);
 					if(fpgreater(multiplier * mintotalwager(), amount))
 					{
-						m_logger( "Warning: adjusting bet amount from " + tostr( amount ) + " to " + tostr( multiplier * mintotalwager() ) + "." );
+						if( & m_logger != & botapinulllogger )
+							m_logger( "Warning: adjusting bet amount from " + tostr( amount ) + " to " + tostr( multiplier * mintotalwager() ) + "." );
 						amount = multiplier * mintotalwager();
 					}
 					myact = BET;
@@ -556,17 +571,20 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 		}
 	}
 
-	// TODO when forcing, eanswer is still set by random decision, and this string
-	// will not always match what is supposed to be forced
-	// to fix this, I would need a way of choosing the edge of the tree that 
-	// that corresponds to my forcing parameter.
-	ostringstream o; 
-	o << "       Bot chose >>>   " << actionstring(currstrat->gettree(), *eanswer, multiplier) << "   <<<";
-	if( fpgreater( amount, multiplier * actualinv[ myplayer ] ) )
-		o << " (adding $" << tostr2( amount - multiplier * actualinv[ myplayer ] ) << " to pot)\n";
-	else
-		o << '\n';
-	m_logger( o.str( ) );
+	if( & m_logger != & botapinulllogger )
+	{
+		// TODO when forcing, eanswer is still set by random decision, and this string
+		// will not always match what is supposed to be forced
+		// to fix this, I would need a way of choosing the edge of the tree that 
+		// that corresponds to my forcing parameter.
+		ostringstream o; 
+		o << "       Bot chose >>>   " << actionstring(currstrat->gettree(), *eanswer, multiplier) << "   <<<";
+		if( fpgreater( amount, multiplier * actualinv[ myplayer ] ) )
+			o << " (adding $" << tostr2( amount - multiplier * actualinv[ myplayer ] ) << " to pot)\n";
+		else
+			o << '\n';
+		m_logger( o.str( ) );
+	}
 
 	lastchosenaction = myact;
 	lastchosenamount = amount/multiplier;
@@ -721,7 +739,7 @@ void BotAPI::docall(Player pl, double amount)
 {
 	if(!fpequal(amount,actualinv[1-pl])) REPORT("you called the wrong amount");
 
-	if( pl != myplayer )
+	if( pl != myplayer && ( & m_logger != & botapinulllogger ) )
 	{
 		if( fpequal( amount, 0 ) )
 			m_logger( "       Opponent has checked.\n" );
@@ -785,19 +803,22 @@ void BotAPI::dobet(Player pl, double amount)
 		if(islimit() && !( fpequal(besterror, 0) ||
 					   ( fpequal(actualpot + amount, truestacksize) && !fpequal(get_property(currstrat->gettree(), settings_tag()).stacksize, truestacksize) )))
 			REPORT("in limit, we expect bets to either exactly match the tree's bets or this to be a covert all-in");
-		if( pl != myplayer )
+		if( & m_logger != & botapinulllogger )
 		{
-			if( fpequal( amount, 0 ) )
-				m_logger( "       Opponent has checked." );
-			else if( ! fpequal( 0, mymax( actualinv[ 0 ], actualinv[ 1 ] ) ) )
-				m_logger( "       Opponent has raised to $" + tostr2( multiplier * amount ) + " (added $" + tostr2( multiplier * ( amount - actualinv[ pl ] ) ) + " to pot)" );
-			else
-				m_logger( "       Opponent has bet $" + tostr2( multiplier * amount ) + " (added $" + tostr2( multiplier * ( amount - actualinv[ pl ] ) ) + " to pot)" );
+			if( pl != myplayer )
+			{
+				if( fpequal( amount, 0 ) )
+					m_logger( "       Opponent has checked." );
+				else if( ! fpequal( 0, mymax( actualinv[ 0 ], actualinv[ 1 ] ) ) )
+					m_logger( "       Opponent has raised to $" + tostr2( multiplier * amount ) + " (added $" + tostr2( multiplier * ( amount - actualinv[ pl ] ) ) + " to pot)" );
+				else
+					m_logger( "       Opponent has bet $" + tostr2( multiplier * amount ) + " (added $" + tostr2( multiplier * ( amount - actualinv[ pl ] ) ) + " to pot)" );
+			}
+			if(!fpequal(besterror, 0))
+				m_logger( "       Note: The best betting action represented in our tree is $" + tostr2( currstrat->gettree()[*ebest].potcontrib * multiplier ) + " with error $" + tostr2( multiplier * besterror ) + ".\n" );
+			else if( pl != myplayer )
+				m_logger( "" ); // ensure a newline in this case to keep log spacing nice
 		}
-		if(!fpequal(besterror, 0))
-			m_logger( "       Note: The best betting action represented in our tree is $" + tostr2( currstrat->gettree()[*ebest].potcontrib * multiplier ) + " with error $" + tostr2( multiplier * besterror ) + ".\n" );
-		else if( pl != myplayer )
-			m_logger( "" ); // ensure a newline in this case to keep log spacing nice
 		actualinv[pl] = amount;
 		perceivedinv[pl] = currstrat->gettree()[*ebest].potcontrib;
 		currentnode = target(*ebest, currstrat->gettree());
@@ -823,7 +844,8 @@ void BotAPI::doallin(Player pl)
 		REPORT("all-in potcontrib set incorrectly");
 
 	if( pl != myplayer )
-		m_logger( "       Opponent has bet all-in. (added $" + tostr2( multiplier * ( truestacksize - actualpot - actualinv[ pl ] ) ) + " to pot)" );
+		if( & m_logger != & botapinulllogger )
+			m_logger( "       Opponent has bet all-in. (added $" + tostr2( multiplier * ( truestacksize - actualpot - actualinv[ pl ] ) ) + " to pot)" );
 
 	actualinv[pl] = truestacksize-actualpot;
 	perceivedinv[pl] = (currstrat->gettree())[*e].potcontrib;
