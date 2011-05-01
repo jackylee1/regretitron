@@ -68,6 +68,8 @@ private:
 #else
 	MTRand mersenne; //used for card dealing, default initialized...that uses clock and time
 #endif
+
+	NullLogger playofflogger;
 };
 
 const double Playoff::_sblind = 1.0;
@@ -83,7 +85,6 @@ Playoff::Playoff(string file1, string file2)
 	  mersenne() //my own local object seeded with time and clock
 #endif
 {
-	NullLogger playofflogger;
 	_bots[0] = new BotAPI(file1, true, MTRand::gettimeclockseed(), playofflogger, playofflogger );
 	_bots[1] = new BotAPI(file2, true, MTRand::gettimeclockseed(), playofflogger, playofflogger );
 	if(_bots[0]->islimit() != _bots[1]->islimit())
