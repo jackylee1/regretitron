@@ -584,8 +584,12 @@ int MemoryManager::getactionifromriveractioni(int ractioni) //opposite of rivera
 }
 
 //internal, used by the functions Solver calls
-template <typename T> 
-void computestratt(Working_type * stratt, T * regret, int numa)
+
+//note: two versions of computestratt
+
+//this is a version of the function when we don't have to cast the regret values to 
+//Working_type. In this case, I don't read them in first and just use them.
+void computestratt(Working_type * stratt, Working_type const * const regret, int numa)
 {
 	//find total regret
 
@@ -598,10 +602,22 @@ void computestratt(Working_type * stratt, T * regret, int numa)
 
 	if (totalregret > 0)
 		for(int i=0; i<numa; i++)
-			stratt[i] = (regret[i]>0) ? (Working_type)regret[i] / totalregret : 0;
+			stratt[i] = (regret[i]>0) ? regret[i] / totalregret : 0;
 	else
 		for(int i=0; i<numa; i++)
 			stratt[i] = (Working_type)1/(Working_type)numa;
+}
+
+//this is a version of the function that gets chosen by the compiler if T is
+// not Working_type. T may be my FloatCustom's, and I only want to read them once.
+template <typename T> 
+void computestratt(Working_type * stratt, T const * const regret_slow, int numa)
+{
+	Working_type regret[ MAX_ACTIONS_SOLVER ];
+	for( int i = 0; i < numa; i++ )
+		regret[ i ] = static_cast< Working_type >( regret_slow[ i ] ); //cast is slow
+
+	computestratt( stratt, regret, numa ); //should call function above
 }
 
 template <typename T>
@@ -639,14 +655,14 @@ template <typename T>
 void computestratn(T * stratn, Working_type prob, Working_type * stratt, int numa)
 {
 	for(int a=0; a<numa; a++)
-		stratn[a] += prob * stratt[a];
+		stratn[a] += ( prob * stratt[a] );
 }
 
 template <int P, typename T>
 void computeregret(T * regret, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility, int numa )
 {
 	for(int a=0; a<numa; a++)
-		regret[a] += prob * (utility[a].get<P>() - avgutility);
+		regret[a] += ( prob * (utility[a].get<P>() - avgutility) );
 }
 
 //very nicely do all teh work of promoting data from one array to another
@@ -914,7 +930,7 @@ void MemoryManager::writestratn( int gr, int numa, int actioni, int cardsi, Work
 }
 
 template < int P >
-inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cardsi, 
+void MemoryManager::writeregret( int gr, int numa, int actioni, int cardsi, 
 		Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility )
 {
 	if (gr == 3)
@@ -1009,22 +1025,12 @@ inline void MemoryManager::writeregret( int gr, int numa, int actioni, int cards
 		computeregret<P>(regret, prob, avgutility, utility, numa);
 	}
 }
+template void MemoryManager::writeregret< 0 >( int gr, int numa, int actioni, int cardsi, 
+		Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
+template void MemoryManager::writeregret< 1 >( int gr, int numa, int actioni, int cardsi, 
+		Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
 
 // ---------------------------------------------------------------------------
-
-// these are here to avoid putting my templated functions in the header file, 
-// instantiate them in this cpp file to be linked to. writeregret<-,-> is defined inline.
-void MemoryManager::writeregret0( int gr, int numa, int actioni, int cardsi, 
-		Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility )
-{
-	writeregret<0>(gr,numa,actioni,cardsi,prob,avgutility,utility);
-}
-
-void MemoryManager::writeregret1( int gr, int numa, int actioni, int cardsi, 
-		Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility )
-{
-	writeregret<1>(gr,numa,actioni,cardsi,prob,avgutility,utility);
-}
 
 //used for outputting info in MemoryManager ctor only
 double getsize(int r)

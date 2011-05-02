@@ -211,9 +211,7 @@ public:
 	void readstratn( unsigned char * buffer, unsigned char & checksum, int gr, int numa, int actioni, int cardsi );
 	void writestratn( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type * stratt );
 	template < int P >
-	inline void writeregret( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
-	void writeregret0( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
-	void writeregret1( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
+	void writeregret( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
 
 	void savecounts(const string & filename);
 	int64 save(const string &filename); //returns length of file written

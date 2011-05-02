@@ -666,7 +666,7 @@ tuple<Working_type,Working_type> Solver::walker(const int gr, const int pot, con
 			memory->writestratn( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob0, stratt );
 
 		if(prob1 != 0)
-			memory->writeregret0( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob1, avgutility.get<0>(), utility );
+			memory->writeregret< 0 >( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob1, avgutility.get<0>(), utility );
 	}
 	else // P1 playing, so his regret values are negative of P0's regret values.
 	{
@@ -674,7 +674,7 @@ tuple<Working_type,Working_type> Solver::walker(const int gr, const int pot, con
 			memory->writestratn( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob1, stratt );
 
 		if(prob0 != 0)
-			memory->writeregret1( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob0, avgutility.get<1>(), utility );
+			memory->writeregret< 1 >( gr, numa, (*tree)[node].actioni, cardsi[gr][playeri], prob0, avgutility.get<1>(), utility );
 	}
 
 
