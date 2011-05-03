@@ -586,6 +586,9 @@ int MemoryManager::getactionifromriveractioni(int ractioni) //opposite of rivera
 //internal, used by the functions Solver calls
 
 //note: two versions of computestratt
+//note: the non-template one overloads the templated one. the non-template one takes precedent
+//      in C++ so that If I use a regret type the same as Working_type, the template won't be called
+//      the template is there to make my FloatCustom's faster by not calling Get more than needed.
 
 //this is a version of the function when we don't have to cast the regret values to 
 //Working_type. In this case, I don't read them in first and just use them.
