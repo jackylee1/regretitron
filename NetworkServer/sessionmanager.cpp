@@ -39,10 +39,10 @@ namespace
 
 }
 
-SessionManager::SessionStruct::SessionStruct( unsigned botid, unsigned sessionid, const string & xmlpath, unsigned myplayerid )
+SessionManager::SessionStruct::SessionStruct( uint64 newbotid, uint64 newsessionid, const string & newxmlpath, uint64 newplayerid )
 {
-	const boost::filesystem::path botpath = SESSIONDIR / GetBotFolder( botid );
-	const boost::filesystem::path sessionpath = botpath / GetSessionFolder( sessionid );
+	const boost::filesystem::path botpath = SESSIONDIR / GetBotFolder( newbotid );
+	const boost::filesystem::path sessionpath = botpath / GetSessionFolder( newsessionid );
 
 	//may already exist but doesn't throw to try again
 	boost::filesystem::create_directory( botpath );
@@ -55,8 +55,8 @@ SessionManager::SessionStruct::SessionStruct( unsigned botid, unsigned sessionid
 	botapilogger = logptr;
 	botapireclog = recptr;
 	botseed = MTRand::gettimeclockseed( );
-	bot = new BotAPI( xmlpath, false, botseed, *logptr, *recptr );
-	playerid = playerid;
+	bot = new BotAPI( newxmlpath, false, botseed, *logptr, *recptr );
+	playerid = newplayerid;
 	iserror = false;
 }
 

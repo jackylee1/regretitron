@@ -33,7 +33,7 @@ private:
 
 	struct SessionStruct
 	{
-		SessionStruct( unsigned botid, unsigned sessionid, const string & xmlpath, unsigned myplayerid );
+		SessionStruct( uint64 newbotid, uint64 newsessionid, const string & newxmlpath, uint64 newplayerid );
 		~SessionStruct( );
 
 		BotAPI * bot;
