@@ -203,7 +203,21 @@ public:
 	InFile(const std::string &filename, int64 expectedsize) : fname(filename) { Open(filename, expectedsize); }
 	~InFile();
 	void Open(const std::string & filename, int64 expectedsize);
-	template < typename T > T Read();
+	template < typename T > T Read()
+	{
+		if(!opened) REPORT("not opened..");
+		T val;
+#ifdef _MSC_VER
+		DWORD bytesread;
+		if(ReadFile(file, (LPVOID)&val, sizeof(T), &bytesread, NULL) == 0 || bytesread != sizeof(T))
+			REPORT("Problem reading file: '"+fname+"'");
+#else
+		if(read(file, (void*)&val, sizeof(T)) != sizeof(T))
+			REPORT("Problem reading file: '"+fname+"'");
+#endif
+		return val;
+	}
+
 	void Seek(int64 position);
 	int64 Tell();
 	int64 Size();

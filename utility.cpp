@@ -367,22 +367,6 @@ InFile::~InFile()
 #endif
 }
 
-template < typename T >
-T InFile::Read()
-{
-	if(!opened) REPORT("not opened..");
-	T val;
-#ifdef _MSC_VER
-	DWORD bytesread;
-	if(ReadFile(file, (LPVOID)&val, sizeof(T), &bytesread, NULL) == 0 || bytesread != sizeof(T))
-		REPORT("Problem reading file: '"+fname+"'");
-#else
-	if(read(file, (void*)&val, sizeof(T)) != sizeof(T))
-		REPORT("Problem reading file: '"+fname+"'");
-#endif
-	return val;
-}
-
 void InFile::Seek(int64 position)
 {
 	if(!opened) REPORT("not opened..");
