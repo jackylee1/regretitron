@@ -24,6 +24,8 @@ MemoryManager * Solver::memory = NULL;
 boost::scoped_array< Solver > Solver::solvers;
 unsigned Solver::num_threads = 0;
 unsigned Solver::n_lookahead = 0;
+Working_type Solver::aggression_static_mult = 0;
+Working_type Solver::aggression_selective_mult = 0;
 #ifdef DO_THREADS
 pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t Solver::signaler = PTHREAD_COND_INITIALIZER;
@@ -49,8 +51,10 @@ void Solver::control_c(int sig)
 	}
 }
 
-void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings, MTRand::uint32 randseed, unsigned nthreads, unsigned nlook )
+void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings, MTRand::uint32 randseed, unsigned nthreads, unsigned nlook, double aggstatic, double aggselective )
 {
+	//threads
+
 	num_threads = nthreads;
 	n_lookahead = nlook;
 
@@ -62,7 +66,14 @@ void Solver::initsolver( const treesettings_t & treesettings, const cardsettings
 	boost::scoped_array< Solver > solver_temp( new Solver[ num_threads ] );
 	solvers.swap( solver_temp );
 
-	signal(SIGINT, control_c); // Register the signal handler for the SIGINT signal (Ctrl+C)
+	//aggression
+
+	aggression_static_mult = static_cast< Working_type >( 1.0 + aggstatic / 100.0 );
+	aggression_selective_mult = static_cast< Working_type >( 1.0 + ( aggstatic + aggselective ) / 100.0 );
+
+	//other init
+
+	//signal(SIGINT, control_c); // Register the signal handler for the SIGINT signal (Ctrl+C)
 
 	tree = new BettingTree(treesettings); //the settings are taken from solveparams.h
 	ConsoleLogger treelogger;
@@ -191,7 +202,10 @@ void Solver::save(const string &filename, bool writedata)
 	//solve parameters
 
 	TiXmlElement * params = new TiXmlElement("parameters");
-	params->SetAttribute("aggression", AGGRESSION_FACTOR);
+	params->SetAttribute("aggstatic", 
+			tostr2( ( aggression_static_mult - 1 ) * 100.0 ) );
+	params->SetAttribute("aggselective", 
+			tostr2( ( aggression_selective_mult - aggression_static_mult ) * 100.0 ) );
 	params->SetAttribute("raketype", RAKE_TYPE);
 
 	//link xml node..
@@ -533,14 +547,27 @@ void Solver::threadloop()
 
 #endif  /*DO_THREADS*/
 
-inline tuple<Working_type, Working_type> utiltuple(int p0utility)
+inline tuple<Working_type, Working_type> Solver::utiltuple( int p0utility, bool awardthebonus )
 {
-	const Working_type aggression_multiplier = (Working_type)1 + (Working_type)AGGRESSION_FACTOR/100.0;
+#ifdef DO_AGGRESSION
+
+	const Working_type aggression_multiplier = awardthebonus ? aggression_selective_mult : aggression_static_mult;
 
 	if(p0utility>0)
 		return tuple<Working_type,Working_type>( aggression_multiplier * (Working_type)rake(p0utility), -(Working_type)p0utility);
 	else
 		return tuple<Working_type,Working_type>( (Working_type)p0utility, aggression_multiplier * (Working_type)rake(-p0utility));
+
+#else 
+	//optimize for the case where aggression_multiplier is 1, 
+	// hope awardthebonus is optimized away
+
+	if(p0utility>0)
+		return tuple<Working_type,Working_type>( (Working_type)rake(p0utility), -(Working_type)p0utility);
+	else
+		return tuple<Working_type,Working_type>( (Working_type)p0utility, (Working_type)rake(-p0utility));
+
+#endif
 }
 
 struct NodeData
@@ -613,13 +640,28 @@ tuple<Working_type,Working_type> Solver::walker(const int gr, const int pot, con
 
 		switch((*tree)[*e].type)
 		{
+			//NOTE: awardthebonus is the 2nd parameter to utiltuple. utiltuple will always award the bonus to the winner only
+			// and only if awardthebonus is true. We get to decide when to awardthebonus here. 
+			//
+			// On a call, we want to awardthebonus to the winner ONLY IF the winner did not make the call. We want to award the
+			// behavior when we trick the opponent into calling with a worse hand. We do not ant to award the behavior of calling
+			// itself, even with a better hand, as it MAY open up an exploitability where the bot calls too much. 
+			//
+			// In code, this is most easily and quicky computed via ( 2*playeri == twoprob0wins ) as shown:
+			//
+			// winner is 0 and 0 is caller, twoprob0wins=2, playeri=0, awardthebonus is false
+			// winner is 1 and 0 is caller, twoprob0wins=0, playeri=0, awardthebonus is true
+			// winner is 0 and 1 is caller, twoprob0wins=2, playeri=1, awardthebonus is true
+			// winner is 1 and 1 is caller, twoprob0wins=0, playeri=1, awardthebonus is false
+			// if it is a tie, twoprob0wins=1, awardthebonus is false, and it would have no effect in this case anyway
+			//
 		case CallAllin: //showdown
-			utility[i] = utiltuple(get_property(*tree, settings_tag()).stacksize * (twoprob0wins-1));
+			utility[i] = utiltuple(get_property(*tree, settings_tag()).stacksize * (twoprob0wins-1), 2*playeri == twoprob0wins );
 			break;
 
 		case Call:
 			if(gr==RIVER) //showdown
-				utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (twoprob0wins-1));
+				utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (twoprob0wins-1), 2*playeri == twoprob0wins );
 			else //moving to next game round
 			{
 				if((*tree)[node].type==P0Plays)
@@ -630,7 +672,13 @@ tuple<Working_type,Working_type> Solver::walker(const int gr, const int pot, con
 			break;
 
 		case Fold:
-			utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (2*playeri - 1)); //acting player is loser, utility is integer
+			//NOTE: awardthebonus is the 2nd parameter to utiltuple. utiltuple will always award the bonus to the winner only
+			// and only if awardthebonus is true. We get to decide when to awardthebonus here. 
+			//
+			// On a fold, we always want to award the bonus, as the folder is never the winner. And we want to award the
+			// behavior where we get the opponent to fold.
+			//
+			utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (2*playeri - 1), true ); //acting player is loser, utility is integer
 			break;
 
 		case Bet:

@@ -92,6 +92,7 @@ int main(int argc, char* argv[])
 		MTRand::uint32 randseed;
 		unsigned nthreads;
 		unsigned nlook;
+		double aggstatic = 0, aggselective = 0;
 
 		namespace po = boost::program_options;
 
@@ -133,6 +134,13 @@ int main(int argc, char* argv[])
 			  "use the cardmachine's flopalyzer or not" )
 			( "seed", po::value< MTRand::uint32 >( ),
 			  "seed to provide to card generator (optional, uses time and clock if not set)" )
+
+#ifdef DO_AGGRESSION
+			( "aggstatic", po::value< double >( & aggstatic )->required( )->default_value( 0 ),
+			  "static aggresion factor (awarded after every hand to the winner)" )
+			( "aggselective", po::value< double >( & aggselective )->required( )->default_value( 0 ),
+			  "selective aggresion factor (awarded after every hand to the winner when he does win by calling)" )
+#endif
 			;
 
 		bool askingforhelp = false;
@@ -215,10 +223,17 @@ int main(int argc, char* argv[])
 			cout << setw( 30 ) << right << "River bins:  " << cardsettings.bin_max[ 3 ] << " (" << cardsettings.filename[ 3 ] << ")" << endl;
 			cout << setw( 30 ) << right << "Using flopalyzer:  " << cardsettings.useflopalyzer << endl;
 
+			//aggression
+
+#ifdef DO_AGGRESSION
+			cout << setw( 30 ) << right << "Static aggression:  " << aggstatic << endl;
+			cout << setw( 30 ) << right << "Selective aggression:  " << aggselective << endl;
+#endif
+
 			//initialize the solver, open bin files and grab all memory
 
 			cout << endl;
-			Solver::initsolver( treesettings, cardsettings, randseed, nthreads, nlook );
+			Solver::initsolver( treesettings, cardsettings, randseed, nthreads, nlook, aggstatic, aggselective );
 		}
 		catch( std::exception & e )
 		{

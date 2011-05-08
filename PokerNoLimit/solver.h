@@ -23,7 +23,7 @@ class Solver
 public:
 	Solver() {} //does nothing - all data is initialized before each loop in threadloop()
 	static void initsolver( const treesettings_t &, const cardsettings_t &, 
-			MTRand::uint32, unsigned, unsigned ); //called once before doing anything ever
+			MTRand::uint32, unsigned, unsigned, double, double ); //called once before doing anything ever
 	static void destructsolver();
 	static boost::tuple<
 		double, //time taken
@@ -57,6 +57,7 @@ private:
 	inline void ThreadDebug(string debugstring);
 	inline static void docompact();
 	void threadloop(); //master loop function, called first by each thread
+	static tuple<Working_type, Working_type> utiltuple( int p0utility, bool awardthebonus );
 	tuple<Working_type,Working_type> walker(const int gr, const int pot, const Vertex node, const Working_type prob0, const Working_type prob1);
 
 	//this is the per thread data
@@ -75,6 +76,8 @@ private:
 	static boost::scoped_array< Solver > solvers;
 	static unsigned num_threads; //used only when DO_THREADS but defined nonetheless
 	static unsigned n_lookahead; //used only when DO_THREADS but defined nonetheless
+	static Working_type aggression_static_mult;
+	static Working_type aggression_selective_mult;
 #ifdef DO_THREADS
 	static pthread_mutex_t threaddatalock;
 	static pthread_cond_t signaler;

@@ -97,6 +97,9 @@
 
    From these data, it seems using 4-bits is best. So I did a further test
 
+   playoff the stratn with 4 expbits vs the regret with 4 expbits (save solves used above
+   ==> 4-bits wins +0.032 aganist the 5-bits after 3.731 billion games (+- 0.074 mbb/hand)
+
    with river stratn AND river regret as 8-bit CustomFloat with EXPBITS = 4...
    ==> wins -0.466 against ref-5-M100.xml after 2.607 billion games (+- 0.088 mbb/hand)
 
@@ -158,7 +161,7 @@ typedef FloatCustomSigned< uint8, 4, 18, true > CUSTOMFLOATNAME( Signed, uint8, 
 #define DYNAMIC_ALLOC_COUNTS 0
 
 #define DO_THREADS /*undefine this to disable threading use*/
-const double AGGRESSION_FACTOR = 0; //0 = "calm old man", 7 = "crazed, cocaine-driven maniac with an ax"
+#define DO_AGGRESSION /*undefine this to disable aggression support (could be faster)*/
 const bool THREADLOOPTRACE = false; //prints out debugging
 const bool WALKERDEBUG = false; //debug print
 
