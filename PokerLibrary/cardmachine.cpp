@@ -788,26 +788,44 @@ int CardMachine::rivalyzer(const CardMask flop, const CardMask turn, const CardM
 	}
 }
 
+namespace //used in makecardsettings
+{
+	int getnumbins( string binname )
+	{
+		const size_t xpos = binname.find( "x" );
+		if( xpos == string::npos )
+			return fromstr< int >( binname );
+		else
+			return fromstr< int >( binname.substr( 0, xpos ) )
+				 * fromstr< int >( binname.substr( xpos + 1 ) );
+	}
+}
 // static function used to replace the code in solveparams.h with code that can
 // be used at runtime (old code in solveparams.h generated a cardsettings_t
 // at compiletime
-cardsettings_t CardMachine::makecardsettings( int pfbin, int fbin, int tbin, int rbin,
+cardsettings_t CardMachine::makecardsettings( 
+		string pfbin, string fbin, string tbin, string rbin,
 		bool usehistory, bool useflopalyzer )
 {
+	int pfbinnum = getnumbins( pfbin );
+	int fbinnum = getnumbins( fbin );
+	int tbinnum = getnumbins( tbin );
+	int rbinnum = getnumbins( rbin );
+
 	cardsettings_t historyretval =
 	{
-		{ pfbin, fbin, tbin, rbin },
+		{ pfbinnum, fbinnum, tbinnum, rbinnum },
 		{
-			"bins/preflop"+tostring(pfbin),
-			"bins/flop"+tostring(pfbin)+"-"+tostring(fbin),
-			"bins/turn"+tostring(pfbin)+"-"+tostring(fbin)+"-"+tostring(tbin),
-			"bins/river"+tostring(pfbin)+"-"+tostring(fbin)+"-"+tostring(tbin)+"-"+tostring(rbin),
+			"bins/preflop"+pfbin,
+			"bins/flop"+pfbin+"-"+fbin,
+			"bins/turn"+pfbin+"-"+fbin+"-"+tbin,
+			"bins/river"+pfbin+"-"+fbin+"-"+tbin+"-"+rbin,
 		},
 		{
-			PackedBinFile::numwordsneeded(pfbin, INDEX2_MAX)*8,
-			PackedBinFile::numwordsneeded(fbin, INDEX23_MAX)*8,
-			PackedBinFile::numwordsneeded(tbin, INDEX231_MAX)*8,
-			PackedBinFile::numwordsneeded(rbin, INDEX2311_MAX)*8
+			PackedBinFile::numwordsneeded(pfbinnum, INDEX2_MAX)*8,
+			PackedBinFile::numwordsneeded(fbinnum, INDEX23_MAX)*8,
+			PackedBinFile::numwordsneeded(tbinnum, INDEX231_MAX)*8,
+			PackedBinFile::numwordsneeded(rbinnum, INDEX2311_MAX)*8
 		},
 		true, //use history
 		useflopalyzer //use flopalyzer
@@ -821,18 +839,18 @@ cardsettings_t CardMachine::makecardsettings( int pfbin, int fbin, int tbin, int
 
 	cardsettings_t nohistoryretval =
 	{
-		{ INDEX2_MAX, fbin, tbin, rbin },
+		{ INDEX2_MAX, fbinnum, tbinnum, rbinnum },
 		{
 			"",
-			"bins/flop" + tostring( fbin ),
-			"bins/turn" + tostring( tbin ),
-			"bins/river" + tostring( rbin ),
+			"bins/flop" + fbin,
+			"bins/turn" + tbin,
+			"bins/river" + rbin,
 		},
 		{
 			0,
-			PackedBinFile::numwordsneeded(fbin, INDEX23_MAX)*8,
-			PackedBinFile::numwordsneeded(tbin, INDEX24_MAX)*8,
-			PackedBinFile::numwordsneeded(rbin, INDEX25_MAX)*8
+			PackedBinFile::numwordsneeded(fbinnum, INDEX23_MAX)*8,
+			PackedBinFile::numwordsneeded(tbinnum, INDEX24_MAX)*8,
+			PackedBinFile::numwordsneeded(rbinnum, INDEX25_MAX)*8
 		},
 		false, //use history
 		false //use flopalyzer

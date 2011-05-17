@@ -122,13 +122,13 @@ int main(int argc, char* argv[])
 			( "stacksize", po::value< int >( )->required( ),
 			  "stacksize (integer value)" )
 
-			( "pfbin", po::value< int >( )->required( ),
+			( "pfbin", po::value< string >( )->required( ),
 			  "number of preflop bins" )
-			( "fbin", po::value< int >( )->required( ),
+			( "fbin", po::value< string >( )->required( ),
 			  "number of flop bins" )
-			( "tbin", po::value< int >( )->required( ),
+			( "tbin", po::value< string >( )->required( ),
 			  "number of turn bins" )
-			( "rbin", po::value< int >( )->required( ),
+			( "rbin", po::value< string >( )->required( ),
 			  "number of river bins" )
 			( "useflopalyzer", po::value< bool >( )->default_value( false )->required( ),
 			  "use the cardmachine's flopalyzer or not" )
@@ -211,10 +211,10 @@ int main(int argc, char* argv[])
 			//card settings
 
 			cardsettings = CardMachine::makecardsettings( 
-					varmap[ "pfbin" ].as< int >( ),
-					varmap[ "fbin" ].as< int >( ),
-					varmap[ "tbin" ].as< int >( ),
-					varmap[ "rbin" ].as< int >( ),
+					varmap[ "pfbin" ].as< string >( ),
+					varmap[ "fbin" ].as< string >( ),
+					varmap[ "tbin" ].as< string >( ),
+					varmap[ "rbin" ].as< string >( ),
 					true, //use history
 					varmap[ "useflopalyzer" ].as< bool >( ) );
 			cout << setw( 30 ) << right << "Preflop bins:  " << cardsettings.bin_max[ 0 ] << " (" << cardsettings.filename[ 0 ] << ")" << endl;

@@ -44,8 +44,9 @@ public:
 	static void testflopalyzer();
 #endif
 
-	static cardsettings_t makecardsettings( int pfbin, int fbin, int tbin, int rbin,
-			        bool usehistory, bool useflopalyzer );
+	static cardsettings_t makecardsettings( 
+			string pfbin, string fbin, string tbin, string rbin,
+			bool usehistory, bool useflopalyzer );
 
 private:
 	//we do not support copying.

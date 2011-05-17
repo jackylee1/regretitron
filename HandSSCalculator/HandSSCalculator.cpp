@@ -88,7 +88,7 @@ void saveriverEV()
 //that is returned by readriverEV above. A reference to this vector, already in
 //in memory, is passed in as a parameter
 //used by computerturnHSS1 only, it is the inner loop of that function.
-inline floater computeturnHSS2(CardMask mine, CardMask flopturn, const FloaterFile &riverEV)
+inline floater computeturnHSS2(bool dohss, CardMask mine, CardMask flopturn, const FloaterFile &riverEV)
 {
 	CardMask river, dead, board;
 	//initialize counters to zero
@@ -104,7 +104,10 @@ inline floater computeturnHSS2(CardMask mine, CardMask flopturn, const FloaterFi
 		CardMask_OR(board, flopturn, river);
 		i = getindex2N(mine, board, 5);
 		//use index to look up riverEV of this situation
-		hss += (double)riverEV[i] * riverEV[i];
+		if( dohss )
+			hss += (double)riverEV[i] * riverEV[i];
+		else
+			hss += (double)riverEV[i];
 		boards++;
 	});
 
@@ -120,9 +123,11 @@ inline floater computeturnHSS2(CardMask mine, CardMask flopturn, const FloaterFi
 //private 2 card hand and each public 4 card board, we compute the HSS
 //using the above function and riverEV, and save it to arr.
 //used only once, and called only once, by the function saveturnHSS below.
-void saveturnHSS()
+void saveturnHSS( bool = true );
+void saveturnEV() { saveturnHSS( false ); }
+void saveturnHSS( bool dohss )
 {
-	cout << "generating turn HSS data using " << FloaterFile::gettypename() << "s ..." << endl;
+	cout << "generating turn " << ( dohss ? "HSS" : "EV" ) << " data using " << FloaterFile::gettypename() << "s ..." << endl;
 
 	FloaterFile arr(INDEX24_MAX);
 	const FloaterFile riverEV("riverEV", INDEX25_MAX);
@@ -139,13 +144,13 @@ void saveturnHSS()
 		{
 			int64 i = getindex2N(m,b,4);
 			if (arr[i] < 0)
-				arr.store(i, computeturnHSS2(m,b,riverEV));
+				arr.store(i, computeturnHSS2(dohss,m,b,riverEV));
 		});
 	});
 
 	cout << endl;
 
-	arr.savefile("turnHSS");
+	arr.savefile( dohss ? "turnHSS" : "turnEV" );
 }
 
 //-------------------- F l o p   H S S -----------------------
@@ -186,12 +191,14 @@ inline floater computeflopHSS2(CardMask mine, CardMask flop, const FloaterFile &
 //private 2 card hand and each public 3 card board, we compute the HSS
 //using the above function and turnHSS, and save it to arr.
 //used only once, and called only once, by the function saveflopHSS below.
-void saveflopHSS()
+void saveflopHSS( bool = true );
+void saveflopEV() { saveflopHSS( false ); }
+void saveflopHSS( bool dohss )
 {
-	cout << "generating flop HSS data using " << FloaterFile::gettypename() << "s ..." << endl;
+	cout << "generating flop " << ( dohss ? "HSS" : "EV" ) << " data using " << FloaterFile::gettypename() << "s ..." << endl;
 
 	FloaterFile arr(INDEX23_MAX);
-	const FloaterFile turnHSS("turnHSS", INDEX24_MAX);
+	const FloaterFile turnHSS( ( dohss ? "turnHSS" : "turnEV" ) , INDEX24_MAX);
 
 	CardMask b,m; //board, mine
 
@@ -211,7 +218,7 @@ void saveflopHSS()
 
 	cout << endl;
 
-	arr.savefile("flopHSS");
+	arr.savefile( dohss ? "flopHSS" : "flopEV" );
 }
 
 //----------------P r e F l o p   H S S -----------------------
@@ -275,6 +282,17 @@ void savepreflopHSS()
 }
 
 //-------------- B i n s   C a l c u l a t i o n ---------------
+
+//utility function used for nesting
+int getnumbins( string binname )
+{
+	const size_t xpos = binname.find( "x" );
+	if( xpos == string::npos )
+		return fromstr< int >( binname );
+	else
+		return fromstr< int >( binname.substr( 0, xpos ) )
+			* fromstr< int >( binname.substr( xpos + 1 ) );
+}
 
 inline bool fpcompare(floater x, floater y)
 {
@@ -624,13 +642,15 @@ void dopflopbins(int n_bins)
 	cout << packedbins.save(BINSFOLDER+"preflop"+tostring(n_bins));
 }
 
-void doflophistorybins(int n_pflop, int n_flop)
+void doflophistorybins(string pflopname, int n_newbins)
 {
-	cout << "generating " << n_pflop << " - " << n_flop << " flop history bins..." << endl;
+	cout << "generating " << pflopname << " - " << n_newbins << " flop history bins..." << endl;
 
-	const PackedBinFile pflopbins(BINSFOLDER+"preflop"+tostring(n_pflop), -1, n_pflop, INDEX2_MAX, true);
+	const int n_pflop = getnumbins( pflopname );
+
+	const PackedBinFile pflopbins(BINSFOLDER+"preflop"+pflopname, -1, n_pflop, INDEX2_MAX, true);
 	const FloaterFile flophss("flopHSS", INDEX23_MAX);
-	PackedBinFile binfile(n_flop, INDEX23_MAX);
+	PackedBinFile binfile(n_newbins, INDEX23_MAX);
 
 	const float expected = 25989600.0f/n_pflop; //52C2 * 50C3 = 25989600
 	vector<RawHand> hand_list((int64)(hand_list_multiplier*expected)); 
@@ -677,24 +697,51 @@ void doflophistorybins(int n_pflop, int n_flop)
 		if(i-1>=hand_list.size())
 			REPORT("...and that overflowed hand_list. make fewer bins for less granularity or make hand_list bigger.");
 
-		binandstore(hand_list, binfile, n_flop, i);
+		binandstore(hand_list, binfile, n_newbins, i);
 	}
 
 	cout << endl;
-	cout << binfile.save(BINSFOLDER+"flop"+tostring(n_pflop)+'-'+tostring(n_flop));
+	cout << binfile.save(BINSFOLDER+"flop"+pflopname+'-'+tostring(n_newbins));
 }
 
+/*** comments on nesting
+  Easier than expected. I adapted the turn binning method to also nest flop bins, and
+  the river binning method to also nest turn bins. The process to create NxM nested bins,
+  is to first create N regular bins that are sorted by HSS, then for each of the N bins,
+  to further sort into M bins based on EV. Finally, the two bin numbers must be combined. I
+  correctly used the N-number as the major and the M-number as the minor in the combine.
+  Clearly the process for creating flop nested bins is the same as creating turn regular
+  bins, except I don't iterate through the possible turn cards.
+***/
 
-void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
+//just so i don't die of naming
+void doturnhistorybins(string, string, int, bool = false);
+void nestflophistorybins(string pflopname, string flopname, int n_newbins)
+{ doturnhistorybins(pflopname, flopname, n_newbins, true); }
+
+void doturnhistorybins(string pflopname, string flopname, int n_newbins, bool nestingflop)
 {
-	cout << "generating " << n_pflop << " - " << n_flop << " - " << n_turn << " turn history bins..." << endl;
+	if( nestingflop )
+	{
+		if( flopname != tostr( getnumbins( flopname ) ) ) REPORT( "bad flopname" );
+		cout << "generating " << pflopname << " - " << flopname << "x" << n_newbins << " flop nested history bins..." << endl;
+	}
+	else
+		cout << "generating " << pflopname << " - " << flopname << " - " << n_newbins << " turn history bins..." << endl;
 
-	const PackedBinFile pflopbins(BINSFOLDER+"preflop"+tostring(n_pflop), -1, n_pflop, INDEX2_MAX, true);
-	const PackedBinFile flopbins(BINSFOLDER+"flop"+tostring(n_pflop)+'-'+tostring(n_flop), -1, n_flop, INDEX23_MAX, true);
-	const FloaterFile turnhss("turnHSS", INDEX24_MAX);
-	PackedBinFile binfile(n_turn, INDEX231_MAX);
+	const int n_pflop = getnumbins( pflopname );
+	const int n_flop = getnumbins( flopname );
 
-	const float expected = 1221511200.0f/n_pflop/n_flop;
+	const PackedBinFile pflopbins(BINSFOLDER+"preflop"+pflopname, -1, n_pflop, INDEX2_MAX, true);
+	const PackedBinFile flopbins(BINSFOLDER+"flop"+pflopname+'-'+flopname, -1, n_flop, INDEX23_MAX, true);
+	const FloaterFile binmeasure(
+			( nestingflop ? "flopEV" : "turnHSS" ),
+			( nestingflop ? INDEX23_MAX : INDEX24_MAX ) );
+	PackedBinFile binfile(
+			( nestingflop ? n_flop * n_newbins : n_newbins ), 
+			( nestingflop ? INDEX23_MAX : INDEX231_MAX ) );
+
+	const float expected = (nestingflop?25989600.0f:1221511200.0f)/n_pflop/n_flop;
 	vector<RawHand> hand_list((int64)(hand_list_multiplier*expected));
 
 	//build hand lists and bin
@@ -705,7 +752,7 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 		{
 			uint64 i=0;
 
-			CardMask cards_pflop, cards_flop, card_turn;
+			CardMask cards_pflop, cards_flop;
 			ENUMERATE_2_CARDS(cards_pflop,
 			{
 				if(x++ % (17*n_pflop*n_flop) == 0) cout << '.' << flush;
@@ -718,27 +765,36 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 					if(flopbins.retrieve(getindex23(cards_pflop, cards_flop)) != myflopbin)
 						continue;
 
-					CardMask dead;
-					CardMask_OR(dead, cards_pflop, cards_flop);
-					ENUMERATE_1_CARDS_D(card_turn, dead,
+					if(nestingflop)
 					{
-						CardMask board;
-						CardMask_OR(board, cards_flop, card_turn);
-						int64 index = getindex231(cards_pflop, cards_flop, card_turn);
-						/*
-						if(index==49062272)
+						int64 index = getindex23(cards_pflop, cards_flop);
+						hand_list[i++] = RawHand(index, binmeasure[index]);
+					}
+					else
+					{
+						CardMask dead;
+						CardMask card_turn;
+						CardMask_OR(dead, cards_pflop, cards_flop);
+						ENUMERATE_1_CARDS_D(card_turn, dead,
 						{
-							cout << endl << "saw index231 " << index << ", "
-								<< "(" << tostring(cards_pflop) << " : " << tostring(cards_flop) << " : " << tostring(card_turn) << ")"
-								<< "  index2: " << getindex2(cards_pflop)
-								<< "  index23: " << getindex23(cards_pflop, cards_flop)
-								<< "  index24: " << getindex2N(cards_pflop, board, 4)
-								<< "  pflopbin: " << pflopbins.retrieve(getindex2(cards_pflop))
-								<< "  flopbin: " << flopbins.retrieve(getindex23(cards_pflop, cards_flop));
-						}
-						*/
-						hand_list[i++] = RawHand(index, turnhss[getindex2N(cards_pflop, board, 4)]);
-					});
+							CardMask board;
+							CardMask_OR(board, cards_flop, card_turn);
+							int64 index = getindex231(cards_pflop, cards_flop, card_turn);
+							/*
+							if(index==49062272)
+							{
+								cout << endl << "saw index231 " << index << ", "
+									<< "(" << tostring(cards_pflop) << " : " << tostring(cards_flop) << " : " << tostring(card_turn) << ")"
+									<< "  index2: " << getindex2(cards_pflop)
+									<< "  index23: " << getindex23(cards_pflop, cards_flop)
+									<< "  index24: " << getindex2N(cards_pflop, board, 4)
+									<< "  pflopbin: " << pflopbins.retrieve(getindex2(cards_pflop))
+									<< "  flopbin: " << flopbins.retrieve(getindex23(cards_pflop, cards_flop));
+							}
+							*/
+							hand_list[i++] = RawHand(index, binmeasure[getindex2N(cards_pflop, board, 4)]);
+						});
+					}
 				});
 			});
 
@@ -749,26 +805,55 @@ void doturnhistorybins(int n_pflop, int n_flop, int n_turn)
 			if(i-1>=hand_list.size())
 				REPORT("...and that overflowed hand_list. make fewer bins for less granularity or make hand_list bigger.");
 
-			binandstore(hand_list, binfile, n_turn, i);
+			binandstore(hand_list, binfile, n_newbins, i);
+			if( nestingflop )
+			{
+				//I don't know which ones I just stored. A super hack is to only 
+				// re-set the ones that have been stored exactly once.
+				for( int64 i = 0; i < INDEX23_MAX; i++ )
+					if( binfile.isstored( i ) == 1 )
+						binfile.store( i, combine( myflopbin, binfile.retrieve( i ), n_newbins ) );
+			}
 		}
 	}
 	
 	cout << endl;
-	cout << binfile.save(BINSFOLDER+"turn"+tostring(n_pflop)+'-'+tostring(n_flop)+'-'+tostring(n_turn));
+	if( nestingflop )
+		cout << binfile.save(BINSFOLDER+"flop"+pflopname+'-'+flopname+'x'+tostring(n_newbins));
+	else
+		cout << binfile.save(BINSFOLDER+"turn"+pflopname+'-'+flopname+'-'+tostring(n_newbins));
 }
 
+//just so i don't die of naming
+void doriverhistorybins(string, string, string, int, bool = false);
+void nestturnhistorybins(string pflopname, string flopname, string turnname, int n_newbins)
+{ doriverhistorybins(pflopname, flopname, turnname, n_newbins, true); }
 
-void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
+void doriverhistorybins(string pflopname, string flopname, string turnname, int n_newbins, bool nestingturn)
 {
-	cout << "generating " << n_pflop << " - " << n_flop << " - " << n_turn << " - " << n_river << " river history bins..." << endl;
+	if( nestingturn )
+	{
+		if( turnname != tostr( getnumbins( turnname ) ) ) REPORT( "bad turnname" );
+		cout << "generating " << pflopname << " - " << flopname << " - " << turnname << "x" << n_newbins << " turn nested history bins..." << endl;
+	}
+	else
+		cout << "generating " << pflopname << " - " << flopname << " - " << turnname << " - " << n_newbins << " river history bins..." << endl;
 
-	const PackedBinFile pflopbins(BINSFOLDER+"preflop"+tostring(n_pflop), -1, n_pflop, INDEX2_MAX, true);
-	const PackedBinFile flopbins(BINSFOLDER+"flop"+tostring(n_pflop)+'-'+tostring(n_flop), -1, n_flop, INDEX23_MAX, true);
-	const PackedBinFile turnbins(BINSFOLDER+"turn"+tostring(n_pflop)+'-'+tostring(n_flop)+'-'+tostring(n_turn), -1, n_turn, INDEX231_MAX, true);
-	const FloaterFile riverev("riverEV", INDEX25_MAX);
-	PackedBinFile binfile(n_river, INDEX2311_MAX);
+	const int n_pflop = getnumbins( pflopname );
+	const int n_flop = getnumbins( flopname );
+	const int n_turn = getnumbins( turnname );
 
-	const float expected = 56189515200.0f/n_pflop/n_flop/n_turn;
+	const PackedBinFile pflopbins(BINSFOLDER+"preflop"+pflopname, -1, n_pflop, INDEX2_MAX, true);
+	const PackedBinFile flopbins(BINSFOLDER+"flop"+pflopname+'-'+flopname, -1, n_flop, INDEX23_MAX, true);
+	const PackedBinFile turnbins(BINSFOLDER+"turn"+pflopname+'-'+flopname+'-'+turnname, -1, n_turn, INDEX231_MAX, true);
+	const FloaterFile binmeasure(
+			( nestingturn ? "turnEV" : "riverEV" ),
+			( nestingturn ? INDEX24_MAX : INDEX25_MAX ) );
+	PackedBinFile binfile(
+			( nestingturn ? n_turn * n_newbins : n_newbins ), 
+			( nestingturn ? INDEX231_MAX : INDEX2311_MAX ) );
+
+	const float expected = (nestingturn?1221511200.0f:56189515200.0f)/n_pflop/n_flop/n_turn;
 	vector<RawHand> hand_list((int64)(hand_list_multiplier*expected));
 
 	//build hand lists and bin
@@ -781,7 +866,7 @@ void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
 			{
 				uint64 i=0;
 
-				CardMask cards_pflop, cards_flop, card_turn, card_river;
+				CardMask cards_pflop, cards_flop, card_turn;
 				ENUMERATE_2_CARDS(cards_pflop,
 				{
 					if(x++ % (17*n_pflop*n_flop*n_turn) == 0) cout << '.' << flush;
@@ -801,16 +886,27 @@ void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
 							if(turnbins.retrieve(getindex231(cards_pflop, cards_flop, card_turn)) != myturnbin)
 								continue;
 
-							CardMask dead2;
-							CardMask_OR(dead2, dead, card_turn);
-							ENUMERATE_1_CARDS_D(card_river, dead2,
+							if( nestingturn )
 							{
 								CardMask board;
 								CardMask_OR(board, cards_flop, card_turn);
-								CardMask_OR(board, board, card_river);
-								int64 index = getindex2311(cards_pflop, cards_flop, card_turn, card_river);
-								hand_list[i++] = RawHand(index, riverev[getindex2N(cards_pflop, board, 5)]);
-							});
+								int64 index = getindex231(cards_pflop, cards_flop, card_turn);
+								hand_list[i++] = RawHand(index, binmeasure[getindex2N(cards_pflop, board, 4)]);
+							}
+							else
+							{
+								CardMask dead2;
+								CardMask card_river;
+								CardMask_OR(dead2, dead, card_turn);
+								ENUMERATE_1_CARDS_D(card_river, dead2,
+								{
+									CardMask board;
+									CardMask_OR(board, cards_flop, card_turn);
+									CardMask_OR(board, board, card_river);
+									int64 index = getindex2311(cards_pflop, cards_flop, card_turn, card_river);
+									hand_list[i++] = RawHand(index, binmeasure[getindex2N(cards_pflop, board, 5)]);
+								});
+							}
 						});
 					});
 				});
@@ -822,50 +918,86 @@ void doriverhistorybins(int n_pflop, int n_flop, int n_turn, int n_river)
 				if(i-1>=hand_list.size())
 					REPORT("...and that overflowed hand_list. make fewer bins for less granularity or make hand_list bigger.");
 
-				binandstore(hand_list, binfile, n_river, i, RIVERBUNCHHISTBINS); //true = DO bunch similar hands!
+				binandstore(hand_list, binfile, n_newbins, i, nestingturn | RIVERBUNCHHISTBINS); //true = DO bunch similar hands!
+				if( nestingturn )
+				{
+					//I don't know which ones I just stored. A super hack is to only 
+					// re-set the ones that have been stored exactly once.
+					for( int64 i = 0; i < INDEX231_MAX; i++ )
+						if( binfile.isstored( i ) == 1 )
+							binfile.store( i, combine( myturnbin, binfile.retrieve( i ), n_newbins ) );
+				}
 			}
 		}
 	}
 
 	cout << endl;
-	cout << binfile.save(BINSFOLDER+"river"+tostring(n_pflop)+'-'+tostring(n_flop)+'-'+tostring(n_turn)+'-'+tostring(n_river));
+	if( nestingturn )
+		cout << binfile.save(BINSFOLDER+"turn"+pflopname+'-'+flopname+'-'+turnname+'x'+tostring(n_newbins));
+	else
+		cout << binfile.save(BINSFOLDER+"river"+pflopname+'-'+flopname+'-'+turnname+'-'+tostring(n_newbins));
 }
 
-void makehistbin(int a, int b, int c, int d)
+void makehistbin(int a, string b, string c, int d)
 {
-	dopflopbins(a);
-	doflophistorybins(a,b);
-	doturnhistorybins(a,b,c);
-	doriverhistorybins(a,b,c,d);
+	size_t bx = b.find( "x" );
+	size_t cx = c.find( "x" );
+	int b1 = fromstr< int >( b.substr( 0, bx ) );
+	int b2 = ( bx == string::npos ? 0 : fromstr< int >( b.substr( bx + 1 ) ) );
+	int c1 = fromstr< int >( c.substr( 0, cx ) );
+	int c2 = ( cx == string::npos ? 0 : fromstr< int >( c.substr( cx + 1 ) ) );
+
+	dopflopbins( a );
+
+	doflophistorybins( tostr( a ), b1 );
+
+	if( b2 )
+		nestflophistorybins( tostr( a ), tostr( b1 ), b2 );
+
+	doturnhistorybins( tostr( a ), b, c1 );
+
+	if( c2 )
+		nestturnhistorybins( tostr( a ), b, tostr( c1 ), c2 );
+
+	doriverhistorybins( tostr( a ), b, c, d );
 }
 
 void makehistbin(int pf, int ftr)
 {
-	dopflopbins(pf);
-	doflophistorybins(pf, ftr);
-	doturnhistorybins(pf, ftr, ftr);
-	doriverhistorybins(pf, ftr, ftr, ftr);
+	makehistbin( pf, tostr( ftr ), tostr( ftr ), ftr );
 }
 
 
-
 	/*
-	saveriverEV(); //No dependencies.				 Generates "bins/riverEV".
-	saveturnHSS(); //Depends on "bins/riverEV". Generates "bins/turnHSS".
-	saveflopHSS(); //Depends on "bins/turnHSS". Generates "bins/flopHSS".
-	savepreflopHSS(); //Deps on "bins/flopHSS". Generates "bins/preflopHSS".
-	saveflopBINS(N_BINS); //Deps on "bins/flopHSS". Generates "bins/flopNBINS".
-	saveflopBINS(N_BINS); //Deps on "bins/flopHSS". Generates "bins/flopNBINS".
-	saveturnBINS(N_BINS);  //Deps on "bins/turnHSS". Generates "bins/turnNBINS".
-	saveriverBINS(N_BINS); //Deps on "bins/riverEV". Generates "bins/riverNBINS".
-	dopflopbins(#bins);     //Deps on "bins/preflopHSS" Gnerates "bins/preflopNHistBins"
-	doflophistorybins(#bins); //Deps on flopHSS and preflopHistBins
-	doturnhistorybins(#bins); //Deps on turnHSS and preflop and flop HistBins
-	doriverhistorybins(#bins); //Deps on riverEV and preflop, flop, and turn HistBins
-	makehistbin(pfbins, ftrbins); //calls previous 4 functions in order. only needs EV & HSS data
-	makehistbin(pf, f, t, r);     //calls previous 4 functions in order. only needs EV & HSS data
-	*/
 
+Generators of HSS and EV values:
+
+void saveriverEV(); //No dependencies.				 Generates "<floaterdir>/riverEV".
+void saveturnHSS(); //Depends on "<floaterdir>/riverEV". Generates "<floaterdir>/turnHSS".
+void saveturnEV(); //Depends on "<floaterdir>/riverEV". Generates "<floaterdir>/turnEV".
+void saveflopHSS(); //Depends on "<floaterdir>/turnHSS". Generates "<floaterdir>/flopHSS".
+void saveflopEV(); //Depends on "<floaterdir>/turnEV". Generates "<floaterdir>/flopEV".
+void savepreflopHSS(); //Deps on "<floaterdir>/flopHSS". Generates "<floaterdir>/preflopHSS".
+
+Old bin generators:
+
+void saveflopBINS(int n_bins); //Deps on "bins/flopHSS". Generates "bins/flopNBINS".
+void saveturnBINS(int n_bins); //Deps on "bins/turnHSS". Generates "bins/turnNBINS".
+void saveriverBINS(int n_bins); //Deps on "bins/riverEV". Generates "bins/riverNBINS".
+
+New (history) bin generators, each generates one new output, 
+depends on all previous, starting with the preflop (no deps besides preflopHSS):
+
+void dopflopbins(int n_bins);
+void doflophistorybins(string pflopname, int n_newbins);
+void doturnhistorybins(string pflopname, string flopname, int n_newbins);
+void nestflophistorybins(string pflopname, string flopname, int n_newbins);
+void doturnhistorybins(string pflopname, string flopname, int n_newbins, bool nestingflop);
+void doriverhistorybins(string pflopname, string flopname, string turnname, int n_newbins);
+void nestturnhistorybins(string pflopname, string flopname, string turnname, int n_newbins);
+void doriverhistorybins(string pflopname, string flopname, string turnname, int n_newbins, bool nestingturn);
+
+	*/
 
 
 //--------------------- M a i n -----------------------
@@ -909,15 +1041,19 @@ int main(int argc, char *argv[])
 	if(argc == 4 && strcmp("histbin", argv[1])==0 && strcmp("preflop", argv[2])==0)
 		dopflopbins(atoi(argv[3]));
 	else if(argc == 5 && strcmp("histbin", argv[1])==0 && strcmp("flop", argv[2])==0)
-		doflophistorybins(atoi(argv[3]), atoi(argv[4]));
+		doflophistorybins(argv[3], atoi(argv[4]));
+	else if(argc == 6 && strcmp("histbin", argv[1])==0 && strcmp("flopnest", argv[2])==0)
+		nestflophistorybins(argv[3], argv[4], atoi(argv[5]));
 	else if(argc == 6 && strcmp("histbin", argv[1])==0 && strcmp("turn", argv[2])==0)
-		doturnhistorybins(atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
+		doturnhistorybins(argv[3], argv[4], atoi(argv[5]));
+	else if(argc == 7 && strcmp("histbin", argv[1])==0 && strcmp("turnnest", argv[2])==0)
+		nestturnhistorybins(argv[3], argv[4], argv[5], atoi(argv[6]));
 	else if(argc == 7 && strcmp("histbin", argv[1])==0 && strcmp("river", argv[2])==0)
-		doriverhistorybins(atoi(argv[3]), atoi(argv[4]), atoi(argv[5]), atoi(argv[6]));
+		doriverhistorybins(argv[3], argv[4], argv[5], atoi(argv[6]));
 
 	//generate all rounds of histbins, different ways to specify number of bins
 	else if(argc == 6 && strcmp("histbin", argv[1])==0)
-		makehistbin(atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
+		makehistbin(atoi(argv[2]), argv[3], argv[4], atoi(argv[5]));
 	else if(argc == 4 && strcmp("histbin", argv[1])==0)
 		makehistbin(atoi(argv[2]), atoi(argv[3]));
 	else if(argc == 3 && strcmp("histbin", argv[1])==0)
@@ -1239,10 +1375,10 @@ int main(int argc, char *argv[])
 	else
 	{
 		cout << "RAM usage of n-n-n-n river histbins: " << argv[0] << " ramtest n_bins" << endl;
-		cout << "Create history bins:           " << argv[0] << " histbin n_pflop n_flop n_turn n_river" << endl;
+		cout << "Create [nested] history bins:  " << argv[0] << " histbin n_pflop flopname turnname n_river" << endl;
 		cout << "Create history bins:           " << argv[0] << " histbin n_pflop n_flop-turn-river" << endl;
 		cout << "Create history bins:           " << argv[0] << " histbin n_bins" << endl;
-		cout << "Create one round of hist bins: " << argv[0] << " histbin (preflop | flop | turn | river) n_bins ... n_bins" << endl;
+		cout << "Create one round of hist bins: " << argv[0] << " histbin (preflop | flop | flopnest | turn | turnnest | river) n_bins ... n_bins" << endl;
 		cout << "Create old-style bins:         " << argv[0] << " oldbins (flop | turn | river) n_bins" << endl;
 #ifdef COMPILE_TESTCODE
 		cout << "Test indexing function:        " << argv[0] << " test" << endl;
