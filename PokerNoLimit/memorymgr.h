@@ -91,13 +91,13 @@ template <typename T>
 class DataContainerSingle
 {
 public:
-	DataContainerSingle(int nactions, int ndatanodes) 
+	DataContainerSingle(int nactions, int64 ndatanodes) 
 		: datastore(ndatanodes == 0 ? NULL : new T[nactions*ndatanodes]), nacts(nactions), ndata(ndatanodes)
 	{ 
 		if(nactions < 2) REPORT("invalid nactions");
 		if(ndatanodes < 0) REPORT("invalid ndatanodes");
 
-		for(int i=0; i<nactions*ndatanodes; i++)
+		for(int64 i=0; i<nactions*ndatanodes; i++)
 			datastore[i] = 0;
 	}
 
@@ -107,7 +107,7 @@ public:
 			delete[] datastore; 
 	}
 
-	inline void getdata(int index, T* &stratn, int checknacts)
+	inline void getdata(int64 index, T* &stratn, int checknacts)
 	{
 		if(checknacts != nacts) REPORT("invalid acts");
 		if(index < 0 || index >= ndata) REPORT("invalid index");
@@ -118,12 +118,12 @@ public:
 
 	int getnacts() const { return nacts; }
 
-	int size() const { return ndata; }
+	int64 size() const { return ndata; }
 
 private:
 	T * datastore;
 	int nacts;
-	int ndata;
+	int64 ndata;
 
 	//no copying
 	DataContainerSingle(const DataContainerSingle& rhs);
@@ -136,12 +136,12 @@ template < typename S, typename R >
 class DataContainer
 {
 public:
-	DataContainer( int nactions, int ndatanodes )
+	DataContainer( int nactions, int64 ndatanodes )
 		: datastratn( nactions, ndatanodes ) 
 		, dataregret( nactions, ndatanodes ) 
 	{ }
-	inline void getstratn(int index, S* &stratn, int checknacts) { return datastratn.getdata( index, stratn, checknacts ); }
-	inline void getregret(int index, R* &stratn, int checknacts) { return dataregret.getdata( index, stratn, checknacts ); }
+	inline void getstratn(int64 index, S* &stratn, int checknacts) { return datastratn.getdata( index, stratn, checknacts ); }
+	inline void getregret(int64 index, R* &stratn, int checknacts) { return dataregret.getdata( index, stratn, checknacts ); }
 private:
 	DataContainerSingle< S > datastratn;
 	DataContainerSingle< R > dataregret;
@@ -151,13 +151,13 @@ template <typename T>
 class DataContainer
 {
 public:
-	DataContainer(int nactions, int ndatanodes) 
+	DataContainer(int nactions, int64 ndatanodes) 
 		: datastore(ndatanodes == 0 ? NULL : new T[nactions*2*ndatanodes]), nacts(nactions), ndata(ndatanodes)
 	{ 
 		if(nactions < 2) REPORT("invalid nactions");
 		if(ndatanodes < 0) REPORT("invalid ndatanodes");
 
-		for(int i=0; i<nactions*2*ndatanodes; i++)
+		for(int64 i=0; i<nactions*2*ndatanodes; i++)
 			datastore[i] = 0;
 	}
 
@@ -167,14 +167,14 @@ public:
 			delete[] datastore; 
 	}
 
-	inline void getstratn(int index, T* &stratn, int checknacts)
+	inline void getstratn(int64 index, T* &stratn, int checknacts)
 	{
 		if(checknacts != nacts) REPORT("invalid acts");
 		if(index < 0 || index >= ndata) REPORT("invalid index");
 		stratn = &datastore[ index * 2*nacts ];
 	}
 
-	inline void getregret(int index, T* &regret, int checknacts)
+	inline void getregret(int64 index, T* &regret, int checknacts)
 	{
 		if(checknacts != nacts) REPORT("invalid acts");
 		if(index < 0 || index >= ndata) REPORT("invalid index");
@@ -185,12 +185,12 @@ public:
 
 	int getnacts() const { return nacts; }
 
-	int size() const { return ndata; }
+	int64 size() const { return ndata; }
 
 private:
 	T * datastore;
 	int nacts;
-	int ndata;
+	int64 ndata;
 
 	//no copying
 	DataContainer(const DataContainer& rhs);
