@@ -143,9 +143,9 @@ inline void notify(string text) { cout << text << endl; }
 #include <execinfo.h> //needed for backtraces
 #endif
 
-#ifdef __GNUC__
 string getbacktracestring()
 {
+#ifdef __GNUC__
 	const int maxtraces = 200;
 	void * backtraces[maxtraces];
 	const size_t numtraces = backtrace(backtraces, maxtraces);
@@ -154,8 +154,10 @@ string getbacktracestring()
 	for(unsigned i=0; i<numtraces; i++)
 		ret += string(strings[i]) + "\n";
 	return ret;
-}
+#else
+	return "";
 #endif
+}
 
 void REPORT(string infomsg, report_t killswitch)
 {
