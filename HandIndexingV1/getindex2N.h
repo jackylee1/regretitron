@@ -14,11 +14,16 @@ using std::vector;
 //Two hands with the same integer should have the same strength/EV/etc against an opponent.
 extern int getindex2N(const vector<CardMask> &cards, int maxround = RIVER);
 extern int getindex2N(const CardMask& mine, const CardMask& board, const int boardcards, int * suits = NULL);
+extern int getindexN(const CardMask& board, const int boardcards, int * suits = NULL);
 extern int getindex2(const CardMask& mine);
 
 inline int getindex23(CardMask pflop, CardMask flop) { return getindex2N(pflop, flop, 3); }
 extern int getindex231(CardMask pflop, CardMask flop, CardMask turn);
 extern int64 getindex2311(CardMask pflop, CardMask flop, CardMask turn, CardMask river);
+
+inline int getindex3(CardMask flop) { return getindexN(flop, 3); }
+extern int getindex31(CardMask flop, CardMask turn);
+extern int getindex311(CardMask flop, CardMask turn, CardMask river);
 
 #ifdef COMPILE_TESTCODE
 extern void testindex2N();

@@ -16,6 +16,7 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uin
 	myparams(cardsettings),
 	cardsi_max(4, -1),
 	binfiles(4, (PackedBinFile*)NULL),
+	boardbinfiles(4, (PackedBinFile*)NULL),
 	solving(issolver),
 	m_randseed( randseed ),
 	randforsolver( randseed ),
@@ -39,6 +40,38 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uin
 		if(myparams.useflopalyzer) //multiply in flopalyzer
 			cardsi_max[gr] *= FLOPALYZER_MAX[gr];
 
+		if(myparams.useboardbins && gr >= FLOP) //multiply in board bins
+			for(int boardi = FLOP; boardi <= gr; boardi ++ )
+				cardsi_max[gr] *= myparams.board_bin_max[boardi];
+
+		//if there are board bins, proeed to open them
+
+		if( myparams.useboardbins )
+		if((myparams.boardbinsfilename[gr].length() != 0 && myparams.boardbinsfilesize[gr] == 0) 
+			|| (myparams.boardbinsfilename[gr].length() == 0 && myparams.boardbinsfilesize[gr] != 0))
+			REPORT("you have a board bin file but it's size is set to zero");
+		if( myparams.boardbinsfilesize[gr] != 0 )
+		{
+			if(solving) //don't print unless guaranteed have console (i.e. solving)
+				cout << "loading " << myparams.boardbinsfilename[gr] << " into memory..." << endl;
+
+			//so ugly to do this in the loop...
+			int64 index_max = 0;
+			if(gr==PREFLOP)
+				REPORT( "loading board bins on preflop..." );
+			else if(gr==FLOP)
+				index_max = INDEX3_MAX;
+			else if(gr==TURN)
+				index_max = INDEX31_MAX;
+			else
+				index_max = INDEX311_MAX;
+
+			//if solving or under 5 megs, preload the file
+			boardbinfiles[gr] = new PackedBinFile(myparams.boardbinsfilename[gr], myparams.boardbinsfilesize[gr], 
+				myparams.board_bin_max[gr], index_max,
+				(solving || (myparams.boardbinsfilesize[gr] != -1 && myparams.boardbinsfilesize[gr] < 5 * 1024 * 1024)));
+		}
+
 		//if there IS a file.. open them
 
 		if((myparams.filename[gr].length() != 0 && myparams.filesize[gr] == 0) 
@@ -56,9 +89,9 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uin
 			else if(gr==FLOP)
 				index_max = INDEX23_MAX;
 			else if(gr==TURN)
-				index_max = myparams.usehistory ? INDEX231_MAX : INDEX24_MAX;
+				index_max = INDEX231_MAX;
 			else
-				index_max = myparams.usehistory ? INDEX2311_MAX : INDEX25_MAX;
+				index_max = INDEX2311_MAX;
 
 			//if solving or under 5 megs, preload the file
 			binfiles[gr] = new PackedBinFile(myparams.filename[gr], myparams.filesize[gr], 
@@ -71,8 +104,10 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uin
 CardMachine::~CardMachine()
 {
 	for(int gr=0; gr<4; gr++)
-		if(binfiles[gr] != NULL)
-			delete binfiles[gr];
+	{
+		delete binfiles[gr];
+		delete boardbinfiles[gr];
+	}
 }
 
 void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
@@ -99,7 +134,7 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 
 	//initialize cardsi with bin numbers
 
-	if(myparams.usehistory) //a la CPRG
+	if(myparams.usehistory) //combine a rounds' bins with all previous rounds bins
 	{
 		int bin[4][2];
 		bin[PREFLOP][P0] = binfiles[PREFLOP]->retrieve(getindex2(priv[P0]));
@@ -126,18 +161,16 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 		cardsi[RIVER][P1] = combine(bin[RIVER][P1],                bin[TURN][P1], binmax[TURN],   
 				                    bin[FLOP][P1], binmax[FLOP],   bin[PREFLOP][P1], binmax[PREFLOP]);
 	}
-	else //my old system
+	else //do not combine in any previous bins
 	{
 		cardsi[PREFLOP][P0] = getindex2(priv[P0]);
 		cardsi[PREFLOP][P1] = getindex2(priv[P1]);
-		CardMask fullboard;
-		CardMask_RESET(fullboard);
-		for(int gr=FLOP; gr<4; gr++)
-		{
-			CardMask_OR(fullboard, fullboard, board[gr]);
-			cardsi[gr][P0] = binfiles[gr]->retrieve(getindex2N(priv[P0], fullboard, gr+2)); //gr+2 is number of board cards
-			cardsi[gr][P1] = binfiles[gr]->retrieve(getindex2N(priv[P1], fullboard, gr+2));
-		}
+		cardsi[FLOP][P0] = binfiles[FLOP]->retrieve(getindex23(priv[P0], board[FLOP]));
+		cardsi[FLOP][P1] = binfiles[FLOP]->retrieve(getindex23(priv[P1], board[FLOP]));
+		cardsi[TURN][P0] = binfiles[TURN]->retrieve(getindex231(priv[P0], board[FLOP], board[TURN]));
+		cardsi[TURN][P1] = binfiles[TURN]->retrieve(getindex231(priv[P1], board[FLOP], board[TURN]));
+		cardsi[RIVER][P0] = binfiles[RIVER]->retrieve(getindex2311(priv[P0], board[FLOP], board[TURN], board[RIVER]));
+		cardsi[RIVER][P1] = binfiles[RIVER]->retrieve(getindex2311(priv[P1], board[FLOP], board[TURN], board[RIVER]));
 	}
 
 	//insert the flopalyzer score in-place if requested
@@ -153,6 +186,27 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 		cardsi[TURN][P1] = combine(cardsi[TURN][P1], turnscore, FLOPALYZER_MAX[TURN]);
 		cardsi[RIVER][P0] = combine(cardsi[RIVER][P0], riverscore, FLOPALYZER_MAX[RIVER]);
 		cardsi[RIVER][P1] = combine(cardsi[RIVER][P1], riverscore, FLOPALYZER_MAX[RIVER]);
+	}
+
+	//insert the board bins in-place if requested, board bins always remember history
+
+	if( myparams.useboardbins )
+	{
+		int flopbin = boardbinfiles[FLOP]->retrieve(getindex3(board[FLOP]));
+		int turnbin = boardbinfiles[TURN]->retrieve(getindex31(board[FLOP], board[TURN]));
+		int riverbin = boardbinfiles[RIVER]->retrieve(getindex311(board[FLOP], board[TURN], board[RIVER]));
+		
+		const int* const &binmax = myparams.board_bin_max; //alias binmax for shorter lines
+		cardsi[FLOP][P0] = combine(cardsi[FLOP][P0], flopbin, binmax[FLOP]);
+		cardsi[FLOP][P1] = combine(cardsi[FLOP][P1], flopbin, binmax[FLOP]);
+
+		cardsi[TURN][P0] = combine(cardsi[TURN][P0],   turnbin, binmax[TURN],   flopbin, binmax[FLOP]);
+		cardsi[TURN][P1] = combine(cardsi[TURN][P1],   turnbin, binmax[TURN],   flopbin, binmax[FLOP]);
+
+		cardsi[RIVER][P0] = combine(cardsi[RIVER][P0],                riverbin, binmax[RIVER],   
+				                    turnbin, binmax[TURN],   flopbin, binmax[FLOP]);
+		cardsi[RIVER][P1] = combine(cardsi[RIVER][P1],                riverbin, binmax[RIVER],   
+				                    turnbin, binmax[TURN],   flopbin, binmax[FLOP]);
 	}
 
 	//compute would-be winner for twoprob0wins
@@ -176,9 +230,10 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 }
 
 //returns cardsi
-int CardMachine::getindices(int gr, const vector<CardMask> &cards, vector<int> &handi, int &boardi)
+int CardMachine::getindices(int gr, const vector<CardMask> &cards, vector<int> &handi, vector<int> &boardi)
 {
-	handi.resize(gr+1);
+	handi.resize( myparams.usehistory ? gr+1 : 1 );
+	boardi.resize( ( myparams.useflopalyzer | myparams.useboardbins ) * gr );
 	if(cards.size() != (unsigned)gr+1) REPORT("gr and cards-size must match");
 
 	int cardsi;
@@ -222,28 +277,24 @@ int CardMachine::getindices(int gr, const vector<CardMask> &cards, vector<int> &
 				exit(1);
 		}
 	}
-	else
+	else //not using history
 	{
 		//my old system, cardsi is determined simply by the bin for that round
 		//so look up the appropriate bin and set it to handi and cardsi
 
-		CardMask board;
 		switch(gr)
 		{
 			case PREFLOP:
-				cardsi = handi[PREFLOP] = getindex2(cards[PREFLOP]);
+				cardsi = handi[0] = getindex2(cards[PREFLOP]);
 				break;
 			case FLOP:
-				cardsi = handi[FLOP] = binfiles[FLOP]->retrieve(getindex2N(cards[PREFLOP],cards[FLOP],3));
+				cardsi = handi[0] = binfiles[FLOP]->retrieve(getindex23(cards[PREFLOP],cards[FLOP]));
 				break;
 			case TURN:
-				CardMask_OR(board, cards[FLOP], cards[TURN]);
-				cardsi = handi[TURN] = binfiles[TURN]->retrieve(getindex2N(cards[PREFLOP],board,4));
+				cardsi = handi[0] = binfiles[TURN]->retrieve(getindex231(cards[PREFLOP],cards[FLOP],cards[TURN]));
 				break;
 			case RIVER:
-				CardMask_OR(board, cards[FLOP], cards[TURN]);
-				CardMask_OR(board, board, cards[RIVER]);
-				cardsi = handi[RIVER] = binfiles[RIVER]->retrieve(getindex2N(cards[PREFLOP],board,5));
+				cardsi = handi[0] = binfiles[RIVER]->retrieve(getindex2311(cards[PREFLOP],cards[FLOP],cards[TURN],cards[RIVER]));
 				break;
 			default:
 				REPORT("invalid gameround");
@@ -257,41 +308,83 @@ int CardMachine::getindices(int gr, const vector<CardMask> &cards, vector<int> &
 	{
 		switch(gr)
 		{
-			case PREFLOP: boardi = 0; break;
-			case FLOP: boardi = flopalyzer(cards[FLOP]); break;
-			case TURN: boardi = turnalyzer(cards[FLOP], cards[TURN]); break;
-			case RIVER: boardi = rivalyzer(cards[FLOP], cards[TURN], cards[RIVER]); break;
-			default: REPORT("bad gr");
+			case RIVER: 
+				boardi[ 2 ] = rivalyzer(cards[FLOP], cards[TURN], cards[RIVER]);
+				boardi[ 1 ] = turnalyzer(cards[FLOP], cards[TURN]);
+				boardi[ 0 ] = flopalyzer(cards[FLOP]);
+				cardsi = combine(cardsi, boardi[ 2 ], FLOPALYZER_MAX[gr]);
+				break;
+			case TURN: 
+				boardi[ 1 ] = turnalyzer(cards[FLOP], cards[TURN]);
+				boardi[ 0 ] = flopalyzer(cards[FLOP]);
+				cardsi = combine(cardsi, boardi[ 1 ], FLOPALYZER_MAX[gr]);
+				break;
+			case FLOP: 
+				boardi[ 0 ] = flopalyzer(cards[FLOP]);
+				cardsi = combine(cardsi, boardi[ 0 ], FLOPALYZER_MAX[gr]);
+				break;
+			case PREFLOP: 
+				break;
+			default: 
+				REPORT("bad gr");
 		}
-		cardsi = combine(cardsi, boardi, FLOPALYZER_MAX[gr]); //depends on boardi being 0 preflop
 	}
-	else
-		boardi = 0;
+
+	//if we are using board bins, then combine in those scores as well in the same way as in getnewgame()
+
+	if( myparams.useboardbins )
+	{
+		const int* const &binmax = myparams.board_bin_max; //alias binmax for shorter lines
+		switch(gr)
+		{
+			case RIVER: 
+				boardi[ 2 ] = boardbinfiles[RIVER]->retrieve(getindex311( cards[FLOP], cards[TURN], cards[RIVER]) );
+				boardi[ 1 ] = boardbinfiles[TURN]->retrieve(getindex31(cards[FLOP], cards[TURN]));
+				boardi[ 0 ] = boardbinfiles[FLOP]->retrieve(getindex3(cards[FLOP]));
+				cardsi = combine(cardsi,  boardi[ 2 ], binmax[RIVER],  boardi[ 1 ], binmax[TURN],  boardi[ 0 ], binmax[FLOP]);
+				break;
+			case TURN: 
+				boardi[ 1 ] = boardbinfiles[TURN]->retrieve(getindex31(cards[FLOP], cards[TURN]));
+				boardi[ 0 ] = boardbinfiles[FLOP]->retrieve(getindex3(cards[FLOP]));
+				cardsi = combine(cardsi,  boardi[ 1 ], binmax[TURN],  boardi[ 0 ], binmax[FLOP]);
+				break;
+			case FLOP: 
+				boardi[ 0 ] = boardbinfiles[FLOP]->retrieve(getindex3(cards[FLOP]));
+				cardsi = combine(cardsi, boardi[ 0 ], binmax[FLOP]);
+				break;
+			case PREFLOP: 
+				break;
+			default: 
+				REPORT("bad gr");
+		}
+	}
 
 	return cardsi;
 }	
 
 
-void CardMachine::findexamplehand(int gr, const vector<int> &handi, int boardi, vector<CardMask> &cards)
+void CardMachine::findexamplehand(int gr, const vector<int> &handi, vector<int> &boardi, vector<CardMask> &cards)
 {
-	//ensure our vectors are only as big as needed 
 
 	cards.resize(gr+1);
-	if(handi.size() != (unsigned)gr+1) REPORT("handi is wrong size");
 
 	//alias rand for the macros
 
 	MTRand &mersenne = randforexamplehands;
 
-	if(myparams.usehistory) //cprg system
+	if(myparams.usehistory && ! myparams.useboardbins) //cprg system
 	{
+		//ensure our vectors are only as big as needed 
+		if(handi.size() != (unsigned)gr+1) REPORT("handi is wrong size");
+		if(boardi.size() != ( myparams.useflopalyzer * (unsigned)gr ) ) REPORT("boardi is wrong size");
+
 		CardMask usedcards;
 		//the story of findcount: if we randomly choose all hands at once, check the indices, 
 		// and then randomly choose them again, it is slow (looking for 1 in 10000 that way),
 		// if we do it incrementally, like here, only looking for 1 in 10 at each step, but
 		// for some preflop/flop/turn combos, NO river card satisfies it. This is what works.
 		int findcount;
-restart:
+restarthistory:
 		CardMask_RESET(usedcards);
 
 		do
@@ -307,10 +400,10 @@ restart:
 		do
 		{
 			if(++findcount == 150)
-				goto restart;
+				goto restarthistory;
 			MONTECARLO_N_CARDS_D(cards[FLOP], usedcards, 3, 1, );
 		}
-		while((myparams.useflopalyzer && flopalyzer(cards[FLOP]) != boardi)
+		while((myparams.useflopalyzer && flopalyzer(cards[FLOP]) != boardi[ 0 ])
 				|| binfiles[FLOP]->retrieve(getindex23(cards[PREFLOP], cards[FLOP])) != handi[FLOP]);
 
 		if(gr==FLOP) return;
@@ -320,10 +413,10 @@ restart:
 		do
 		{
 			if(++findcount == 150)
-				goto restart;
+				goto restarthistory;
 			MONTECARLO_N_CARDS_D(cards[TURN], usedcards, 1, 1, );
 		}
-		while((myparams.useflopalyzer && turnalyzer(cards[FLOP],cards[TURN]) != boardi)
+		while((myparams.useflopalyzer && turnalyzer(cards[FLOP],cards[TURN]) != boardi[ 1 ])
 				|| binfiles[TURN]->retrieve(getindex231(cards[PREFLOP], cards[FLOP], cards[TURN])) != handi[TURN]);
 
 		if(gr==TURN) return;
@@ -333,64 +426,93 @@ restart:
 		do
 		{
 			if(++findcount == 150)
-				goto restart;
+				goto restarthistory;
 			MONTECARLO_N_CARDS_D(cards[RIVER], usedcards, 1, 1, );
 		}
-		while((myparams.useflopalyzer && rivalyzer(cards[FLOP],cards[TURN],cards[RIVER]) != boardi)
+		while((myparams.useflopalyzer && rivalyzer(cards[FLOP],cards[TURN],cards[RIVER]) != boardi[ 2 ])
 				|| binfiles[RIVER]->retrieve(getindex2311(cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER])) != handi[RIVER]);
 
 		if(gr==RIVER) return;
 	}
-	else // my old binning system
+	// my own binning system
+	else if( ! myparams.usehistory && myparams.useboardbins && ! myparams.useflopalyzer )
 	{
-		while(1) //find entire board, it is fast due to smart if statements
+		//ensure our vectors are only as big as needed 
+		if(handi.size() != 1) REPORT("handi is wrong size");
+		if(boardi.size() != (unsigned)gr) REPORT("boardi is wrong size");
+		CardMask usedcards;
+
+		int findcount;
+
+restartboard:
+		CardMask_RESET(usedcards);
+		if(gr==PREFLOP) goto findpreflop;
+
+		do
 		{
-			CardMask board;
-			CardMask_RESET(board); //also used as usedcards
-			switch(gr)
+			MONTECARLO_N_CARDS_D(cards[FLOP], usedcards, 3, 1, );
+		}
+		while(boardbinfiles[FLOP]->retrieve(getindex3(cards[FLOP])) != boardi[0]);
+
+		usedcards = cards[FLOP];
+		if(gr==FLOP) goto findpreflop;
+
+		findcount = 0;
+		do
+		{
+			if(++findcount == 150)
+				goto restartboard;
+			MONTECARLO_N_CARDS_D(cards[TURN], usedcards, 1, 1, );
+		}
+		while(boardbinfiles[TURN]->retrieve(getindex31(cards[FLOP], cards[TURN])) != boardi[1]);
+
+		CardMask_OR(usedcards, usedcards, cards[TURN]);
+		if(gr==TURN) goto findpreflop;
+
+		findcount = 0;
+		do
+		{
+			if(++findcount == 150)
+				goto restartboard;
+			MONTECARLO_N_CARDS_D(cards[RIVER], usedcards, 1, 1, );
+		}
+		while(boardbinfiles[RIVER]->retrieve(getindex311(cards[FLOP], cards[TURN], cards[RIVER])) != boardi[2]);
+
+		CardMask_OR(usedcards, usedcards, cards[RIVER]);
+
+findpreflop:
+		//finally we must find a preflop hand
+		findcount = 0;
+		while( true )
+		{
+			if(++findcount == 150)
+				goto restartboard;
+			MONTECARLO_N_CARDS_D(cards[PREFLOP], usedcards, 2, 1, );
+			switch( gr )
 			{
-				//deal out random cards
-				case RIVER:
-					MONTECARLO_N_CARDS_D(cards[RIVER], board;, 1, 1, );
-					board = cards[RIVER]; //do not break from switch
-				case TURN:
-					MONTECARLO_N_CARDS_D(cards[TURN], board, 1, 1, );
-					CardMask_OR(board, board, cards[TURN]);
+				case PREFLOP:
+					if( handi[0] == getindex2( cards[PREFLOP] ) )
+						return;
+					break;
 				case FLOP:
-					MONTECARLO_N_CARDS_D(cards[FLOP], board, 3, 1, );
-					CardMask_OR(board, board, cards[FLOP]);
-				case PREFLOP:
-					MONTECARLO_N_CARDS_D(cards[PREFLOP], board, 2, 1, );
-
-			}
-
-			switch(gr)
-			{
-				//check the ones that are fast to check first
-				case RIVER: 
-					if( (!myparams.useflopalyzer || rivalyzer(cards[FLOP],cards[TURN],cards[RIVER]) == boardi)
-							&& binfiles[RIVER]->retrieve(getindex2N(cards[PREFLOP], board, 5)) == handi[RIVER])
-						return;
-					break; //break from switch
-
-				case TURN: 
-					if( (!myparams.useflopalyzer || turnalyzer(cards[FLOP],cards[TURN]) == boardi)
-							&& binfiles[TURN]->retrieve(getindex2N(cards[PREFLOP], board, 4)) == handi[TURN])
+					if( handi[0] == binfiles[gr]->retrieve( getindex23( cards[PREFLOP], cards[FLOP] ) ) )
 						return;
 					break;
-
-				case FLOP: 
-					if( (!myparams.useflopalyzer || flopalyzer(cards[FLOP]) == boardi)
-							&& binfiles[FLOP]->retrieve(getindex2N(cards[PREFLOP], board, 3)) == handi[FLOP])
+				case TURN:
+					if( handi[0] == binfiles[gr]->retrieve( getindex231( cards[PREFLOP], cards[FLOP], cards[TURN] ) ) )
 						return;
 					break;
-				case PREFLOP:
-					if( getindex2(cards[PREFLOP]) == handi[PREFLOP] )
+				case RIVER:
+					if( handi[0] == binfiles[gr]->retrieve( getindex2311( cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER] ) ) )
 						return;
 					break;
+				default:
+					REPORT("bad gr");
 			}
 		}
 	}
+	else
+		REPORT("example hands is not written for the settings this solve uses");
 
 	REPORT("we got to the end of example hands, but it should have returned by now.");
 }
@@ -805,7 +927,8 @@ namespace //used in makecardsettings
 // at compiletime
 cardsettings_t CardMachine::makecardsettings( 
 		string pfbin, string fbin, string tbin, string rbin,
-		bool usehistory, bool useflopalyzer )
+		int boardfbin, int boardtbin, int boardrbin,
+		bool usehistory, bool useflopalyzer, bool useboardbins )
 {
 	int pfbinnum = getnumbins( pfbin );
 	int fbinnum = getnumbins( fbin );
@@ -828,35 +951,66 @@ cardsettings_t CardMachine::makecardsettings(
 			PackedBinFile::numwordsneeded(rbinnum, INDEX2311_MAX)*8
 		},
 		true, //use history
-		useflopalyzer //use flopalyzer
+		useflopalyzer, //use flopalyzer
+		useboardbins, //use board bins
+		{ 0, boardfbin, boardtbin, boardrbin },
+		{
+			"",
+			"bins/boardflop" + tostr( boardfbin ),
+			"bins/boardturn" + tostr( boardtbin ),
+			"bins/boardriver" + tostr( boardrbin )
+		},
+		{
+			0,
+			PackedBinFile::numwordsneeded(boardfbin, INDEX3_MAX)*8,
+			PackedBinFile::numwordsneeded(boardtbin, INDEX31_MAX)*8,
+			PackedBinFile::numwordsneeded(boardrbin, INDEX311_MAX)*8
+		}
 	};
-
-	/* default values I had for no-history (imperfect recall) bin amounts:
-		#define FBIN 256
-		#define TBIN 90
-		#define RBIN 90
-	 */
 
 	cardsettings_t nohistoryretval =
 	{
 		{ INDEX2_MAX, fbinnum, tbinnum, rbinnum },
 		{
 			"",
-			"bins/flop" + fbin,
-			"bins/turn" + tbin,
-			"bins/river" + rbin,
+			"bins/flopb" + tostr( boardfbin ) + '-' + fbin,
+			"bins/turnb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + tbin,
+			"bins/riverb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + 'b' + tostr( boardrbin ) + '-' + rbin
 		},
 		{
 			0,
 			PackedBinFile::numwordsneeded(fbinnum, INDEX23_MAX)*8,
-			PackedBinFile::numwordsneeded(tbinnum, INDEX24_MAX)*8,
-			PackedBinFile::numwordsneeded(rbinnum, INDEX25_MAX)*8
+			PackedBinFile::numwordsneeded(tbinnum, INDEX231_MAX)*8,
+			PackedBinFile::numwordsneeded(rbinnum, INDEX2311_MAX)*8
 		},
 		false, //use history
-		false //use flopalyzer
+		useflopalyzer, //use flopalyzer
+		useboardbins, //use board bins
+		{ 0, boardfbin, boardtbin, boardrbin },
+		{
+			"",
+			"bins/flopb" + tostr( boardfbin ),
+			"bins/turnb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ),
+			"bins/riverb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + 'b' + tostr( boardrbin )
+		},
+		{
+			0,
+			PackedBinFile::numwordsneeded(boardfbin, INDEX3_MAX)*8,
+			PackedBinFile::numwordsneeded(boardtbin, INDEX31_MAX)*8,
+			PackedBinFile::numwordsneeded(boardrbin, INDEX311_MAX)*8
+		}
 	};
 
-	return ( usehistory ? historyretval : nohistoryretval );
+	if( usehistory )
+	{
+		return historyretval;
+	}
+	else
+	{
+		if( pfbinnum != INDEX2_MAX )
+			REPORT( "Bad value for pfbinnum when not using history. (should be max, 169)" );
+		return nohistoryretval;
+	}
 }
 
 

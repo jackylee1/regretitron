@@ -132,6 +132,16 @@ int main(int argc, char* argv[])
 			  "number of river bins" )
 			( "useflopalyzer", po::value< bool >( )->default_value( false )->required( ),
 			  "use the cardmachine's flopalyzer or not" )
+			( "usehistory", po::value< bool >( )->required( ),
+			  "use the private information bins historically or not" )
+			( "useboardbins", po::value< bool >( )->required( ),
+			  "use extra files for the board bins or not " )
+			( "fboard", po::value< int >( ),
+			  "number of flop board bins to use (required when useboardbins=true)" )
+			( "tboard", po::value< int >( ),
+			  "number of turn board bins to use (required when useboardbins=true)" )
+			( "rboard", po::value< int >( ),
+			  "number of river board bins to use (required when useboardbins=true)" )
 			( "seed", po::value< MTRand::uint32 >( ),
 			  "seed to provide to card generator (optional, uses time and clock if not set)" )
 
@@ -215,13 +225,28 @@ int main(int argc, char* argv[])
 					varmap[ "fbin" ].as< string >( ),
 					varmap[ "tbin" ].as< string >( ),
 					varmap[ "rbin" ].as< string >( ),
-					true, //use history
-					varmap[ "useflopalyzer" ].as< bool >( ) );
+					varmap[ "useboardbins" ].as< bool >( ) 
+								? varmap[ "fboard" ].as< int >( ) : 0,
+					varmap[ "useboardbins" ].as< bool >( ) 
+								? varmap[ "tboard" ].as< int >( ) : 0,
+					varmap[ "useboardbins" ].as< bool >( ) 
+								? varmap[ "rboard" ].as< int >( ) : 0,
+					varmap[ "usehistory" ].as< bool >( ),
+					varmap[ "useflopalyzer" ].as< bool >( ),
+					varmap[ "useboardbins" ].as< bool >( ) );
 			cout << setw( 30 ) << right << "Preflop bins:  " << cardsettings.bin_max[ 0 ] << " (" << cardsettings.filename[ 0 ] << ")" << endl;
 			cout << setw( 30 ) << right << "Flop bins:  " << cardsettings.bin_max[ 1 ] << " (" << cardsettings.filename[ 1 ] << ")" << endl;
 			cout << setw( 30 ) << right << "Turn bins:  " << cardsettings.bin_max[ 2 ] << " (" << cardsettings.filename[ 2 ] << ")" << endl;
 			cout << setw( 30 ) << right << "River bins:  " << cardsettings.bin_max[ 3 ] << " (" << cardsettings.filename[ 3 ] << ")" << endl;
+			cout << setw( 30 ) << right << "Using history:  " << cardsettings.usehistory << endl;
 			cout << setw( 30 ) << right << "Using flopalyzer:  " << cardsettings.useflopalyzer << endl;
+			cout << setw( 30 ) << right << "Using board bins:  " << cardsettings.useboardbins << endl;
+			if( cardsettings.useboardbins )
+			{
+				cout << setw( 30 ) << right << "Flop board bins:  " << cardsettings.board_bin_max[ 1 ] << " (" << cardsettings.boardbinsfilename[ 1 ] << ")" << endl;
+				cout << setw( 30 ) << right << "Turn board bins:  " << cardsettings.board_bin_max[ 2 ] << " (" << cardsettings.boardbinsfilename[ 2 ] << ")" << endl;
+				cout << setw( 30 ) << right << "River board bins:  " << cardsettings.board_bin_max[ 3 ] << " (" << cardsettings.boardbinsfilename[ 3 ] << ")" << endl;
+			}
 
 			//aggression
 
@@ -233,6 +258,7 @@ int main(int argc, char* argv[])
 			//initialize the solver, open bin files and grab all memory
 
 			cout << endl;
+
 			Solver::initsolver( treesettings, cardsettings, randseed, nthreads, nlook, aggstatic, aggselective );
 		}
 		catch( std::exception & e )

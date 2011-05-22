@@ -225,8 +225,9 @@ void Solver::save(const string &filename, bool writedata)
 	TiXmlElement * meta = new TiXmlElement("meta");
 	meta->SetAttribute("usehistory", cardmachine->getparams().usehistory);
 	meta->SetAttribute("useflopalyzer", cardmachine->getparams().useflopalyzer);
+	meta->SetAttribute("useboardbins", cardmachine->getparams().useboardbins);
 	cardbins->LinkEndChild(meta);
-	for(int gr=0; gr<4; gr++)
+	for(int gr=0; gr<4; gr++) //regular bins
 	{
 		ostringstream o;
 		o << "round" << gr;
@@ -234,6 +235,17 @@ void Solver::save(const string &filename, bool writedata)
 		round->SetAttribute("nbins", cardmachine->getparams().bin_max[gr]);
 		round->SetAttribute("filesize", cardmachine->getparams().filesize[gr]);
 		TiXmlText * roundtext = new TiXmlText(cardmachine->getparams().filename[gr]);
+		round->LinkEndChild(roundtext);
+		cardbins->LinkEndChild(round);
+	}
+	for(int gr=0; gr<4; gr++) //board bins
+	{
+		ostringstream o;
+		o << "boardround" << gr;
+		TiXmlElement * round = new TiXmlElement(o.str());
+		round->SetAttribute("nbins", cardmachine->getparams().board_bin_max[gr]);
+		round->SetAttribute("filesize", cardmachine->getparams().boardbinsfilesize[gr]);
+		TiXmlText * roundtext = new TiXmlText(cardmachine->getparams().boardbinsfilename[gr]);
 		round->LinkEndChild(roundtext);
 		cardbins->LinkEndChild(round);
 	}

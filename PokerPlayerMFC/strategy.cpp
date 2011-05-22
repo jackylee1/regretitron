@@ -60,6 +60,33 @@ Strategy::Strategy(string xmlfilename, bool preload, LoggerClass & strategylogge
 			cardsettings.filesize[gr] = mybin->GetAttribute<int64>("filesize");
 			cardsettings.bin_max[gr] = mybin->GetAttribute<int>("nbins");
 		}
+
+		//remain backwards compatible if the xml file doesn't have useboardbins
+		cardsettings.useboardbins = 
+			cardbins->FirstChildElement("meta")->HasAttribute("useboardbins")
+			&& cardbins->FirstChildElement("meta")->GetAttribute<bool>("useboardbins");
+		for(int gr=0; gr<4; gr++)
+		{
+			if( cardsettings.useboardbins )
+			{
+				ostringstream roundname;
+				roundname << "boardround" << gr;
+				Element* mybin = cardbins->FirstChildElement(roundname.str());
+				cardsettings.boardbinsfilename[gr] = mybin->GetTextOrDefault("");
+				if(preload && cardsettings.filename[gr].length()>0)
+					if(system(("cat "+cardsettings.filename[gr]+".bins > /dev/null").c_str()) != 0)
+						REPORT("cat something failed");
+				cardsettings.boardbinsfilesize[gr] = mybin->GetAttribute<int64>("filesize");
+				cardsettings.board_bin_max[gr] = mybin->GetAttribute<int>("nbins");
+			}
+			else
+			{
+				cardsettings.boardbinsfilename[gr] = "";
+				cardsettings.boardbinsfilesize[gr] = 0;
+				cardsettings.board_bin_max[gr] = 0;
+			}
+		}
+
 		cardmach = new CardMachine(cardsettings, false);
 
 		//set BettingTree

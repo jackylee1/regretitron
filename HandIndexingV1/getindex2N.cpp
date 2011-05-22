@@ -66,6 +66,12 @@ inline int mcolexi(const int &a, const int &b, const int &c)
 	return nchoosek(c,1)+nchoosek(b+1,2)+nchoosek(a+2,3);
 }
 
+//written years after previous code. assuming i can follow pattern
+inline int mcolexi(const int &a, const int &b, const int &c, const int &d)
+{
+	return nchoosek(d,1)+nchoosek(c+1,2)+nchoosek(b+2,3)+nchoosek(a+3,4);
+}
+
 
 //easy way to identify the number-of-cards-in-each-suit case.
 #define SUITI(a, b, c, d) ((a) + (b<<4) + (c<<8) + (d<<12))
@@ -206,6 +212,66 @@ inline int getindex5(const suitrep n[])
 		//one suited
 	case SUITI(5,0,0,0):
 		return n[3].ranki + N2*M31 + N3*M21 + M22*N1 + N4*N1 + N3*N2;
+
+	default:
+		REPORT("You called getindex2N with wrong N");
+		return -1;
+	}
+}
+
+inline int getindex4(const suitrep n[])
+{
+	switch(SUITI(n[3].n_cards, n[2].n_cards, n[1].n_cards, n[0].n_cards)) //largest first
+	{
+		// ... THE FOUR CARDED HANDS
+		//four suited
+	case SUITI(1,1,1,1):
+		return mcolexi(n[3].ranki, n[2].ranki, n[1].ranki, n[0].ranki);
+
+		//three suited
+	case SUITI(2,1,1,0):
+		return n[3].ranki*M21 + mcolexi(n[2].ranki, n[1].ranki) 
+				+ M41;
+
+		//two suited
+	case SUITI(3,1,0,0):
+		return n[3].ranki*N1 + n[2].ranki 
+				+ M41 + N2*M21;
+
+	case SUITI(2,2,0,0):
+		return mcolexi(n[3].ranki, n[2].ranki)
+				+ M41 + N2*M21 + N3*N1;
+
+		//one suited
+	case SUITI(4,0,0,0):
+		return n[3].ranki 
+				+ M41 + N2*M21 + N3*N1 + M22;
+
+	default:
+		REPORT("You called getindex2N with wrong N");
+		return -1;
+	}
+}
+
+
+inline int getindex3(const suitrep n[])
+{
+	switch(SUITI(n[3].n_cards, n[2].n_cards, n[1].n_cards, n[0].n_cards)) //largest first
+	{
+		// ... THE THREE CARDED HANDS
+		//three suited
+	case SUITI(1,1,1,0):
+		return mcolexi(n[3].ranki, n[2].ranki, n[1].ranki); 
+
+		//two suited
+	case SUITI(2,1,0,0):
+		return n[3].ranki*N1 + n[2].ranki 
+				+ M31;
+
+		//one suited
+	case SUITI(3,0,0,0):
+		return n[3].ranki 
+				+ M31 + N2*N1;
 
 	default:
 		REPORT("You called getindex2N with wrong N");
@@ -382,6 +448,48 @@ int getindex2N(const CardMask& mine, const CardMask& board, const int boardcards
 	return ret;
 }
 
+//same as above but I don't have to deal with having my two cards in the mix
+int getindexN(const CardMask& board, const int boardcards, int * suits)
+{
+	suitrep n[4];
+
+	//fill suitrep 'suit' field - only used by 31 and 311
+	n[0].suit = StdDeck_Suit_SPADES;
+	n[1].suit = StdDeck_Suit_DIAMONDS;
+	n[2].suit = StdDeck_Suit_CLUBS;
+	n[3].suit = StdDeck_Suit_HEARTS;
+	//fill the rest of the structure
+	//(use 0 as the mask for my cards since they don't exist, everything should still work)
+	masktosuitrep(0, CardMask_SPADES(board),   n[0]);
+	masktosuitrep(0, CardMask_DIAMONDS(board), n[1]);
+	masktosuitrep(0, CardMask_CLUBS(board),    n[2]);
+	masktosuitrep(0, CardMask_HEARTS(board),   n[3]);
+
+	std::sort(n, n+4);
+	//n[3] is BIGGEST - MOST CARDS, or if same cards, MOST RANKI
+	//n[0] IS smallest - least cards, or if same cards, SMALLEST RANK.
+
+	if(suits!=NULL) // - only used by 231 and 2311
+	{
+		suits[0] = n[0].suit;
+		suits[1] = n[1].suit;
+		suits[2] = n[2].suit;
+		suits[3] = n[3].suit;
+	}
+
+	//this right here is the only code that depends on number of cards
+	switch(boardcards)
+	{
+	case 3: return getindex3(n);
+	case 4: return getindex4(n);
+	case 5: return getindex5(n);
+		
+	default:
+		REPORT("You called getindexN with wrong N");
+		return -1;
+	}
+}
+
 //this code is not going to match the above in style or convention.
 //it was written much later, and will be much more awesome
 
@@ -418,6 +526,42 @@ foundit:
 	//we just need to combine that with the 24 index, and we're good.
 
 	return combine(index24, num_passed, 4);
+}
+
+//very identical to the getindex231 function, just replacing getindex2N with getindexN
+int getindex31(CardMask flop, CardMask turn)
+{
+	if(CardMask_ANY_SET(flop, turn))
+		REPORT("duplicate cards found in getindex31");
+
+	//need to get an ordering of the 4 suits that does not change with suit rotation (and the index)
+
+	CardMask board;
+	CardMask_OR(board, flop, turn);
+	int suits[4];
+	int index4 = getindexN(board, 4, suits);
+
+	//we just need to find the location of the turn card among the 4 total cards
+	//the ordering doesn't matter, but it NEEDS to be such that a rotation of the suits won't change
+	//the index.
+
+	int num_passed = 0;
+	for(int i=3; i>=0; i--) //faster since most cards sorted to end
+		for(int r=0; r<13; r++)
+			if(CardMask_CARD_IS_SET(flop, StdDeck_MAKE_CARD(r, suits[i])))
+				num_passed++;
+			else if(CardMask_CARD_IS_SET(turn, StdDeck_MAKE_CARD(r, suits[i])))
+				goto foundit; //need to break out of double loop
+foundit:
+
+	//now num_passed is the 0-3 location of the turn card, in some arbitrary ordering defined by PokerEval
+
+	if(num_passed < 0 || num_passed > 3)
+		REPORT("getindex31 failed!");
+
+	//we just need to combine that with the 24 index, and we're good.
+
+	return combine(index4, num_passed, 4);
 }
 
 int64 getindex2311(CardMask pflop, CardMask flop, CardMask turn, CardMask river)
@@ -459,6 +603,48 @@ int64 getindex2311(CardMask pflop, CardMask flop, CardMask turn, CardMask river)
 	//we just need to combine that with the 25 index, and we're good.
 
 	return combine(index25, turn_location, 5, river_location, 4);
+}
+
+//very identical to the getindex231 function, just replacing getindex2N with getindexN
+int getindex311(CardMask flop, CardMask turn, CardMask river)
+{
+	//need to get an ordering of the 4 suits that does not change with suit rotation (and the index)
+
+	if(CardMask_ANY_SET(flop, turn) || CardMask_ANY_SET(flop, river) || CardMask_ANY_SET(river, turn))
+		REPORT("duplicate cards found in getindex231");
+	CardMask board;
+	CardMask_OR(board, flop, turn);
+	CardMask_OR(board, board, river);
+	int suits[4];
+	int index5 = getindexN(board, 5, suits);
+
+	//i give you 5 (arbitrarily) ordered cards (from the number returned by getindex2N with N=5)
+	//i need to know, which 1 of the 5 is the turn, and which 1 of the remaining 4 is the river
+	//so i find the number of cards to the left of the turn-card, which will be 0,1,2,3,or 4, 
+	//and i find the number of cards --besides the turn-card-- to the left of the river,
+	//which will be 0,1,2,or 3.
+
+	int num_passed = 0, turn_location = -1, river_location = -1;
+
+	for(int i=0; i<4 && (turn_location<0 || river_location<0); i++)
+		for(int r=StdDeck_Rank_FIRST; r<=StdDeck_Rank_LAST && (turn_location<0 || river_location<0); r++)
+
+			if(CardMask_CARD_IS_SET(river, StdDeck_MAKE_CARD(r, suits[i])))
+				river_location = num_passed++; //count river for turn count (and not river count -- post inc)
+			else if(CardMask_CARD_IS_SET(turn, StdDeck_MAKE_CARD(r, suits[i])))
+				turn_location = num_passed; //do not count turn card for either count
+			else if(CardMask_CARD_IS_SET(flop, StdDeck_MAKE_CARD(r, suits[i])))
+				num_passed++;
+
+	if(num_passed < 1 || num_passed > 5 || 
+			turn_location < 0 || turn_location > 4 || 
+			river_location < 0 || river_location > 3)
+		REPORT("getindex311 failed! num_passed="+tostring(num_passed)
+			+", turn_loc="+tostring(turn_location)+", river_loc="+tostring(river_location));
+
+	//we just need to combine that with the 25 index, and we're good.
+
+	return combine(index5, turn_location, 5, river_location, 4);
 }
 
 int getindex2(const CardMask& mine)

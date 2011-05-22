@@ -19,6 +19,10 @@ struct cardsettings_t
 	int64 filesize[4];
 	bool usehistory;
 	bool useflopalyzer;
+	bool useboardbins;
+	int board_bin_max[4];
+	string boardbinsfilename[4];
+	int64 boardbinsfilesize[4];
 };
 
 class CardMachine
@@ -33,10 +37,10 @@ public:
 	inline MTRand::uint32 getrandseed( ) const { return m_randseed; }
 
 	void getnewgame(int cardsi[4][2], int &twoprob0wins);
-	int getindices(int gr, const vector<CardMask> &cards, vector<int> &handi, int &boardi); //returns cardsi
+	int getindices(int gr, const vector<CardMask> &cards, vector<int> &handi, vector<int> &boardi); //returns cardsi
 	inline int getcardsi(int gr, const vector<CardMask> &cards)
-		{ vector<int> dummy1; int dummy2; return getindices(gr, cards, dummy1, dummy2); }
-	void findexamplehand(int gr, const vector<int> &handi, int boardi, vector<CardMask> &cards);
+		{ vector<int> dummy1; vector<int> dummy2; return getindices(gr, cards, dummy1, dummy2); }
+	void findexamplehand(int gr, const vector<int> &handi, vector<int> &boardi, vector<CardMask> &cards);
 	int preflophandinfo(int index, string &handstring); //index is getindex2() index, return cardsi
 
 
@@ -46,7 +50,8 @@ public:
 
 	static cardsettings_t makecardsettings( 
 			string pfbin, string fbin, string tbin, string rbin,
-			bool usehistory, bool useflopalyzer );
+			int boardfbin, int boardtbin, int boardrbin,
+			bool usehistory, bool useflopalyzer, bool useboardbins );
 
 private:
 	//we do not support copying.
@@ -63,6 +68,7 @@ private:
 	vector<int> cardsi_max; //constant too
 	static const int FLOPALYZER_MAX[4]; //must be initialized in the cpp file, as it is an array (not integral data member)
 	vector<PackedBinFile *> binfiles;
+	vector<PackedBinFile *> boardbinfiles;
 	bool solving; //is CardMachine being used by Solver or by BotAPI?
 	MTRand::uint32 m_randseed;
 	MTRand randforsolver;

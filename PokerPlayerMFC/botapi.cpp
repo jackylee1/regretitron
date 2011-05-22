@@ -992,22 +992,22 @@ void BotAPI::populatewindow(CWnd* parentwin)
 	//get bin number(s) & board score
 
 	vector<int> handi; 
-	int boardi;
+	vector<int> boardi;
 	currstrat->getcardmach().getindices(currentgr, cards, handi, boardi);
 
 	//set bin number
 
 	if(currstrat->getcardmach().getparams().usehistory)
 	{
-		text.Format("%d", handi[PREFLOP]+1);
-		for(int i=FLOP; i<=currentgr; i++)
+		text.Format("%d", handi[0]+1);
+		for(unsigned i=1; i<handi.size( ); i++)
 			text.AppendFormat(" - %d", handi[i]+1);
 	}
 	else
 		if(currentgr==PREFLOP)
 			text = TEXT("(index)");
 		else
-			text.Format("%d", handi[currentgr]+1);
+			text.Format("%d", handi[0]+1);
 	MyWindow->BinNumber.SetWindowText(text);
 
 	//set bin max
@@ -1030,13 +1030,14 @@ void BotAPI::populatewindow(CWnd* parentwin)
 
 	//set board score
 
-	if(currstrat->getcardmach().getparams().useflopalyzer)
-		if(currentgr==PREFLOP)
-			text = TEXT("-");
-		else
-			text.Format("%d", boardi);
+	if( boardi.empty( ) )
+		text = TEXT("--");
 	else
-		text = TEXT("(N/A)");
+	{
+		text.Format("%d", boardi[0]+1);
+		for(unsigned i=1; i<boardi.size( ); i++)
+			text.AppendFormat(" - %d", boardi[i]+1);
+	}
 	MyWindow->BoardScore.SetWindowText(text);
 
 	//send cards and our strategy to MyWindow, so that it can draw the cards as it needs

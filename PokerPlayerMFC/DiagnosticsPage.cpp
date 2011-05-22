@@ -196,7 +196,7 @@ void DiagnosticsPage::RefreshCards(bool newcards)
 	//get indices from strategy
 
 	vector<int> handi;
-	int boardi;
+	vector<int> boardi;
 	mycurrstrat->getcardmach().getindices(mygr, mycards, handi, boardi);
 
 	//set my cards to the first row
