@@ -9,7 +9,8 @@ public:
 	enum FormatEnum
 	{
 		FORMAT_NONE,
-		FORMAT_FULLTILT
+		FORMAT_FULLTILT,
+		FORMAT_MERGE
 	};
 
 	ReconcilerHelper( ) { }
