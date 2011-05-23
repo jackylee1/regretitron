@@ -143,7 +143,7 @@ Strategy::Strategy(string xmlfilename, bool preload, LoggerClass & strategylogge
 			if(thisoffset != nextoffset)
 				REPORT("redundant offset storage has revealed errors in strategy file");
 			dataoffset[gr][n-2] = thisoffset;
-			nextoffset = thisoffset + get_property(gettree(), maxorderindex_tag())[gr][n] * cardmach->getcardsimax(gr) * (n+1);
+			nextoffset = thisoffset + get_property(gettree(), maxorderindex_tag())[gr][n] * static_cast< int64 >( cardmach->getcardsimax(gr) ) * static_cast< int64 >(n+1);
 		}
 	}
 	if(dataoffset[0][7] != strategyfile.Tell() || strategyfilesize != nextoffset)

@@ -47,29 +47,31 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uin
 		//if there are board bins, proeed to open them
 
 		if( myparams.useboardbins )
-		if((myparams.boardbinsfilename[gr].length() != 0 && myparams.boardbinsfilesize[gr] == 0) 
-			|| (myparams.boardbinsfilename[gr].length() == 0 && myparams.boardbinsfilesize[gr] != 0))
-			REPORT("you have a board bin file but it's size is set to zero");
-		if( myparams.boardbinsfilesize[gr] != 0 )
 		{
-			if(solving) //don't print unless guaranteed have console (i.e. solving)
-				cout << "loading " << myparams.boardbinsfilename[gr] << " into memory..." << endl;
+			if((myparams.boardbinsfilename[gr].length() != 0 && myparams.boardbinsfilesize[gr] == 0) 
+					|| (myparams.boardbinsfilename[gr].length() == 0 && myparams.boardbinsfilesize[gr] != 0))
+				REPORT("you have a board bin file but it's size is set to zero");
+			if( myparams.boardbinsfilesize[gr] != 0 )
+			{
+				if(solving) //don't print unless guaranteed have console (i.e. solving)
+					cout << "loading " << myparams.boardbinsfilename[gr] << " into memory..." << endl;
 
-			//so ugly to do this in the loop...
-			int64 index_max = 0;
-			if(gr==PREFLOP)
-				REPORT( "loading board bins on preflop..." );
-			else if(gr==FLOP)
-				index_max = INDEX3_MAX;
-			else if(gr==TURN)
-				index_max = INDEX31_MAX;
-			else
-				index_max = INDEX311_MAX;
+				//so ugly to do this in the loop...
+				int64 index_max = 0;
+				if(gr==PREFLOP)
+					REPORT( "loading board bins on preflop..." );
+				else if(gr==FLOP)
+					index_max = INDEX3_MAX;
+				else if(gr==TURN)
+					index_max = INDEX31_MAX;
+				else
+					index_max = INDEX311_MAX;
 
-			//if solving or under 5 megs, preload the file
-			boardbinfiles[gr] = new PackedBinFile(myparams.boardbinsfilename[gr], myparams.boardbinsfilesize[gr], 
-				myparams.board_bin_max[gr], index_max,
-				(solving || (myparams.boardbinsfilesize[gr] != -1 && myparams.boardbinsfilesize[gr] < 5 * 1024 * 1024)));
+				//if solving or under 5 megs, preload the file
+				boardbinfiles[gr] = new PackedBinFile(myparams.boardbinsfilename[gr], myparams.boardbinsfilesize[gr], 
+						myparams.board_bin_max[gr], index_max,
+						(solving || (myparams.boardbinsfilesize[gr] != -1 && myparams.boardbinsfilesize[gr] < 5 * 1024 * 1024)));
+			}
 		}
 
 		//if there IS a file.. open them

@@ -132,10 +132,10 @@ int main(int argc, char* argv[])
 			  "number of river bins" )
 			( "useflopalyzer", po::value< bool >( )->default_value( false )->required( ),
 			  "use the cardmachine's flopalyzer or not" )
-			( "usehistory", po::value< bool >( )->required( ),
-			  "use the private information bins historically or not" )
-			( "useboardbins", po::value< bool >( )->required( ),
-			  "use extra files for the board bins or not " )
+			( "usehistory", po::value< bool >( ),
+			  "use the private information bins historically or not (defaults to !useboardbins)" )
+			( "useboardbins", po::value< bool >( )->default_value( false )->required( ),
+			  "use extra files for the board bins or not" )
 			( "fboard", po::value< int >( ),
 			  "number of flop board bins to use (required when useboardbins=true)" )
 			( "tboard", po::value< int >( ),
@@ -226,12 +226,17 @@ int main(int argc, char* argv[])
 					varmap[ "tbin" ].as< string >( ),
 					varmap[ "rbin" ].as< string >( ),
 					varmap[ "useboardbins" ].as< bool >( ) 
-								? varmap[ "fboard" ].as< int >( ) : 0,
+								? varmap[ "fboard" ].as< int >( ) 
+								: 0,
 					varmap[ "useboardbins" ].as< bool >( ) 
-								? varmap[ "tboard" ].as< int >( ) : 0,
+								? varmap[ "tboard" ].as< int >( ) 
+								: 0,
 					varmap[ "useboardbins" ].as< bool >( ) 
-								? varmap[ "rboard" ].as< int >( ) : 0,
-					varmap[ "usehistory" ].as< bool >( ),
+								? varmap[ "rboard" ].as< int >( ) 
+								: 0,
+					varmap.count( "usehistory" )
+								?  varmap[ "usehistory" ].as< bool >( ) 
+								: ! varmap[ "useboardbins" ].as< bool >( ),
 					varmap[ "useflopalyzer" ].as< bool >( ),
 					varmap[ "useboardbins" ].as< bool >( ) );
 			cout << setw( 30 ) << right << "Preflop bins:  " << cardsettings.bin_max[ 0 ] << " (" << cardsettings.filename[ 0 ] << ")" << endl;
