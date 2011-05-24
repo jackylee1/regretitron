@@ -113,6 +113,11 @@ int main(int argc, char* argv[])
 			( "nlook", po::value< unsigned >( & nlook )->required( )->default_value( 1 ),
 			  "amount to consider ahead for out of order solving when running "
 			  "with more than one thread (may reduce contention)" )
+#else
+			( "nthread", po::value< unsigned >( & nthreads )->required( )->default_value( 1 ),
+			  "this build not compiled with theading support, ignored" )
+			( "nlook", po::value< unsigned >( & nlook )->required( )->default_value( 1 ),
+			  "used with threading, this build not compiled with theading support, ignored" )
 #endif
 
 			( "sblind", po::value< int >( )->required( ),
@@ -202,9 +207,11 @@ int main(int argc, char* argv[])
 				randseed = MTRand::gettimeclockseed( );
 
 #ifdef DO_THREADS
-			cout << setw( 30 ) << right << "Threads:  " << nthreads << 
-				" (nlook = " << nlook << ")" << endl;
+			cout << setw( 30 ) << right << "Threads:  " 
+				<< nthreads << " (nlook = " << nlook << ")" << endl;
 #else
+			cout << setw( 30 ) << right << "Threads:  " 
+				<< "This build not compiled with threading support, using single thread." << endl;
 			nthreads = 1;
 			nlook = 1;
 #endif
