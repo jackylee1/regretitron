@@ -372,7 +372,7 @@ inline bool Solver::getreadydata(list<iteration_data_t>::iterator & newdata)
 	{
 		if(!dataguardpflopp0[newdata->cardsi[PREFLOP][P0]] && !dataguardpflopp1[newdata->cardsi[PREFLOP][P1]]
 		&& !dataguardriver[newdata->cardsi[RIVER][P0]] && !dataguardriver[newdata->cardsi[RIVER][P1]]
-#if PERFECT_RECALL
+#if IMPERFECT_RECALL
 		&& !dataguardflopp0[newdata->cardsi[FLOP][P0]] && !dataguardflopp1[newdata->cardsi[FLOP][P1]]
 		&& !dataguardturnp0[newdata->cardsi[TURN][P0]] && !dataguardturnp1[newdata->cardsi[TURN][P1]]
 #endif
@@ -382,7 +382,7 @@ inline bool Solver::getreadydata(list<iteration_data_t>::iterator & newdata)
 			{
 				if(newdata->cardsi[PREFLOP][P0] == to_be_skipped->cardsi[PREFLOP][P0] 
 				|| newdata->cardsi[PREFLOP][P1] == to_be_skipped->cardsi[PREFLOP][P1]
-#if PERFECT_RECALL
+#if IMPERFECT_RECALL
 				|| newdata->cardsi[FLOP][P0] == to_be_skipped->cardsi[FLOP][P0]
 				|| newdata->cardsi[FLOP][P1] == to_be_skipped->cardsi[FLOP][P1]
 				|| newdata->cardsi[TURN][P0] == to_be_skipped->cardsi[TURN][P0]
