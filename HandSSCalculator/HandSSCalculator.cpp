@@ -4,6 +4,7 @@
 #include "../PokerLibrary/binstorage.h" //my standard routines to pack and un-pack data.
 #include "../MersenneTwister.h"
 #include <string>
+#include <list>
 #include <iomanip>
 #include "../utility.h"
 #include "../PokerLibrary/floaterfile.h"
@@ -479,6 +480,7 @@ inline void binandstore(vector<RawHand> &hand_list, PackedBinFile &binfile, int 
 
 	static vector<CompressedHand> hand_list_compressed(0); //massive hack so we don't reallocate all the time
 	if((int64)hand_list_compressed.size() < total_hands/8) hand_list_compressed.resize(total_hands/7);
+	if( total_hands < 5000 ) hand_list_compressed.resize( 5000 );
 	int64 compressed_size = compressbins(hand_list, hand_list_compressed, total_hands, bunchsimilarhands);
 	if(compressed_size > (int64)hand_list_compressed.size())
 		REPORT("overflowed hand_list_compressed - "+tostring(total_hands)+" "+tostring(compressed_size));
@@ -582,42 +584,799 @@ void calculatebins(const int numboardcards, const int n_bins, const FloaterFile 
 }
 
 
+//------------ B o a r d   C l u s t e r i n g -------------
+
+const int CHARCOUNT = 12;
+struct BoardStruct
+{
+	BoardStruct( int64 myindex ) 
+		: index( myindex )
+		, cluster( -1 )
+	{
+		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i ++ )
+			characteristic[ i ] = 0; 
+	}
+	int64 index;
+	int characteristic[ CHARCOUNT * CHARCOUNT ];
+	int cluster;
+};
+typedef std::list< BoardStruct > BoardList;
+
+struct TempSorter
+{
+	bool operator( )( const BoardStruct & a, const BoardStruct & b )
+	{
+		return a.index < b.index;
+	}
+};
+
+void clusterandstore( BoardList & boards, int n_clusters, PackedBinFile & output, 
+		const string & name )
+{
+	int count = 0;
+	boards.sort( TempSorter( ) );
+	const int stride = ( boards.size( ) + n_clusters - 1 ) / n_clusters;
+	for( BoardList::iterator i = boards.begin( ); i != boards.end( ); i++ )
+	{
+		i->cluster = ( ( count++ / stride ) % n_clusters ); //TODO perform k-means here
+		output.store( i->index, i->cluster );
+	}
+
+	vector< int > clustersize( n_clusters, 0 );
+	for( BoardList::iterator i = boards.begin( ); i != boards.end( ); i++ )
+	{
+		clustersize[ i->cluster ]++;
+	}
+
+	cerr << endl;
+   	cerr << "For " << name << " clusters:" << endl;
+	cerr << "Cluster number: size of cluster" << endl;
+	for( int i = 0; i < n_clusters; i++ )
+	{
+		cerr << i << ": " << clustersize[ i ] << endl;
+	}
+}
+
+void saveboardflopclusters( int n_new )
+{
+	cout << "generating b" << n_new << " flop clusters..." << endl;
+
+	//the final list of boards we are trying to construct
+	BoardList boards;
+
+	//the bin file that will receive the output
+	PackedBinFile output(n_new, INDEX3_MAX);
+
+	//the bin information used to characterize the boards
+	const PackedBinFile prebins(
+			BINSFOLDER + "preflop" + tostr( CHARCOUNT ), 
+			-1, CHARCOUNT, INDEX2_MAX, true );
+	const PackedBinFile postbins(
+			BINSFOLDER + "flop" + tostr( CHARCOUNT ) + '-' + tostr( CHARCOUNT ), 
+			-1, CHARCOUNT, INDEX23_MAX, true);
+
+	//enumerate through all flops
+	int x = 0;
+	CardMask cards_flop;
+	ENUMERATE_3_CARDS(cards_flop,
+	{
+		if(x++ % (277) == 0) cout << '.' << flush;
+
+		//create a new BoardStruct with its index
+		const int64 index = getindex3( cards_flop );
+		boards.push_back( BoardStruct( index ) );
+		BoardStruct & newboard = boards.back( );
+
+		//characterize it:
+		//for each private hand
+		CardMask cards_hole;
+		ENUMERATE_2_CARDS_D( cards_hole, cards_flop,
+		{
+			//lookup that hand's preflop 10-bin and flop 10-bin
+			const int pre = prebins.retrieve( getindex2( cards_hole ) );
+			const int post = postbins.retrieve( getindex23( cards_hole, cards_flop ) );
+
+			//increment that element of the array
+			newboard.characteristic[ combine( pre, post, CHARCOUNT ) ]++;
+		});
+	});
+	cout << endl;
+
+	//pass the whole thing to clustering and storing to output
+	clusterandstore( boards, n_new, output, "flopb" + tostr( n_new ) );
+
+	//save the file
+	cout << output.save( BINSFOLDER + "flopb" + tostr( n_new ) );
+}
+
+void saveboardturnclusters( const int n_flop, const int n_new )
+{
+	cout << "generating b" << n_flop << " - b" << n_new << " turn clusters..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_new, INDEX31_MAX );
+
+	//the bin information that will have the history
+	const PackedBinFile flopclusters(
+			BINSFOLDER + "flopb" + tostr( n_flop ),
+			-1, n_flop, INDEX3_MAX, true );
+
+	//the bin information used to characterize the boards
+	const PackedBinFile prebins(
+			BINSFOLDER + "flop" + tostr( CHARCOUNT ) + '-' + tostr( CHARCOUNT ), 
+			-1, CHARCOUNT, INDEX23_MAX, true );
+	const PackedBinFile postbins(
+			BINSFOLDER + "turn" + tostr( CHARCOUNT ) + '-' + tostr( CHARCOUNT ) + '-' + tostr( CHARCOUNT ), 
+			-1, CHARCOUNT, INDEX231_MAX, true);
+
+	//for each flop cluster
+	int x = 0;
+	for( int myflopcluster = 0; myflopcluster < n_flop; myflopcluster++ )
+	{
+		//the final list of boards we are trying to construct
+		BoardList boards;
+
+		//enumerate through all flops, 
+		CardMask cards_flop;
+		ENUMERATE_3_CARDS(cards_flop,
+		{
+			if(x++ % (277 * n_flop) == 0) cout << '.' << flush;
+
+			// reject the ones not in the current flop cluster of interest
+			if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
+				continue;
+
+			//enumerate through all turns
+			CardMask card_turn;
+			ENUMERATE_1_CARDS_D(card_turn, cards_flop,
+			{
+				//create a new BoardStruct with its index
+				const int64 index = getindex31( cards_flop, card_turn );
+				boards.push_back( BoardStruct( index ) );
+				BoardStruct & newboard = boards.back( );
+
+				//characterize it:
+				//for each private hand
+				CardMask cards_hole;
+				CardMask cards_used;
+				CardMask_OR( cards_used, cards_flop, card_turn );
+				ENUMERATE_2_CARDS_D( cards_hole, cards_used,
+				{
+					//lookup that hand's preflop 10-bin and flop 10-bin
+					const int pre = prebins.retrieve( getindex23( cards_hole, cards_flop ) );
+					const int post = postbins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
+
+					//increment that element of the array
+					newboard.characteristic[ combine( pre, post, CHARCOUNT ) ]++;
+				});
+			});
+		});
+
+		//pass the whole thing to clustering and storing to output
+		clusterandstore( boards, n_new, output, "turnb" + tostr( n_flop ) + "-b" + tostr( n_new ) + " (doing " + tostr( myflopcluster ) + ")" );
+	}
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "turnb" + tostr( n_flop ) + "-b" + tostr( n_new ) );
+}
+
+void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new )
+{
+	cout << "generating b" << n_flop << " - b" << n_turn << " - b" << n_new << " river clusters..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_new, INDEX311_MAX );
+
+	//the bin information that will have the history
+	const PackedBinFile flopclusters(
+			BINSFOLDER + "flopb" + tostr( n_flop ),
+			-1, n_flop, INDEX3_MAX, true );
+
+	const PackedBinFile turnclusters(
+			BINSFOLDER + "turnb" + tostr( n_flop ) + "-b" + tostr( n_turn ),
+			-1, n_turn, INDEX31_MAX, true );
+
+	//the bin information used to characterize the boards
+	const PackedBinFile prebins(
+			BINSFOLDER + "turn" + tostr( CHARCOUNT ) + '-' + tostr( CHARCOUNT ) + '-' + tostr( CHARCOUNT ), 
+			-1, CHARCOUNT, INDEX231_MAX, true );
+	const PackedBinFile postbins(
+			BINSFOLDER + "river" + tostr( CHARCOUNT ) + '-' + tostr( CHARCOUNT ) + '-' + tostr( CHARCOUNT ) + '-' + tostr( CHARCOUNT ), 
+			-1, CHARCOUNT, INDEX2311_MAX, true);
+
+	//for each flop + turn cluster
+	int x = 0;
+	for( int myflopcluster = 0; myflopcluster < n_flop; myflopcluster++ )
+	{
+		for( int myturncluster = 0; myturncluster < n_turn; myturncluster++ )
+		{
+			//the final list of boards we are trying to construct
+			BoardList boards;
+
+			//enumerate through all flops, 
+			CardMask cards_flop;
+			ENUMERATE_3_CARDS(cards_flop,
+			{
+
+				if(x++ % (277 * n_flop * n_turn) == 0) cout << '.' << flush;
+
+				// reject the ones not in the current flop cluster of interest
+				if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
+					continue;
+
+				//enumerate through all turns
+				CardMask card_turn;
+				ENUMERATE_1_CARDS_D(card_turn, cards_flop,
+				{
+					// reject the ones not in the current turn cluster of interest
+					if( turnclusters.retrieve( getindex31( cards_flop, card_turn ) ) != myturncluster )
+						continue;
+
+					//enumerate through all rivers
+					CardMask card_river;
+					CardMask cards_used;
+					CardMask_OR( cards_used, cards_flop, card_turn );
+					ENUMERATE_1_CARDS_D(card_river, cards_used,
+					{
+
+						//create a new BoardStruct with its index
+						const int64 index = getindex311( cards_flop, card_turn, card_river );
+						boards.push_back( BoardStruct( index ) );
+						BoardStruct & newboard = boards.back( );
+
+						//characterize it:
+						//for each private hand
+						CardMask cards_hole;
+						CardMask cards_used2;
+						CardMask_OR( cards_used2, cards_used, card_river );
+						ENUMERATE_2_CARDS_D( cards_hole, cards_used2,
+						{
+							//lookup that hand's preflop 10-bin and flop 10-bin
+							const int pre = prebins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
+							const int post = postbins.retrieve( getindex2311( cards_hole, cards_flop, card_turn, card_river ) );
+
+							//increment that element of the array
+							newboard.characteristic[ combine( pre, post, CHARCOUNT ) ]++;
+						});
+					});
+				});
+			});
+
+			//pass the whole thing to clustering and storing to output
+			clusterandstore( boards, n_new, output, "riverb" + tostr( n_flop ) + "-b" + tostr( n_turn ) + "-b" + tostr( n_new ) + " (doing " + tostr( myflopcluster) + ", " + tostr( myturncluster ) + ")" );
+		}
+	}
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "riverb" + tostr( n_flop ) + "-b" + tostr( n_turn ) + "-b" + tostr( n_new ) );
+}
+
 //---------------- B i n   S t o r i n g ------------------
 
-//This is an end result function that could be called by main(). 
-//it depends on the file bins/flopHSS, as used by readflopHSS().
-void saveflopBINS(int n_bins)
+
+/*
+  for(fcl)
+	foreach(flop)
+	  if(!fcl) continue
+	  foreach(priv)
+	    takenote
+	binandstore
+*/
+void saveflopbins( int n_flopclusters, int n_flopnew )
 {
-	cout << "generating " << n_bins << " flop bins... (no status bar)" << endl;
-	PackedBinFile packedbins(n_bins, INDEX23_MAX);
-	const FloaterFile hss("flopHSS", INDEX23_MAX);
-	calculatebins(3, n_bins, hss, packedbins);
-	cout << packedbins.save(BINSFOLDER+"flop"+tostring(n_bins));
+	cout << "generating b" << n_flopclusters << " - " << n_flopnew << " flop bins..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_flopnew, INDEX23_MAX );
+
+	//the strength by which we will be binning the hands
+	const FloaterFile flophss( "flopHSS", INDEX23_MAX );
+
+	//the bin information that will have the history
+	const PackedBinFile flopclusters(
+			BINSFOLDER + "flopb" + tostr( n_flopclusters ),
+			-1, n_flopclusters, INDEX3_MAX, true );
+
+	//for each flop cluster
+	int x = 0;
+	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
+	{
+		//the final list of boards we are trying to construct
+		vector< RawHand > hands;
+
+		//enumerate through all flops, 
+		CardMask cards_flop;
+		ENUMERATE_3_CARDS(cards_flop,
+		{
+
+			if(x++ % (277 * n_flopclusters) == 0) cout << '.' << flush;
+
+			// reject the ones not in the current flop cluster of interest
+			if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
+				continue;
+
+			//enumerate through all private cards
+			CardMask cards_hole;
+			ENUMERATE_2_CARDS_D(cards_hole, cards_flop,
+			{
+				//create a new RawHand with its index
+				const int64 index = getindex23( cards_hole, cards_flop );
+				hands.push_back( RawHand( index, flophss[ index ] ) );
+			});
+		});
+
+		//pass the whole thing to my binandstore routine
+		binandstore( hands, output, n_flopnew, hands.size( ) );
+	}
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "flopb" + tostr( n_flopclusters ) + "-" + tostr( n_flopnew ) );
 }
 
-
-//This is an end result function that could be called by main(). 
-//it depends on the file bins/turnHSS, as used by readturnHSS().
-void saveturnBINS(int n_bins)
+/*
+  for(fcl)
+    for(tcl)
+	  foreach(flop)
+		if(!fcl) continue
+		foreach(turn)
+		  if(!tcl) continue
+			foreach(priv)
+	          takenote
+	  binandstore
+*/
+void saveturnbins( const int n_flopclusters, const int n_turnclusters, const int n_turnnew )
 {
-	cout << "generating " << n_bins << " turn bins... (no status bar)" << endl;
-	PackedBinFile packedbins(n_bins, INDEX24_MAX);
-	const FloaterFile hss("turnHSS", INDEX24_MAX);
-	calculatebins(4, n_bins, hss, packedbins);
-	cout << packedbins.save(BINSFOLDER+"turn"+tostring(n_bins));
+	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - " << n_turnnew << " turn bins..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_turnnew, INDEX231_MAX );
+
+	//the data used to bin the hands
+	const FloaterFile turnhss( "turnHSS", INDEX24_MAX );
+
+	//the bin information that will have the history
+	const PackedBinFile flopclusters(
+			BINSFOLDER + "flopb" + tostr( n_flopclusters ),
+			-1, n_flopclusters, INDEX3_MAX, true );
+
+	const PackedBinFile turnclusters(
+			BINSFOLDER + "turnb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ),
+			-1, n_turnclusters, INDEX31_MAX, true );
+
+	//for each flop + turn cluster
+	int x = 0;
+	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
+	{
+		for( int myturncluster = 0; myturncluster < n_turnclusters; myturncluster++ )
+		{
+			//the final list of boards we are trying to construct
+			vector< RawHand > hands;
+
+			//enumerate through all flops, 
+			CardMask cards_flop;
+			ENUMERATE_3_CARDS(cards_flop,
+			{
+
+				if(x++ % (277 * n_flopclusters * n_turnclusters) == 0) cout << '.' << flush;
+
+				// reject the ones not in the current flop cluster of interest
+				if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
+					continue;
+
+				//enumerate through all turns
+				CardMask card_turn;
+				ENUMERATE_1_CARDS_D(card_turn, cards_flop,
+				{
+					// reject the ones not in the current turn cluster of interest
+					if( turnclusters.retrieve( getindex31( cards_flop, card_turn ) ) != myturncluster )
+						continue;
+
+					//enumerate through all hole cards
+					CardMask cards_hole;
+					CardMask cards_used;
+					CardMask_OR( cards_used, cards_flop, card_turn );
+					ENUMERATE_2_CARDS_D(cards_hole, cards_used,
+					{
+
+						//create a new RawHand with its index
+						const int64 index231 = getindex231( cards_hole, cards_flop, card_turn );
+						CardMask cards_board;
+						CardMask_OR( cards_board, cards_flop, card_turn );
+						const int64 index24 = getindex2N( cards_hole, cards_board, 4 );
+						hands.push_back( RawHand( index231, turnhss[ index24 ] ) );
+
+					});
+				});
+			});
+
+			//pass the whole thing to my binandstore routine
+			binandstore( hands, output, n_turnnew, hands.size( ) );
+		}
+	}
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "turnb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-" + tostr( n_turnnew ) );
 }
 
+/*
+flopnest
 
-//This is an end result function that could be called by main(). 
-//it depends on the file bins/riverEV, as used by readriverEV().
-void saveriverBINS(int n_bins)
+  for(fcl)
+	for(privbin)
+	  foreach(flop)
+	    if(!fcl) continue
+	    foreach(priv)
+	      if(!privbin) continue
+	      takenote
+	  binandstore
+*/
+void nestflopbins( const int n_flopclusters, const int n_flopbins, const int n_flopnew )
 {
-	cout << "generating " << n_bins << " river bins... (no status bar)" << endl;
-	PackedBinFile packedbins(n_bins, INDEX25_MAX);
-	const FloaterFile ev("riverEV", INDEX25_MAX);
-	calculatebins(5, n_bins, ev, packedbins);
-	cout << packedbins.save(BINSFOLDER+"river"+tostring(n_bins));
+	cout << "generating b" << n_flopclusters << " - " << n_flopbins << "x" << n_flopnew << " nested flop bins..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_flopbins * n_flopnew, INDEX23_MAX );
+
+	//the data used to bin the hands
+	const FloaterFile flopev( "flopEV", INDEX23_MAX );
+
+	//the bin information that will have the history
+	const PackedBinFile flopclusters(
+			BINSFOLDER + "flopb" + tostr( n_flopclusters ),
+			-1, n_flopclusters, INDEX3_MAX, true );
+
+	const PackedBinFile flopbins(
+			BINSFOLDER + "flopb" + tostr( n_flopclusters ) + "-" + tostr( n_flopbins ),
+			-1, n_flopbins, INDEX23_MAX, true );
+
+	//for each flop cluster + flop bin
+	int x = 0;
+	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
+	{
+		for( int myflopbin = 0; myflopbin < n_flopbins; myflopbin++ )
+		{
+			//the final list of boards we are trying to construct
+			vector< RawHand > hands;
+
+			//enumerate through all flops, 
+			CardMask cards_flop;
+			ENUMERATE_3_CARDS(cards_flop,
+			{
+
+				if(x++ % (277 * n_flopclusters * n_flopbins) == 0) cout << '.' << flush;
+
+				// reject the ones not in the current flop cluster of interest
+				if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
+					continue;
+
+				//enumerate through all hole cards
+				CardMask cards_hole;
+				ENUMERATE_2_CARDS_D(cards_hole, cards_flop,
+				{
+					// reject the ones not in the current flop bin of interest
+					if( flopbins.retrieve( getindex23( cards_hole, cards_flop ) ) != myflopbin )
+						continue;
+
+					//create a new RawHand with its index
+					const int64 index = getindex23( cards_hole, cards_flop );
+					hands.push_back( RawHand( index, flopev[ index ] ) );
+
+				});
+			});
+
+			//pass the whole thing to my binandstore routine
+			binandstore( hands, output, n_flopnew, hands.size( ) );
+
+			//I don't know which ones I just stored. A super hack is to only 
+			// re-set the ones that have been stored exactly once.
+			for( int64 i = 0; i < INDEX23_MAX; i++ )
+				if( output.isstored( i ) == 1 )
+					output.store( i, combine( myflopbin, output.retrieve( i ), n_flopnew ) );
+		}
+	}
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "flopb" + tostr( n_flopclusters ) + "-" + tostr( n_flopbins ) + "x" + tostr( n_flopnew ) );
 }
+
+/*
+  for(fcl)
+    for(tcl)
+	  for(rcl)
+	    foreach(flop)
+		  if(!fcl) continue
+		  foreach(turn)
+		    if(!tcl) continue
+		    foreach(river)
+		      if(!rcl) continue
+			  foreach(priv)
+	            takenote
+	    binandstore
+		*/
+void saveriverbins( const int n_flopclusters, const int n_turnclusters, const int n_riverclusters, const int n_rivernew )
+{
+// 1 = easy way, less memory, idea will be to choose divisions in riverEV numbers for river bin divisions, 
+//     possible since all hole cards are in computation, would like to prove is same as hard way.
+// 0 = hard way, tons memory, idea is to put ALL river hands that match board bins into a bid array and sort, definitely correct.
+#if 1
+
+	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - b" << n_riverclusters << " - " << n_rivernew << " river bins..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_rivernew, INDEX2311_MAX );
+
+	//the data used to bin the hands
+	const FloaterFile riverev( "riverEV", INDEX25_MAX );
+
+	//for each flop + turn + river cluster
+	vector< RawHand > hands;
+	int x = 0;
+
+	//enumerate through all flops, 
+	CardMask cards_flop;
+	ENUMERATE_3_CARDS(cards_flop,
+	{
+		if(x++ % (277) == 0) cout << '.' << flush;
+
+		//enumerate through all turns
+		CardMask card_turn;
+		ENUMERATE_1_CARDS_D(card_turn, cards_flop,
+		{
+			//enumerate through all rivers
+			CardMask card_river;
+			CardMask cards_used;
+			CardMask_OR( cards_used, cards_flop, card_turn );
+			ENUMERATE_1_CARDS_D(card_river, cards_used,
+			{
+				//the final list of boards we are trying to construct
+				hands.resize( 0 );
+				const int reservesize = ( 47 * 46 ) / 2;
+				hands.reserve( static_cast< uint64 >( reservesize ) );
+
+				//enumerate through all hole cards
+				CardMask cards_hole;
+				CardMask cards_used2;
+				CardMask_OR( cards_used2, cards_used, card_river );
+				ENUMERATE_2_CARDS_D(cards_hole, cards_used2,
+				{
+
+					//create a new RawHand with its index
+					const int64 index2311 = getindex2311( cards_hole, cards_flop, card_turn, card_river );
+					CardMask cards_board;
+					CardMask_OR( cards_board, cards_flop, card_turn );
+					CardMask_OR( cards_board, cards_board, card_river );
+					const int64 index25 = getindex2N( cards_hole, cards_board, 5 );
+					hands.push_back( RawHand( index2311, riverev[ index25 ] ) );
+
+				});
+				//pass the whole thing to my binandstore routine
+				binandstore( hands, output, n_rivernew, hands.size( ) );
+
+			});
+		});
+	});
+
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "riverb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-b" + tostr( n_riverclusters ) + "-" + tostr( n_rivernew ) );
+
+#else
+
+	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - b" << n_riverclusters << " - " << n_rivernew << " river bins..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_rivernew, INDEX2311_MAX );
+
+	//the data used to bin the hands
+	const FloaterFile riverev( "riverEV", INDEX25_MAX );
+
+	//the bin information that will have the history
+	const PackedBinFile flopclusters(
+			BINSFOLDER + "flopb" + tostr( n_flopclusters ),
+			-1, n_flopclusters, INDEX3_MAX, true );
+
+	const PackedBinFile turnclusters(
+			BINSFOLDER + "turnb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ),
+			-1, n_turnclusters, INDEX31_MAX, true );
+
+	const PackedBinFile riverclusters(
+			BINSFOLDER + "riverb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-b" + tostr( n_riverclusters ),
+			-1, n_riverclusters, INDEX311_MAX, true );
+
+	//for each flop + turn + river cluster
+	vector< RawHand > hands;
+	int x = 0;
+	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
+	{
+		for( int myturncluster = 0; myturncluster < n_turnclusters; myturncluster++ )
+		{
+			for( int myrivercluster = 0; myrivercluster < n_riverclusters; myrivercluster++ )
+			{
+				//the final list of boards we are trying to construct
+				hands.resize( 0 );
+				const double reservesize 
+					= ( 22100.0 / n_flopclusters ) // 52 c 3 == 22100
+					* ( 49.0 / n_turnclusters )
+					* ( 48.0 / n_riverclusters )
+					* 1081.0 // 47 c 2 == 1081
+					* hand_list_multiplier;
+				hands.reserve( static_cast< uint64 >( reservesize ) );
+
+				//enumerate through all flops, 
+				CardMask cards_flop;
+				ENUMERATE_3_CARDS(cards_flop,
+				{
+
+					if(x++ % (277 * n_flopclusters * n_turnclusters * n_riverclusters) == 0) cout << '.' << flush;
+
+					// reject the ones not in the current flop cluster of interest
+					if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
+						continue;
+
+					//enumerate through all turns
+					CardMask card_turn;
+					ENUMERATE_1_CARDS_D(card_turn, cards_flop,
+					{
+						// reject the ones not in the current turn cluster of interest
+						if( turnclusters.retrieve( getindex31( cards_flop, card_turn ) ) != myturncluster )
+							continue;
+
+						//enumerate through all rivers
+						CardMask card_river;
+						CardMask cards_used;
+						CardMask_OR( cards_used, cards_flop, card_turn );
+						ENUMERATE_1_CARDS_D(card_river, cards_used,
+						{
+							// reject the ones not in the current turn cluster of interest
+							if( riverclusters.retrieve( getindex311( cards_flop, card_turn, card_river ) ) != myrivercluster )
+								continue;
+
+							//enumerate through all hole cards
+							CardMask cards_hole;
+							CardMask cards_used2;
+							CardMask_OR( cards_used2, cards_used, card_river );
+							ENUMERATE_2_CARDS_D(cards_hole, cards_used2,
+							{
+
+								//create a new RawHand with its index
+								const int64 index2311 = getindex2311( cards_hole, cards_flop, card_turn, card_river );
+								CardMask cards_board;
+								CardMask_OR( cards_board, cards_flop, card_turn );
+								CardMask_OR( cards_board, cards_board, card_river );
+								const int64 index25 = getindex2N( cards_hole, cards_board, 5 );
+								hands.push_back( RawHand( index2311, riverev[ index25 ] ) );
+
+							});
+						});
+					});
+				});
+
+				//pass the whole thing to my binandstore routine
+				binandstore( hands, output, n_rivernew, hands.size( ) );
+			}
+		}
+	}
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "riverb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-b" + tostr( n_riverclusters ) + "-" + tostr( n_rivernew ) );
+
+#endif
+}	            
+
+/*
+
+turnnest
+
+  for(fcl)
+	for(tcl)
+	  for(privbin)
+	    foreach(flop)
+	      if(!fcl) continue
+		  foreach(turn)
+	        if(!tcl) continue
+	        foreach(priv)
+	          if(!privbin) continue
+	          takenote
+	    binandstore
+*/
+void nestturnbins( const int n_flopclusters, const int n_turnclusters, const int n_turnbins, const int n_turnnew )
+{
+	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - " << n_turnbins << "x" << n_turnnew << " nested turn bins..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_turnbins * n_turnnew, INDEX231_MAX );
+
+	//the data used to bin the hands
+	const FloaterFile turnev( "turnEV", INDEX24_MAX );
+
+	//the bin information that will have the history
+	const PackedBinFile flopclusters(
+			BINSFOLDER + "flopb" + tostr( n_flopclusters ),
+			-1, n_flopclusters, INDEX3_MAX, true );
+
+	const PackedBinFile turnclusters(
+			BINSFOLDER + "turnb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ),
+			-1, n_turnclusters, INDEX31_MAX, true );
+
+	const PackedBinFile turnbins(
+			BINSFOLDER + "turnb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-" + tostr( n_turnbins ),
+			-1, n_turnbins, INDEX231_MAX, true );
+
+	//for each flop + turn + river cluster
+	int x = 0;
+	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
+	{
+		for( int myturncluster = 0; myturncluster < n_turnclusters; myturncluster++ )
+		{
+			for( int myturnbin = 0; myturnbin < n_turnbins; myturnbin++ )
+			{
+				//the final list of boards we are trying to construct
+				vector< RawHand > hands;
+
+				//enumerate through all flops, 
+				CardMask cards_flop;
+				ENUMERATE_3_CARDS(cards_flop,
+				{
+
+					if(x++ % (277 * n_flopclusters * n_turnclusters * n_turnbins) == 0) cout << '.' << flush;
+
+					// reject the ones not in the current flop cluster of interest
+					if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
+						continue;
+
+					//enumerate through all turns
+					CardMask card_turn;
+					ENUMERATE_1_CARDS_D(card_turn, cards_flop,
+					{
+						// reject the ones not in the current turn cluster of interest
+						if( turnclusters.retrieve( getindex31( cards_flop, card_turn ) ) != myturncluster )
+							continue;
+
+						//enumerate through all rivers
+						CardMask cards_hole;
+						CardMask cards_used;
+						CardMask_OR( cards_used, cards_flop, card_turn );
+						ENUMERATE_2_CARDS_D(cards_hole, cards_used,
+						{
+							// reject the ones not in the current turn cluster of interest
+							if( turnbins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) ) != myturnbin )
+								continue;
+
+							//create a new RawHand with its index
+							const int64 index231 = getindex231( cards_hole, cards_flop, card_turn );
+							CardMask cards_board;
+							CardMask_OR( cards_board, cards_flop, card_turn );
+							const int64 index24 = getindex2N( cards_hole, cards_board, 4 );
+							hands.push_back( RawHand( index231, turnev[ index24 ] ) );
+
+						});
+					});
+				});
+
+				//pass the whole thing to my binandstore routine
+				binandstore( hands, output, n_turnnew, hands.size( ) );
+
+				//I don't know which ones I just stored. A super hack is to only 
+				// re-set the ones that have been stored exactly once.
+				for( int64 i = 0; i < INDEX231_MAX; i++ )
+					if( output.isstored( i ) == 1 )
+						output.store( i, combine( myturnbin, output.retrieve( i ), n_turnnew ) );
+			}
+		}
+	}
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "turnb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-" + tostr( n_turnbins ) + "x" + tostr( n_turnnew ) );
+}
+
 
 //------------------ H i s t o r y   B i n s --------------------------
 
@@ -968,6 +1727,32 @@ void makehistbin(int pf, int ftr)
 }
 
 
+void makeboardbins( int bf, int bt, int br, string f, string t, int r )
+{
+	size_t fx = f.find( "x" );
+	size_t tx = t.find( "x" );
+	int f1 = fromstr< int >( f.substr( 0, fx ) );
+	int f2 = ( fx == string::npos ? 0 : fromstr< int >( f.substr( fx + 1 ) ) );
+	int t1 = fromstr< int >( t.substr( 0, tx ) );
+	int t2 = ( tx == string::npos ? 0 : fromstr< int >( t.substr( tx + 1 ) ) );
+	
+	saveboardflopclusters( bf );
+	saveboardturnclusters( bf, bt );
+	saveboardriverclusters( bf, bt, br );
+
+	saveflopbins( bf, f1 );
+
+	if( f2 )
+		nestflopbins( bf, f1, f2 );
+
+	saveturnbins( bf, bt, t1 );
+
+	if( t2 )
+		nestturnbins( bf, bt, t1, t2 );
+
+	saveriverbins( bf, bt, br, r );
+}
+
 	/*
 
 Generators of HSS and EV values:
@@ -979,11 +1764,18 @@ void saveflopHSS(); //Depends on "<floaterdir>/turnHSS". Generates "<floaterdir>
 void saveflopEV(); //Depends on "<floaterdir>/turnEV". Generates "<floaterdir>/flopEV".
 void savepreflopHSS(); //Deps on "<floaterdir>/flopHSS". Generates "<floaterdir>/preflopHSS".
 
-Old bin generators:
 
-void saveflopBINS(int n_bins); //Deps on "bins/flopHSS". Generates "bins/flopNBINS".
-void saveturnBINS(int n_bins); //Deps on "bins/turnHSS". Generates "bins/turnNBINS".
-void saveriverBINS(int n_bins); //Deps on "bins/riverEV". Generates "bins/riverNBINS".
+My original idea of bin generators:
+
+void saveboardflopclusters( int n_new )
+void saveboardturnclusters( const int n_flop, const int n_new )
+void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new )
+void saveflopbins( int n_flopclusters, int n_flopnew )
+void saveturnbins( const int n_flopclusters, const int n_turnclusters, const int n_turnnew )
+void nestflopbins( const int n_flopclusters, const int n_flopbins, const int n_flopnew )
+void saveriverbins( const int n_flopclusters, const int n_turnclusters, const int n_riverclusters, const int n_rivernew )
+void nestturnbins( const int n_flopclusters, const int n_turnclusters, const int n_turnbins, const int n_turnnew )
+
 
 New (history) bin generators, each generates one new output, 
 depends on all previous, starting with the preflop (no deps besides preflopHSS):
@@ -1025,7 +1817,7 @@ int main(int argc, char *argv[])
 {
 	checkdataformat();
 
-	if((argc>=2) && (strcmp("histbin", argv[1]) == 0 || strcmp("oldbins", argv[1]) == 0 || strcmp("ramtest", argv[1])==0))
+	if((argc>=2) && (strcmp("histbin", argv[1]) == 0 || strcmp("boardbins", argv[1]) == 0 || strcmp("ramtest", argv[1])==0))
 	{
 		cout << "Current data type: Using " << FloaterFile::gettypename() << endl;
 		cout << "fpcompare uses " << EPSILON << "." << endl;
@@ -1059,13 +1851,15 @@ int main(int argc, char *argv[])
 	else if(argc == 3 && strcmp("histbin", argv[1])==0)
 		makehistbin(atoi(argv[2]), atoi(argv[2]));
 
-	//generate one round of oldbins
-	else if(argc == 4 && strcmp("oldbins", argv[1])==0 && strcmp("flop", argv[2])==0)
-		saveflopBINS(atoi(argv[3]));
-	else if(argc == 4 && strcmp("oldbins", argv[1])==0 && strcmp("turn", argv[2])==0)
-		saveturnBINS(atoi(argv[3]));
-	else if(argc == 4 && strcmp("oldbins", argv[1])==0 && strcmp("river", argv[2])==0)
-		saveriverBINS(atoi(argv[3]));
+	//generate one round of boardbins
+	else if(argc == 8 && strcmp("boardbins", argv[1])==0)
+		makeboardbins( 
+				atoi( argv[ 2 ] ),
+				atoi( argv[ 3 ] ),
+				atoi( argv[ 4 ] ),
+				argv[ 5 ],
+				argv[ 6 ],
+				atoi( argv[ 7 ] ) );
 
 #ifdef COMPILE_TESTCODE
 	//test
@@ -1379,7 +2173,7 @@ int main(int argc, char *argv[])
 		cout << "Create history bins:           " << argv[0] << " histbin n_pflop n_flop-turn-river" << endl;
 		cout << "Create history bins:           " << argv[0] << " histbin n_bins" << endl;
 		cout << "Create one round of hist bins: " << argv[0] << " histbin (preflop | flop | flopnest | turn | turnnest | river) n_bins ... n_bins" << endl;
-		cout << "Create old-style bins:         " << argv[0] << " oldbins (flop | turn | river) n_bins" << endl;
+		cout << "Create old-style board bins:   " << argv[0] << " boardbins n_flopclusters n_turnclusters n_riverclusters flopbins turnbins n_riverbins" << endl;
 #ifdef COMPILE_TESTCODE
 		cout << "Test indexing function:        " << argv[0] << " test" << endl;
 #endif
