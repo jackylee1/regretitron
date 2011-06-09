@@ -1113,8 +1113,6 @@ void saveriverbins( const int n_flopclusters, const int n_turnclusters, const in
 	//the data used to bin the hands
 	const FloaterFile riverev( "riverEV", INDEX25_MAX );
 
-	//for each flop + turn + river cluster
-	vector< RawHand > hands;
 	int x = 0;
 
 	//enumerate through all flops, 
@@ -1133,11 +1131,6 @@ void saveriverbins( const int n_flopclusters, const int n_turnclusters, const in
 			CardMask_OR( cards_used, cards_flop, card_turn );
 			ENUMERATE_1_CARDS_D(card_river, cards_used,
 			{
-				//the final list of boards we are trying to construct
-				hands.resize( 0 );
-				const int reservesize = ( 47 * 46 ) / 2;
-				hands.reserve( static_cast< uint64 >( reservesize ) );
-
 				//enumerate through all hole cards
 				CardMask cards_hole;
 				CardMask cards_used2;
@@ -1147,16 +1140,22 @@ void saveriverbins( const int n_flopclusters, const int n_turnclusters, const in
 
 					//create a new RawHand with its index
 					const int64 index2311 = getindex2311( cards_hole, cards_flop, card_turn, card_river );
-					CardMask cards_board;
-					CardMask_OR( cards_board, cards_flop, card_turn );
-					CardMask_OR( cards_board, cards_board, card_river );
-					const int64 index25 = getindex2N( cards_hole, cards_board, 5 );
-					hands.push_back( RawHand( index2311, riverev[ index25 ] ) );
+					if( output.isstored( index2311 ) != 1 )
+					{
+						CardMask cards_board;
+						CardMask_OR( cards_board, cards_flop, card_turn );
+						CardMask_OR( cards_board, cards_board, card_river );
+						const int64 index25 = getindex2N( cards_hole, cards_board, 5 );
+						const floater value = riverev[ index25 ];
+
+						int bin = static_cast< int >( value * n_rivernew );
+						if( bin == n_rivernew )
+							bin--;
+
+						output.store( index2311, bin );
+					}
 
 				});
-				//pass the whole thing to my binandstore routine
-				binandstore( hands, output, n_rivernew, hands.size( ) );
-
 			});
 		});
 	});
