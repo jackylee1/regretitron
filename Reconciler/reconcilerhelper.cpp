@@ -15,7 +15,8 @@ ReconcilerHelper::FormatEnum ReconcilerHelper::GetFileFormat( const boost::files
 
 	// example: "Mink Room - Heads Up (34606767-1).xml"
 	// example: "Boar Room - Turbo Heads Up (35009468-1).xml"
-	boost::regex mergestring( ".* Heads Up \\(.*\\)\\.xml" ); 
+	// example: "Acropolis (Heads Up) (35783825).xml"
+	boost::regex mergestring( ".* Heads Up\\)? \\(.*\\)\\.xml" ); 
 
 	if( boost::regex_match( filepath.filename( ), fulltiltstring ) )
 		return FORMAT_FULLTILT;
