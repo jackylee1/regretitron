@@ -6,6 +6,7 @@
 #include <string>
 #include <list>
 #include <iomanip>
+#include <limits>
 #include "../utility.h"
 #include "../PokerLibrary/floaterfile.h"
 using namespace std;
@@ -15,7 +16,7 @@ const floater EPSILON = 1e-12;
 const bool RIVERBUNCHHISTBINS = false;
 const float hand_list_multiplier = 2.5; //to keep it from overflowing (nominally 1.11 for regular bin sizes larger if using 169 PF bins)
 const float chunky_bin_tolerance = hand_list_multiplier*0.95;
-
+MTRand binrand;
 
 //------------- R i v e r   E V -------------------
 
@@ -586,23 +587,73 @@ void calculatebins(const int numboardcards, const int n_bins, const FloaterFile 
 
 //------------ B o a r d   C l u s t e r i n g -------------
 
-const int CHARCOUNT = 12;
+const int CHARCOUNT = 10;
+
+template< typename T >
+struct BoardChar
+{
+	BoardChar( ) { zero( ); }
+	T c[ CHARCOUNT * CHARCOUNT ];
+	void zero( ) { memset( c, 0, sizeof( c ) ); } 
+
+	template < typename U >
+	BoardChar< T > & operator=( const BoardChar< U > & that )
+	{
+		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+			c[ i ] = that.c[ i ];
+		return * this;
+	}
+
+	template < typename U >
+	BoardChar< T > & operator+=( const BoardChar< U > & that )
+	{
+		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+			c[ i ] += that.c[ i ];
+		return * this;
+	}
+
+	template < typename U >
+	BoardChar< T > & operator/=( const U & that )
+	{
+		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+			c[ i ] /= that;
+		return * this;
+	}
+
+	template < typename U >
+	void add( int & count, const BoardChar< U > & that )
+	{
+		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+			c[ i ] = ( c[ i ] * count + that.c[ i ] ) / ( count + 1 );
+		count++;
+	}
+
+	template < typename U >
+	void subtract( int & count, const BoardChar< U > & that )
+	{
+		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+			c[ i ] = ( c[ i ] * count - that.c[ i ] ) / ( count - 1 );
+		count--;
+	}
+};
+
 struct BoardStruct
 {
+	BoardStruct( ) : index( -1 ), cluster( -1 ) { }
 	BoardStruct( int64 myindex ) 
 		: index( myindex )
 		, cluster( -1 )
-	{
-		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i ++ )
-			characteristic[ i ] = 0; 
-	}
+	{ }
 	int64 index;
-	int characteristic[ CHARCOUNT * CHARCOUNT ];
+	BoardChar< int > characteristic;
 	int cluster;
 };
-typedef std::list< BoardStruct > BoardList;
+typedef std::vector< BoardStruct > BoardVec;
+typedef std::vector< BoardChar< double > > CentroidVec;
 
-struct TempSorter
+inline double square( double x ) { return x * x; }
+
+struct IndexSorter
 {
 	bool operator( )( const BoardStruct & a, const BoardStruct & b )
 	{
@@ -610,42 +661,423 @@ struct TempSorter
 	}
 };
 
-void clusterandstore( BoardList & boards, int n_clusters, PackedBinFile & output, 
-		const string & name )
+#if 1
+// assign each board to a cluster, then compute the initial centroids from that
+// this board assignment seems to be pretty good on its own (just uses index)
+void initialize_kmeans( BoardVec & boards, CentroidVec & centroids )
 {
+	// assign the clusters by grouping near indices together
+	// the way I do it, each cluster gets an equal number of boards (up to rounding)
+
 	int count = 0;
-	boards.sort( TempSorter( ) );
-	const int stride = ( boards.size( ) + n_clusters - 1 ) / n_clusters;
-	for( BoardList::iterator i = boards.begin( ); i != boards.end( ); i++ )
+	sort( boards.begin( ), boards.end( ), IndexSorter( ) );
+	const int stride = ( boards.size( ) + centroids.size( ) - 1 ) / centroids.size( );
+
+	// assign the cluster and sum up the centroids in one go
+
+	vector< int > centroidcounts( centroids.size( ), 0 );
+	for( CentroidVec::iterator c = centroids.begin( ); c != centroids.end( ); c++ )
+		c->zero( ); // zero out the centroid vectors
+	for( BoardVec::iterator b = boards.begin( ); b != boards.end( ); b++ )
 	{
-		i->cluster = ( ( count++ / stride ) % n_clusters ); //TODO perform k-means here
-		output.store( i->index, i->cluster );
+		b->cluster = ( ( count++ / stride ) % centroids.size( ) );
+		centroids[ b->cluster ] += b->characteristic;
+		centroidcounts[ b->cluster ]++;
 	}
 
-	vector< int > clustersize( n_clusters, 0 );
-	for( BoardList::iterator i = boards.begin( ); i != boards.end( ); i++ )
+	// make sure we assigned everything and calculate the centroids
+	
+	for( unsigned i = 0; i < centroids.size( ); i++ )
 	{
-		clustersize[ i->cluster ]++;
-	}
-
-	cerr << endl;
-   	cerr << "For " << name << " clusters:" << endl;
-	cerr << "Cluster number: size of cluster" << endl;
-	for( int i = 0; i < n_clusters; i++ )
-	{
-		cerr << i << ": " << clustersize[ i ] << endl;
+		if( centroidcounts[ i ] == 0 )
+			REPORT( "kmeans fault not enough boards" );
+		centroids[ i ] /= centroidcounts[ i ];
 	}
 }
+#endif
 
+#if 0
+// assign each centroid to be a randomly selected board
+// this algorithm only assigns the centroids, not the boards
+void initialize_kmeans( BoardVec & boards, CentroidVec & centroids )
+{
+	// this algorithm is the same as my card shuffling algorithm
+
+	vector< int > boardstouse( boards.size( ) );
+	for( unsigned i = 0; i < boards.size( ); i++ )
+		boardstouse[ i ] = i;
+	for( unsigned i = 0; i < centroids.size( ); i++ )
+	{
+		swap( boardstouse[ i ], boardstouse[ i + binrand.randInt( boards.size( ) - 1 - i ) ] );
+		centroids[ i ] = boards[ boardstouse[ i ] ].characteristic;
+	}
+}
+#endif
+
+template< typename T1, typename T2 >
+double get_distance( BoardChar< T1 > & b1, BoardChar< T2 > & b2 )
+{
+	double total = 0;
+	for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+		total += square( b1.c[ i ] - b2.c[ i ] );
+	return sqrt( total );
+}
+
+#define ACTUALLYDOKMEANS
+
+void clusterandstore( BoardVec & boards, int n_clusters, PackedBinFile & output, 
+		const string & name )
+{
+   	cerr << "For " << name << " clusters:" << endl;
+	if( (unsigned)n_clusters >= boards.size( ) )
+		REPORT( "k >= n in kmeans" );
+	if( n_clusters <= 1 )
+		REPORT( "k <= 1 in kmeans" );
+
+	CentroidVec centroids( n_clusters );
+	initialize_kmeans( boards, centroids );
+	vector< int > clustercounts( n_clusters, 0 );
+	vector< double > clustererrors( n_clusters, 0 );
+	int n_iter = 0;
+
+#ifdef ACTUALLYDOKMEANS
+	const int MAX_ITER_ALLOWED = numeric_limits< int >::max( );
+
+	// loop through to find the first and second closest clusters for each point
+	// assign each board to its nearest centroid
+
+	vector< int > secondcluster( boards.size( ) ); //second closest cluster
+	for( unsigned i = 0; i < boards.size( ); i++ )
+	{
+		// prime the loop with the first two centroids
+
+		boards[ i ].cluster = 0;
+		secondcluster[ i ] = 1;
+		int distance1 = get_distance( boards[ i ].characteristic, centroids[ 0 ] );
+		int distance2 = get_distance( boards[ i ].characteristic, centroids[ 1 ] );
+		if( distance2 < distance1 )
+		{
+			swap( boards[ i ].cluster, secondcluster[ i ] );
+			swap( distance1, distance2 );
+		}
+
+		// loop through the rest of the clusters to finish finding the best and second best clusters
+
+		for( int j = 2; j < n_clusters; j++ )
+		{
+			int newdistance = get_distance( boards[ i ].characteristic, centroids[ j ] );
+			if( newdistance < distance1 )
+			{
+				distance2 = distance1;
+				distance1 = newdistance;
+				secondcluster[ i ] = boards[ i ].cluster;
+				boards[ i ].cluster = j;
+			}
+			else if( newdistance < distance2 )
+			{
+				distance2 = newdistance;
+				secondcluster[ i ] = j;
+			}
+		}
+	}
+
+	// recompute the cluster centroids by averaging the boards that were assigned to them
+
+	for( int i = 0; i < n_clusters; i++ )
+		centroids[ i ].zero( );
+
+	for( unsigned i = 0; i < boards.size( ); i++ )
+	{
+		clustercounts[ boards[ i ].cluster ]++;
+		centroids[ boards[ i ].cluster ] += boards[ i ].characteristic;
+	}
+
+
+	// initialize for the optimal transfer stage
+	// if there are any empty clusters, we produce fault 1 
+
+	vector< double > an1( n_clusters ); // n / ( n - 1 )
+	vector< double > an2( n_clusters ); // n / ( n + 1 )
+	vector< bool > itran( n_clusters, true );
+	vector< int > ncp( n_clusters, -1 );
+	unsigned indx = 0;
+	vector< double > d( boards.size( ), 0 );
+	vector< int > live( n_clusters, 0 );
+	for( int i = 0; i < n_clusters; i++ )
+	{
+		if( clustercounts[ i ] == 0 )
+			REPORT( "cluster fault 1" );
+
+		centroids[ i ] /= clustercounts[ i ];
+
+		if( clustercounts[ i ] == 1 )
+			an1[ i ] = numeric_limits< double >::infinity( );
+		else
+			an1[ i ] = static_cast< double >( clustercounts[ i ] ) / ( clustercounts[ i ] - 1 );
+
+		an2[ i ] = static_cast< double >( clustercounts[ i ] ) / ( clustercounts[ i ] + 1 );
+	}
+
+	for( n_iter = 1; n_iter <= MAX_ITER_ALLOWED; n_iter++ ) 
+	{
+
+		// this is the optimal transfer stage
+
+		for( int i = 0; i < n_clusters; i++ )
+			if( itran[ i ] )
+				live[ i ] = boards.size( ) + 1; //TODO ???
+		
+		for( int i = 0; static_cast< unsigned >( i ) < boards.size( ); i++ )
+		{
+			indx++;
+			int L1 = boards[ i ].cluster;
+			int L2 = secondcluster[ i ];
+			int LL = L2;
+
+			if( clustercounts[ L1 ] > 1 )
+			{
+				if( ncp[ L1 ] != 0 )
+					d[ i ] = an1[ L1 ] * get_distance( boards[ i ].characteristic, centroids[ L1 ] );
+
+				double R2 = an2[ L2 ] * get_distance( boards[ i ].characteristic, centroids[ L2 ] );
+
+				for( int j = 0; j < n_clusters; j++ )
+				{
+					if( ( i < live[ L1 ] || i < live[ L2 ] ) && j != L1 && j != LL )
+					{
+						const double newdist = get_distance( boards[ i ].characteristic, centroids[ j ] );
+						if( newdist < R2 / an2[ j ] )
+						{
+							R2 = newdist * an2[ j ];
+							L2 = j;
+						}
+					}
+				}
+				
+				if( d[ i ] <= R2 )
+				{
+					secondcluster[ i ] = L2;
+				}
+				else
+				{
+					indx = 0;
+					live[ L1 ] = boards.size( ) + i;
+					live[ L2 ] = boards.size( ) + i;
+					ncp[ L1 ] = i;
+					ncp[ L2 ] = i;
+					centroids[ L1 ].subtract( clustercounts[ L1 ], boards[ i ].characteristic );
+					centroids[ L2 ].add( clustercounts[ L2 ], boards[ i ].characteristic );
+					if( clustercounts[ L1 ] == 1 )
+						an1[ L1 ] = numeric_limits< double >::infinity( );
+					else
+						an1[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] - 1 );
+					an2[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] + 1 );
+					an1[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] - 1 );
+					an2[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] + 1 );
+					boards[ i ].cluster = L2;
+					secondcluster[ i ] = L1;
+				}
+			}
+
+			if( indx == boards.size( ) )
+				goto endoptra;
+
+		}
+
+		for( int j = 0; j < n_clusters; j++ )
+		{
+			itran[ j ] = false;
+			live[ j ] -= boards.size( );
+		}
+
+endoptra:
+
+		if( indx == boards.size( ) )
+			break;
+
+		// this is the quick transfer stage
+
+		unsigned icoun = 0;
+		int istep = 0;
+
+		while( true )
+		{
+			for( unsigned i = 0; i < boards.size( ); i++ )
+			{
+				icoun++;
+				istep++;
+				int L1 = boards[ i ].cluster;
+				int L2 = secondcluster[ i ];
+
+				if( clustercounts[ L1 ] > 1 )
+				{
+					if( ncp[ L1 ] >= istep )
+						d[ i ] = an1[ L1 ] * get_distance( boards[ i ].characteristic, centroids[ L1 ] );
+
+					if( ncp[ L1 ] > istep || ncp[ L2 ] > istep )
+					{
+						const double newdist = get_distance( boards[ i ].characteristic, centroids[ L2 ] );
+						if( newdist < d[ i ] / an2[ L2 ] )
+						{
+							icoun = 0;
+							indx = 0;
+							itran[ L1 ] = true;
+							itran[ L2 ] = true;
+							ncp[ L1 ] = istep + boards.size( );
+							ncp[ L2 ] = istep + boards.size( );
+							centroids[ L1 ].subtract( clustercounts[ L1 ], boards[ i ].characteristic );
+							centroids[ L2 ].add( clustercounts[ L2 ], boards[ i ].characteristic );
+							if( clustercounts[ L1 ] == 1 )
+								an1[ L1 ] = numeric_limits< double >::infinity( );
+							else
+								an1[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] - 1 );
+							an2[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] + 1 );
+							an1[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] - 1 );
+							an2[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] + 1 );
+							boards[ i ].cluster = L2;
+							secondcluster[ i ] = L1;
+						}
+					}
+				}
+
+				if( icoun == boards.size( ) )
+					goto endqtran;
+			}
+		}
+
+endqtran:
+
+		if( n_clusters == 2 )
+			break;
+
+		// initialize for optra again
+		for( int i = 0; i < n_clusters; i++ )
+			ncp[ i ] = 0;
+	}
+
+#endif
+
+	for( int i = 0; i < n_clusters; i++ )
+	{
+		clustercounts[ i ] = 0;
+		clustererrors[ i ] = 0;
+		centroids[ i ].zero( );
+	}
+
+	for( BoardVec::iterator i = boards.begin( ); i != boards.end( ); i++ )
+	{
+		output.store( i->index, i->cluster );
+		clustercounts[ i->cluster ]++;
+		centroids[ i->cluster ] += i->characteristic;
+	}
+
+	for( int i = 0; i < n_clusters; i++ )
+		centroids[ i ] /= clustercounts[ i ];
+
+	double totalerror = 0;
+	for( BoardVec::iterator i = boards.begin( ); i != boards.end( ); i++ )
+	{
+		const double newerror = square( get_distance( i->characteristic, centroids[ i->cluster ] ) );
+		clustererrors[ i->cluster ] += newerror;
+		totalerror +=newerror;
+	}
+
+	cerr << "Final error: " << totalerror << endl;
+	cerr << "Iterations: " << n_iter << endl;
+	cerr << "Cluster number: size of cluster (wss error)" << endl;
+	for( int i = 0; i < n_clusters; i++ )
+	{
+		cerr << i << ": " << clustercounts[ i ] << " (" << clustererrors[ i ] << ")" << endl;
+	}
+	cerr << endl;
+}
+
+#if 0
+	const double MAX_ERROR_ALLOWED = 0;
+
+	// start iterations
+	CentroidVec newcentroidssum( n_clusters );
+	double old_error = 0, error = 1e200; // sum of squared euclidean distance
+	int n_iter = 0;
+
+	while( myabs( error - old_error ) > MAX_ERROR_ALLOWED )
+	{
+		n_iter++;
+
+		// save error from last step
+		old_error = error, error = 0;
+		int changed = 0;
+
+		// clear old counts and temp centroids
+		for( int i = 0; i < n_clusters; i++ )
+		{
+			counts[ i ] = 0;
+			newcentroidssum[ i ].zero( );
+		}
+
+		for( BoardVec::iterator b = boards.begin( ); b != boards.end( ); b++ )
+		{
+			// identify the closest cluster
+			double min_distance = 1e200;
+			int bestcluster = b->cluster;
+			for( int clus = 0; clus < n_clusters; clus++ )
+			{
+				double distance = get_distance( b->characteristic, centroids[ clus ] );
+				if (distance < min_distance) 
+				{
+					bestcluster = clus;
+					min_distance = distance;
+				}
+			}
+			if( b->cluster != bestcluster )
+			{
+				changed++;
+				b->cluster = bestcluster;
+			}
+
+			// update size and temp centroid of the destination cluster
+			newcentroidssum[ bestcluster ] += b->characteristic;
+			counts[ bestcluster ]++;
+			// update standard error
+			error += min_distance;
+		}
+
+		for( int i = 0; i < n_clusters; i++ )
+		{
+			if( counts[ i ] )
+				for( int j = 0; j < CHARCOUNT * CHARCOUNT; j++ )
+					centroids[ i ].c[ j ] = newcentroidssum[ i ].c[ j ] / counts[ i ];
+			else
+			{
+				cerr << "iteration " << n_iter << ": hit 0 count for cluster " << i << " choosing random board to re-center" << endl;
+				const unsigned randboard = binrand.randInt( boards.size( ) - 1 );
+				BoardVec::iterator b = boards.begin( );
+				for( unsigned x = 0; x < randboard; x++ )
+					b++;
+				centroids[ i ] = b->characteristic;
+			}
+		}
+
+		if( MAX_ITER_ALLOWED > 0 && n_iter >= MAX_ITER_ALLOWED ) 
+			break;
+	}
+
+#endif
 void saveboardflopclusters( int n_new )
 {
 	cout << "generating b" << n_new << " flop clusters..." << endl;
 
 	//the final list of boards we are trying to construct
-	BoardList boards;
+	BoardVec boards;
 
 	//the bin file that will receive the output
 	PackedBinFile output(n_new, INDEX3_MAX);
+
+	if( n_new == 1 )
+	{
+		for( int i = 0; i < INDEX3_MAX; i++ )
+			output.store( i, 0 );
+	} else { // bracket is closed near end of function
 
 	//the bin information used to characterize the boards
 	const PackedBinFile prebins(
@@ -677,13 +1109,15 @@ void saveboardflopclusters( int n_new )
 			const int post = postbins.retrieve( getindex23( cards_hole, cards_flop ) );
 
 			//increment that element of the array
-			newboard.characteristic[ combine( pre, post, CHARCOUNT ) ]++;
+			newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
 		});
 	});
 	cout << endl;
 
 	//pass the whole thing to clustering and storing to output
 	clusterandstore( boards, n_new, output, "flopb" + tostr( n_new ) );
+
+	} // end of n_new == 1 case
 
 	//save the file
 	cout << output.save( BINSFOLDER + "flopb" + tostr( n_new ) );
@@ -695,6 +1129,12 @@ void saveboardturnclusters( const int n_flop, const int n_new )
 
 	//the bin file that will receive the output
 	PackedBinFile output( n_new, INDEX31_MAX );
+
+	if( n_new == 1 )
+	{
+		for( int i = 0; i < INDEX31_MAX; i++ )
+			output.store( i, 0 );
+	} else { // bracket is closed near end of function
 
 	//the bin information that will have the history
 	const PackedBinFile flopclusters(
@@ -714,7 +1154,7 @@ void saveboardturnclusters( const int n_flop, const int n_new )
 	for( int myflopcluster = 0; myflopcluster < n_flop; myflopcluster++ )
 	{
 		//the final list of boards we are trying to construct
-		BoardList boards;
+		BoardVec boards;
 
 		//enumerate through all flops, 
 		CardMask cards_flop;
@@ -747,7 +1187,7 @@ void saveboardturnclusters( const int n_flop, const int n_new )
 					const int post = postbins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
 
 					//increment that element of the array
-					newboard.characteristic[ combine( pre, post, CHARCOUNT ) ]++;
+					newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
 				});
 			});
 		});
@@ -756,6 +1196,8 @@ void saveboardturnclusters( const int n_flop, const int n_new )
 		clusterandstore( boards, n_new, output, "turnb" + tostr( n_flop ) + "-b" + tostr( n_new ) + " (doing " + tostr( myflopcluster ) + ")" );
 	}
 	cout << endl;
+
+	} // end of n_new == 1 case
 
 	//save the file
 	cout << output.save( BINSFOLDER + "turnb" + tostr( n_flop ) + "-b" + tostr( n_new ) );
@@ -767,6 +1209,12 @@ void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new
 
 	//the bin file that will receive the output
 	PackedBinFile output( n_new, INDEX311_MAX );
+
+	if( n_new == 1 )
+	{
+		for( int i = 0; i < INDEX311_MAX; i++ )
+			output.store( i, 0 );
+	} else { // bracket is closed near end of function
 
 	//the bin information that will have the history
 	const PackedBinFile flopclusters(
@@ -787,12 +1235,15 @@ void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new
 
 	//for each flop + turn cluster
 	int x = 0;
+	BoardVec boards;
 	for( int myflopcluster = 0; myflopcluster < n_flop; myflopcluster++ )
 	{
 		for( int myturncluster = 0; myturncluster < n_turn; myturncluster++ )
 		{
 			//the final list of boards we are trying to construct
-			BoardList boards;
+			const int oldcap = boards.capacity( );
+			boards.resize( 0 );
+			boards.reserve( oldcap );
 
 			//enumerate through all flops, 
 			CardMask cards_flop;
@@ -837,7 +1288,7 @@ void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new
 							const int post = postbins.retrieve( getindex2311( cards_hole, cards_flop, card_turn, card_river ) );
 
 							//increment that element of the array
-							newboard.characteristic[ combine( pre, post, CHARCOUNT ) ]++;
+							newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
 						});
 					});
 				});
@@ -848,6 +1299,8 @@ void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new
 		}
 	}
 	cout << endl;
+
+	} // end of n_new == 1 case
 
 	//save the file
 	cout << output.save( BINSFOLDER + "riverb" + tostr( n_flop ) + "-b" + tostr( n_turn ) + "-b" + tostr( n_new ) );
