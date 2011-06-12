@@ -17,7 +17,7 @@ const bool RIVERBUNCHHISTBINS = false;
 const float hand_list_multiplier = 2.5; //to keep it from overflowing (nominally 1.11 for regular bin sizes larger if using 169 PF bins)
 const float chunky_bin_tolerance = hand_list_multiplier*0.95;
 MTRand binrand;
-const bool ACTUALLYDOKMEANS = false;
+const bool ACTUALLYDOKMEANS = true;
 
 //------------- R i v e r   E V -------------------
 
@@ -1410,6 +1410,10 @@ void saveturnbins( const int n_flopclusters, const int n_turnclusters, const int
 		{
 			//the final list of boards we are trying to construct
 			vector< RawHand > hands;
+			if( n_flopclusters * n_turnclusters <= 2 )
+				//most it can use if n_flopclusters == n_turnclusters == 1
+				//linux does not actually allocate unless used.
+				hands.reserve( 1221511200 ); 
 
 			//enumerate through all flops, 
 			CardMask cards_flop;
