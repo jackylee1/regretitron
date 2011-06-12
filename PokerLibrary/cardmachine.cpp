@@ -92,8 +92,10 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uin
 				index_max = INDEX23_MAX;
 			else if(gr==TURN)
 				index_max = INDEX231_MAX;
-			else
+			else if( myparams.usehistory )
 				index_max = INDEX2311_MAX;
+			else
+				index_max = INDEX25_MAX;
 
 			//if solving or under 5 megs, preload the file
 			binfiles[gr] = new PackedBinFile(myparams.filename[gr], myparams.filesize[gr], 
@@ -171,8 +173,8 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 		cardsi[FLOP][P1] = binfiles[FLOP]->retrieve(getindex23(priv[P1], board[FLOP]));
 		cardsi[TURN][P0] = binfiles[TURN]->retrieve(getindex231(priv[P0], board[FLOP], board[TURN]));
 		cardsi[TURN][P1] = binfiles[TURN]->retrieve(getindex231(priv[P1], board[FLOP], board[TURN]));
-		cardsi[RIVER][P0] = binfiles[RIVER]->retrieve(getindex2311(priv[P0], board[FLOP], board[TURN], board[RIVER]));
-		cardsi[RIVER][P1] = binfiles[RIVER]->retrieve(getindex2311(priv[P1], board[FLOP], board[TURN], board[RIVER]));
+		cardsi[RIVER][P0] = binfiles[RIVER]->retrieve(getindex25(priv[P0], board[FLOP], board[TURN], board[RIVER]));
+		cardsi[RIVER][P1] = binfiles[RIVER]->retrieve(getindex25(priv[P1], board[FLOP], board[TURN], board[RIVER]));
 	}
 
 	//insert the flopalyzer score in-place if requested
@@ -296,7 +298,7 @@ int CardMachine::getindices(int gr, const vector<CardMask> &cards, vector<int> &
 				cardsi = handi[0] = binfiles[TURN]->retrieve(getindex231(cards[PREFLOP],cards[FLOP],cards[TURN]));
 				break;
 			case RIVER:
-				cardsi = handi[0] = binfiles[RIVER]->retrieve(getindex2311(cards[PREFLOP],cards[FLOP],cards[TURN],cards[RIVER]));
+				cardsi = handi[0] = binfiles[RIVER]->retrieve(getindex25(cards[PREFLOP],cards[FLOP],cards[TURN],cards[RIVER]));
 				break;
 			default:
 				REPORT("invalid gameround");
@@ -505,7 +507,7 @@ findpreflop:
 						return;
 					break;
 				case RIVER:
-					if( handi[0] == binfiles[gr]->retrieve( getindex2311( cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER] ) ) )
+					if( handi[0] == binfiles[gr]->retrieve( getindex25( cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER] ) ) )
 						return;
 					break;
 				default:

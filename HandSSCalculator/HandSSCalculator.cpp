@@ -17,6 +17,7 @@ const bool RIVERBUNCHHISTBINS = false;
 const float hand_list_multiplier = 2.5; //to keep it from overflowing (nominally 1.11 for regular bin sizes larger if using 169 PF bins)
 const float chunky_bin_tolerance = hand_list_multiplier*0.95;
 MTRand binrand;
+const bool ACTUALLYDOKMEANS = false;
 
 //------------- R i v e r   E V -------------------
 
@@ -723,8 +724,6 @@ double get_distance( BoardChar< T1 > & b1, BoardChar< T2 > & b2 )
 	return sqrt( total );
 }
 
-#define ACTUALLYDOKMEANS
-
 void clusterandstore( BoardVec & boards, int n_clusters, PackedBinFile & output, 
 		const string & name )
 {
@@ -740,222 +739,223 @@ void clusterandstore( BoardVec & boards, int n_clusters, PackedBinFile & output,
 	vector< double > clustererrors( n_clusters, 0 );
 	int n_iter = 0;
 
-#ifdef ACTUALLYDOKMEANS
-	const int MAX_ITER_ALLOWED = numeric_limits< int >::max( );
-
-	// loop through to find the first and second closest clusters for each point
-	// assign each board to its nearest centroid
-
-	vector< int > secondcluster( boards.size( ) ); //second closest cluster
-	for( unsigned i = 0; i < boards.size( ); i++ )
+	if( ACTUALLYDOKMEANS )
 	{
-		// prime the loop with the first two centroids
+		const int MAX_ITER_ALLOWED = numeric_limits< int >::max( );
 
-		boards[ i ].cluster = 0;
-		secondcluster[ i ] = 1;
-		int distance1 = get_distance( boards[ i ].characteristic, centroids[ 0 ] );
-		int distance2 = get_distance( boards[ i ].characteristic, centroids[ 1 ] );
-		if( distance2 < distance1 )
+		// loop through to find the first and second closest clusters for each point
+		// assign each board to its nearest centroid
+
+		vector< int > secondcluster( boards.size( ) ); //second closest cluster
+		for( unsigned i = 0; i < boards.size( ); i++ )
 		{
-			swap( boards[ i ].cluster, secondcluster[ i ] );
-			swap( distance1, distance2 );
+			// prime the loop with the first two centroids
+
+			boards[ i ].cluster = 0;
+			secondcluster[ i ] = 1;
+			int distance1 = get_distance( boards[ i ].characteristic, centroids[ 0 ] );
+			int distance2 = get_distance( boards[ i ].characteristic, centroids[ 1 ] );
+			if( distance2 < distance1 )
+			{
+				swap( boards[ i ].cluster, secondcluster[ i ] );
+				swap( distance1, distance2 );
+			}
+
+			// loop through the rest of the clusters to finish finding the best and second best clusters
+
+			for( int j = 2; j < n_clusters; j++ )
+			{
+				int newdistance = get_distance( boards[ i ].characteristic, centroids[ j ] );
+				if( newdistance < distance1 )
+				{
+					distance2 = distance1;
+					distance1 = newdistance;
+					secondcluster[ i ] = boards[ i ].cluster;
+					boards[ i ].cluster = j;
+				}
+				else if( newdistance < distance2 )
+				{
+					distance2 = newdistance;
+					secondcluster[ i ] = j;
+				}
+			}
 		}
 
-		// loop through the rest of the clusters to finish finding the best and second best clusters
-
-		for( int j = 2; j < n_clusters; j++ )
-		{
-			int newdistance = get_distance( boards[ i ].characteristic, centroids[ j ] );
-			if( newdistance < distance1 )
-			{
-				distance2 = distance1;
-				distance1 = newdistance;
-				secondcluster[ i ] = boards[ i ].cluster;
-				boards[ i ].cluster = j;
-			}
-			else if( newdistance < distance2 )
-			{
-				distance2 = newdistance;
-				secondcluster[ i ] = j;
-			}
-		}
-	}
-
-	// recompute the cluster centroids by averaging the boards that were assigned to them
-
-	for( int i = 0; i < n_clusters; i++ )
-		centroids[ i ].zero( );
-
-	for( unsigned i = 0; i < boards.size( ); i++ )
-	{
-		clustercounts[ boards[ i ].cluster ]++;
-		centroids[ boards[ i ].cluster ] += boards[ i ].characteristic;
-	}
-
-
-	// initialize for the optimal transfer stage
-	// if there are any empty clusters, we produce fault 1 
-
-	vector< double > an1( n_clusters ); // n / ( n - 1 )
-	vector< double > an2( n_clusters ); // n / ( n + 1 )
-	vector< bool > itran( n_clusters, true );
-	vector< int > ncp( n_clusters, -1 );
-	unsigned indx = 0;
-	vector< double > d( boards.size( ), 0 );
-	vector< int > live( n_clusters, 0 );
-	for( int i = 0; i < n_clusters; i++ )
-	{
-		if( clustercounts[ i ] == 0 )
-			REPORT( "cluster fault 1" );
-
-		centroids[ i ] /= clustercounts[ i ];
-
-		if( clustercounts[ i ] == 1 )
-			an1[ i ] = numeric_limits< double >::infinity( );
-		else
-			an1[ i ] = static_cast< double >( clustercounts[ i ] ) / ( clustercounts[ i ] - 1 );
-
-		an2[ i ] = static_cast< double >( clustercounts[ i ] ) / ( clustercounts[ i ] + 1 );
-	}
-
-	for( n_iter = 1; n_iter <= MAX_ITER_ALLOWED; n_iter++ ) 
-	{
-
-		// this is the optimal transfer stage
+		// recompute the cluster centroids by averaging the boards that were assigned to them
 
 		for( int i = 0; i < n_clusters; i++ )
-			if( itran[ i ] )
-				live[ i ] = boards.size( ) + 1; //TODO ???
-		
-		for( int i = 0; static_cast< unsigned >( i ) < boards.size( ); i++ )
+			centroids[ i ].zero( );
+
+		for( unsigned i = 0; i < boards.size( ); i++ )
 		{
-			indx++;
-			int L1 = boards[ i ].cluster;
-			int L2 = secondcluster[ i ];
-			int LL = L2;
-
-			if( clustercounts[ L1 ] > 1 )
-			{
-				if( ncp[ L1 ] != 0 )
-					d[ i ] = an1[ L1 ] * get_distance( boards[ i ].characteristic, centroids[ L1 ] );
-
-				double R2 = an2[ L2 ] * get_distance( boards[ i ].characteristic, centroids[ L2 ] );
-
-				for( int j = 0; j < n_clusters; j++ )
-				{
-					if( ( i < live[ L1 ] || i < live[ L2 ] ) && j != L1 && j != LL )
-					{
-						const double newdist = get_distance( boards[ i ].characteristic, centroids[ j ] );
-						if( newdist < R2 / an2[ j ] )
-						{
-							R2 = newdist * an2[ j ];
-							L2 = j;
-						}
-					}
-				}
-				
-				if( d[ i ] <= R2 )
-				{
-					secondcluster[ i ] = L2;
-				}
-				else
-				{
-					indx = 0;
-					live[ L1 ] = boards.size( ) + i;
-					live[ L2 ] = boards.size( ) + i;
-					ncp[ L1 ] = i;
-					ncp[ L2 ] = i;
-					centroids[ L1 ].subtract( clustercounts[ L1 ], boards[ i ].characteristic );
-					centroids[ L2 ].add( clustercounts[ L2 ], boards[ i ].characteristic );
-					if( clustercounts[ L1 ] == 1 )
-						an1[ L1 ] = numeric_limits< double >::infinity( );
-					else
-						an1[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] - 1 );
-					an2[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] + 1 );
-					an1[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] - 1 );
-					an2[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] + 1 );
-					boards[ i ].cluster = L2;
-					secondcluster[ i ] = L1;
-				}
-			}
-
-			if( indx == boards.size( ) )
-				goto endoptra;
-
+			clustercounts[ boards[ i ].cluster ]++;
+			centroids[ boards[ i ].cluster ] += boards[ i ].characteristic;
 		}
 
-		for( int j = 0; j < n_clusters; j++ )
+
+		// initialize for the optimal transfer stage
+		// if there are any empty clusters, we produce fault 1 
+
+		vector< double > an1( n_clusters ); // n / ( n - 1 )
+		vector< double > an2( n_clusters ); // n / ( n + 1 )
+		vector< bool > itran( n_clusters, true );
+		vector< int > ncp( n_clusters, -1 );
+		unsigned indx = 0;
+		vector< double > d( boards.size( ), 0 );
+		vector< int > live( n_clusters, 0 );
+		for( int i = 0; i < n_clusters; i++ )
 		{
-			itran[ j ] = false;
-			live[ j ] -= boards.size( );
+			if( clustercounts[ i ] == 0 )
+				REPORT( "cluster fault 1" );
+
+			centroids[ i ] /= clustercounts[ i ];
+
+			if( clustercounts[ i ] == 1 )
+				an1[ i ] = numeric_limits< double >::infinity( );
+			else
+				an1[ i ] = static_cast< double >( clustercounts[ i ] ) / ( clustercounts[ i ] - 1 );
+
+			an2[ i ] = static_cast< double >( clustercounts[ i ] ) / ( clustercounts[ i ] + 1 );
 		}
 
-endoptra:
-
-		if( indx == boards.size( ) )
-			break;
-
-		// this is the quick transfer stage
-
-		unsigned icoun = 0;
-		int istep = 0;
-
-		while( true )
+		for( n_iter = 1; n_iter <= MAX_ITER_ALLOWED; n_iter++ ) 
 		{
-			for( unsigned i = 0; i < boards.size( ); i++ )
+
+			// this is the optimal transfer stage
+
+			for( int i = 0; i < n_clusters; i++ )
+				if( itran[ i ] )
+					live[ i ] = boards.size( ) + 1; //TODO ???
+
+			for( int i = 0; static_cast< unsigned >( i ) < boards.size( ); i++ )
 			{
-				icoun++;
-				istep++;
+				indx++;
 				int L1 = boards[ i ].cluster;
 				int L2 = secondcluster[ i ];
+				int LL = L2;
 
 				if( clustercounts[ L1 ] > 1 )
 				{
-					if( ncp[ L1 ] >= istep )
+					if( ncp[ L1 ] != 0 )
 						d[ i ] = an1[ L1 ] * get_distance( boards[ i ].characteristic, centroids[ L1 ] );
 
-					if( ncp[ L1 ] > istep || ncp[ L2 ] > istep )
+					double R2 = an2[ L2 ] * get_distance( boards[ i ].characteristic, centroids[ L2 ] );
+
+					for( int j = 0; j < n_clusters; j++ )
 					{
-						const double newdist = get_distance( boards[ i ].characteristic, centroids[ L2 ] );
-						if( newdist < d[ i ] / an2[ L2 ] )
+						if( ( i < live[ L1 ] || i < live[ L2 ] ) && j != L1 && j != LL )
 						{
-							icoun = 0;
-							indx = 0;
-							itran[ L1 ] = true;
-							itran[ L2 ] = true;
-							ncp[ L1 ] = istep + boards.size( );
-							ncp[ L2 ] = istep + boards.size( );
-							centroids[ L1 ].subtract( clustercounts[ L1 ], boards[ i ].characteristic );
-							centroids[ L2 ].add( clustercounts[ L2 ], boards[ i ].characteristic );
-							if( clustercounts[ L1 ] == 1 )
-								an1[ L1 ] = numeric_limits< double >::infinity( );
-							else
-								an1[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] - 1 );
-							an2[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] + 1 );
-							an1[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] - 1 );
-							an2[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] + 1 );
-							boards[ i ].cluster = L2;
-							secondcluster[ i ] = L1;
+							const double newdist = get_distance( boards[ i ].characteristic, centroids[ j ] );
+							if( newdist < R2 / an2[ j ] )
+							{
+								R2 = newdist * an2[ j ];
+								L2 = j;
+							}
 						}
+					}
+
+					if( d[ i ] <= R2 )
+					{
+						secondcluster[ i ] = L2;
+					}
+					else
+					{
+						indx = 0;
+						live[ L1 ] = boards.size( ) + i;
+						live[ L2 ] = boards.size( ) + i;
+						ncp[ L1 ] = i;
+						ncp[ L2 ] = i;
+						centroids[ L1 ].subtract( clustercounts[ L1 ], boards[ i ].characteristic );
+						centroids[ L2 ].add( clustercounts[ L2 ], boards[ i ].characteristic );
+						if( clustercounts[ L1 ] == 1 )
+							an1[ L1 ] = numeric_limits< double >::infinity( );
+						else
+							an1[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] - 1 );
+						an2[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] + 1 );
+						an1[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] - 1 );
+						an2[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] + 1 );
+						boards[ i ].cluster = L2;
+						secondcluster[ i ] = L1;
 					}
 				}
 
-				if( icoun == boards.size( ) )
-					goto endqtran;
+				if( indx == boards.size( ) )
+					goto endoptra;
+
 			}
-		}
+
+			for( int j = 0; j < n_clusters; j++ )
+			{
+				itran[ j ] = false;
+				live[ j ] -= boards.size( );
+			}
+
+endoptra:
+
+			if( indx == boards.size( ) )
+				break;
+
+			// this is the quick transfer stage
+
+			unsigned icoun = 0;
+			int istep = 0;
+
+			while( true )
+			{
+				for( unsigned i = 0; i < boards.size( ); i++ )
+				{
+					icoun++;
+					istep++;
+					int L1 = boards[ i ].cluster;
+					int L2 = secondcluster[ i ];
+
+					if( clustercounts[ L1 ] > 1 )
+					{
+						if( ncp[ L1 ] >= istep )
+							d[ i ] = an1[ L1 ] * get_distance( boards[ i ].characteristic, centroids[ L1 ] );
+
+						if( ncp[ L1 ] > istep || ncp[ L2 ] > istep )
+						{
+							const double newdist = get_distance( boards[ i ].characteristic, centroids[ L2 ] );
+							if( newdist < d[ i ] / an2[ L2 ] )
+							{
+								icoun = 0;
+								indx = 0;
+								itran[ L1 ] = true;
+								itran[ L2 ] = true;
+								ncp[ L1 ] = istep + boards.size( );
+								ncp[ L2 ] = istep + boards.size( );
+								centroids[ L1 ].subtract( clustercounts[ L1 ], boards[ i ].characteristic );
+								centroids[ L2 ].add( clustercounts[ L2 ], boards[ i ].characteristic );
+								if( clustercounts[ L1 ] == 1 )
+									an1[ L1 ] = numeric_limits< double >::infinity( );
+								else
+									an1[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] - 1 );
+								an2[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] + 1 );
+								an1[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] - 1 );
+								an2[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] + 1 );
+								boards[ i ].cluster = L2;
+								secondcluster[ i ] = L1;
+							}
+						}
+					}
+
+					if( icoun == boards.size( ) )
+						goto endqtran;
+				}
+			}
 
 endqtran:
 
-		if( n_clusters == 2 )
-			break;
+			if( n_clusters == 2 )
+				break;
 
-		// initialize for optra again
-		for( int i = 0; i < n_clusters; i++ )
-			ncp[ i ] = 0;
+			// initialize for optra again
+			for( int i = 0; i < n_clusters; i++ )
+				ncp[ i ] = 0;
+		}
+
 	}
-
-#endif
 
 	for( int i = 0; i < n_clusters; i++ )
 	{
@@ -992,7 +992,7 @@ endqtran:
 	cerr << endl;
 }
 
-#if 0
+#if 0 /* this is Lloyd's algorithm (the really simple one) */
 	const double MAX_ERROR_ALLOWED = 0;
 
 	// start iterations
@@ -1061,8 +1061,8 @@ endqtran:
 		if( MAX_ITER_ALLOWED > 0 && n_iter >= MAX_ITER_ALLOWED ) 
 			break;
 	}
-
 #endif
+
 void saveboardflopclusters( int n_new )
 {
 	cout << "generating b" << n_new << " flop clusters..." << endl;
@@ -1097,20 +1097,24 @@ void saveboardflopclusters( int n_new )
 		//create a new BoardStruct with its index
 		const int64 index = getindex3( cards_flop );
 		boards.push_back( BoardStruct( index ) );
-		BoardStruct & newboard = boards.back( );
 
-		//characterize it:
-		//for each private hand
-		CardMask cards_hole;
-		ENUMERATE_2_CARDS_D( cards_hole, cards_flop,
+		if( ACTUALLYDOKMEANS || true )
 		{
-			//lookup that hand's preflop 10-bin and flop 10-bin
-			const int pre = prebins.retrieve( getindex2( cards_hole ) );
-			const int post = postbins.retrieve( getindex23( cards_hole, cards_flop ) );
+			BoardStruct & newboard = boards.back( );
 
-			//increment that element of the array
-			newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
-		});
+			//characterize it:
+			//for each private hand
+			CardMask cards_hole;
+			ENUMERATE_2_CARDS_D( cards_hole, cards_flop,
+			{
+				//lookup that hand's preflop 10-bin and flop 10-bin
+				const int pre = prebins.retrieve( getindex2( cards_hole ) );
+				const int post = postbins.retrieve( getindex23( cards_hole, cards_flop ) );
+
+				//increment that element of the array
+				newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
+			});
+		}
 	});
 	cout << endl;
 
@@ -1173,22 +1177,26 @@ void saveboardturnclusters( const int n_flop, const int n_new )
 				//create a new BoardStruct with its index
 				const int64 index = getindex31( cards_flop, card_turn );
 				boards.push_back( BoardStruct( index ) );
-				BoardStruct & newboard = boards.back( );
 
-				//characterize it:
-				//for each private hand
-				CardMask cards_hole;
-				CardMask cards_used;
-				CardMask_OR( cards_used, cards_flop, card_turn );
-				ENUMERATE_2_CARDS_D( cards_hole, cards_used,
+				if( ACTUALLYDOKMEANS || true )
 				{
-					//lookup that hand's preflop 10-bin and flop 10-bin
-					const int pre = prebins.retrieve( getindex23( cards_hole, cards_flop ) );
-					const int post = postbins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
+					BoardStruct & newboard = boards.back( );
 
-					//increment that element of the array
-					newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
-				});
+					//characterize it:
+					//for each private hand
+					CardMask cards_hole;
+					CardMask cards_used;
+					CardMask_OR( cards_used, cards_flop, card_turn );
+					ENUMERATE_2_CARDS_D( cards_hole, cards_used,
+					{
+						//lookup that hand's preflop 10-bin and flop 10-bin
+						const int pre = prebins.retrieve( getindex23( cards_hole, cards_flop ) );
+						const int post = postbins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
+
+						//increment that element of the array
+						newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
+					});
+				}
 			});
 		});
 
@@ -1274,22 +1282,26 @@ void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new
 						//create a new BoardStruct with its index
 						const int64 index = getindex311( cards_flop, card_turn, card_river );
 						boards.push_back( BoardStruct( index ) );
-						BoardStruct & newboard = boards.back( );
 
-						//characterize it:
-						//for each private hand
-						CardMask cards_hole;
-						CardMask cards_used2;
-						CardMask_OR( cards_used2, cards_used, card_river );
-						ENUMERATE_2_CARDS_D( cards_hole, cards_used2,
+						if( ACTUALLYDOKMEANS )
 						{
-							//lookup that hand's preflop 10-bin and flop 10-bin
-							const int pre = prebins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
-							const int post = postbins.retrieve( getindex2311( cards_hole, cards_flop, card_turn, card_river ) );
+							BoardStruct & newboard = boards.back( );
 
-							//increment that element of the array
-							newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
-						});
+							//characterize it:
+							//for each private hand
+							CardMask cards_hole;
+							CardMask cards_used2;
+							CardMask_OR( cards_used2, cards_used, card_river );
+							ENUMERATE_2_CARDS_D( cards_hole, cards_used2,
+							{
+								//lookup that hand's preflop 10-bin and flop 10-bin
+								const int pre = prebins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
+								const int post = postbins.retrieve( getindex2311( cards_hole, cards_flop, card_turn, card_river ) );
+
+								//increment that element of the array
+								newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
+							});
+						}
 					});
 				});
 			});
@@ -1537,7 +1549,9 @@ void nestflopbins( const int n_flopclusters, const int n_flopbins, const int n_f
 	cout << output.save( BINSFOLDER + "flopb" + tostr( n_flopclusters ) + "-" + tostr( n_flopbins ) + "x" + tostr( n_flopnew ) );
 }
 
-/*
+/* this is the correct algorithm. I think what i do below is exactly the 
+   same. or better in the places where it differs
+
   for(fcl)
     for(tcl)
 	  for(rcl)
@@ -1553,10 +1567,36 @@ void nestflopbins( const int n_flopclusters, const int n_flopbins, const int n_f
 		*/
 void saveriverbins( const int n_flopclusters, const int n_turnclusters, const int n_riverclusters, const int n_rivernew )
 {
-// 1 = easy way, less memory, idea will be to choose divisions in riverEV numbers for river bin divisions, 
-//     possible since all hole cards are in computation, would like to prove is same as hard way.
-// 0 = hard way, tons memory, idea is to put ALL river hands that match board bins into a bid array and sort, definitely correct.
 #if 1
+// INDEX25 easy way. same idea as below but it can be done MUCH more easily with only INDEX25!
+
+	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - b" << n_riverclusters << " - " << n_rivernew << " river bins..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_rivernew, INDEX25_MAX );
+
+	//the data used to bin the hands
+	const FloaterFile riverev( "riverEV", INDEX25_MAX );
+
+	for( int index25 = 0; index25 < INDEX25_MAX; index25++ )
+	{
+		const floater value = riverev[ index25 ];
+		int bin = static_cast< int >( value * n_rivernew );
+		if( bin == n_rivernew )
+			bin--;
+		output.store( index25, bin );
+	}
+
+	//save the file
+	cout << output.save( BINSFOLDER + "riverb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-b" + tostr( n_riverclusters ) + "-" + tostr( n_rivernew ) );
+
+#endif 
+
+// ...................................
+
+#if 0
+// INDEX2311 easy way, less memory, idea will be to choose divisions in riverEV numbers for river bin 
+// divisions, possible since all hole cards are in computation, would like to prove is same as hard way.
 
 	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - b" << n_riverclusters << " - " << n_rivernew << " river bins..." << endl;
 
@@ -1618,7 +1658,13 @@ void saveriverbins( const int n_flopclusters, const int n_turnclusters, const in
 	//save the file
 	cout << output.save( BINSFOLDER + "riverb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-b" + tostr( n_riverclusters ) + "-" + tostr( n_rivernew ) );
 
-#else
+#endif 
+
+// ..........................................
+
+#if 0
+// hard way, tons memory, idea is to put ALL river hands that match board bins into a bid array 
+// and sort, definitely correct. Most naturally uses INDEX2311
 
 	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - b" << n_riverclusters << " - " << n_rivernew << " river bins..." << endl;
 

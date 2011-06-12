@@ -21,6 +21,14 @@ inline int getindex23(CardMask pflop, CardMask flop) { return getindex2N(pflop, 
 extern int getindex231(CardMask pflop, CardMask flop, CardMask turn);
 extern int64 getindex2311(CardMask pflop, CardMask flop, CardMask turn, CardMask river);
 
+inline int getindex25(CardMask pflop, CardMask flop, CardMask turn, CardMask river)
+{
+	CardMask board;
+	CardMask_OR( board, flop, turn );
+	CardMask_OR( board, board, river );
+	return getindex2N( pflop, board, 5 );
+}
+
 inline int getindex3(CardMask flop) { return getindexN(flop, 3); }
 extern int getindex31(CardMask flop, CardMask turn);
 extern int getindex311(CardMask flop, CardMask turn, CardMask river);
