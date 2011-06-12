@@ -462,15 +462,6 @@ void determinebins(vector<CompressedHand> &myhands, const int n_bins, const int6
 		cout << endl << status.str() << flush;
 }
 
-inline void store(PackedBinFile &binfile, int64 myindex, int newbinvalue)
-{
-	const int mult = binfile.isstored(myindex);
-	if(mult == 0)
-		binfile.store(myindex, newbinvalue);
-	else //weighted running average
-		binfile.store(myindex, (int)(((float)(newbinvalue + mult*binfile.retrieve(myindex)) / (mult + 1)) + 0.5));
-}
-
 inline void binandstore(vector<RawHand> &hand_list, PackedBinFile &binfile, int n_bins, int64 total_hands, bool bunchsimilarhands = true)
 {
 	//hand_list will be larger than it needs to be and any unused slots will have
@@ -528,12 +519,12 @@ inline void binandstore(vector<RawHand> &hand_list, PackedBinFile &binfile, int 
 	
 	for(int64 i=0; i<compressed_size; i++)
 	{
-		store(binfile, hand_list_compressed[i].index, hand_list_compressed[i].bin);
+		binfile.store( hand_list_compressed[i].index, hand_list_compressed[i].bin );
 		IndexNode * nextindex = hand_list_compressed[i].nextindex;
 		hand_list_compressed[i].nextindex = NULL;
 		while(nextindex != NULL)
 		{
-			store(binfile, nextindex->index, hand_list_compressed[i].bin);
+			binfile.store( nextindex->index, hand_list_compressed[i].bin );
 			IndexNode * temp = nextindex->next;
 			delete nextindex;
 			nextindex = temp;
@@ -2323,6 +2314,9 @@ int main(int argc, char *argv[])
 		cout << "river bunches hands by HSS using fpcompare? " 
 			<< (RIVERBUNCHHISTBINS ? "Yes." : "No.") << endl;
 		cout << "(everything bunches hands by HSS using fpcompare, with possible exception of river.)" << endl;
+		cout << "Actually doing K-Means for board bins: " 
+			<< ( ACTUALLYDOKMEANS ? " Yes, using Hartigan-Wong with index groupings as initialization."
+							    : " No, using only index groupings." ) << endl;
 		cout << endl;
 	}
 

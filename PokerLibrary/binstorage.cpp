@@ -99,7 +99,8 @@ void PackedBinFile::store(int64 index, int bin_num)
 	if(index<0 || index>=_index_max ||  bin_num<0 || bin_num>=_bin_max)
 		REPORT("invalid parameters to store()");
 
-	if(_haveseen != NULL && (*_haveseen)[index]++ == 0xFF) //increment counter too
+	if( _haveseen && ( ( * _haveseen )[ index ] == 0 || bin_num != retrieve( index ) ) )
+		if( ( * _haveseen )[ index ]++ == 0xFF )
 			REPORT("you have stored to index "+tostring(index)+" over 255 times! _haveseen counter overflowed.");
 
 	const int nbits = bitsperbin(_bin_max);
