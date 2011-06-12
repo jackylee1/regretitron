@@ -985,7 +985,7 @@ cardsettings_t CardMachine::makecardsettings(
 			0,
 			PackedBinFile::numwordsneeded(fbinnum, INDEX23_MAX)*8,
 			PackedBinFile::numwordsneeded(tbinnum, INDEX231_MAX)*8,
-			PackedBinFile::numwordsneeded(rbinnum, INDEX2311_MAX)*8
+			PackedBinFile::numwordsneeded(rbinnum, INDEX25_MAX)*8
 		},
 		false, //use history
 		useflopalyzer, //use flopalyzer
