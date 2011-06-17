@@ -93,6 +93,8 @@ int main(int argc, char* argv[])
 		unsigned nthreads;
 		unsigned nlook;
 		double aggstatic = 0, aggselective = 0;
+		string rakename = "none";
+		int rakecap = 0;
 
 		namespace po = boost::program_options;
 
@@ -156,6 +158,11 @@ int main(int argc, char* argv[])
 			( "aggselective", po::value< double >( & aggselective )->required( )->default_value( 0 ),
 			  "selective aggresion factor (awarded after every hand to the winner when he does win by calling)" )
 #endif
+			( "rakename", po::value< string >( & rakename )->required( )->default_value( "none" ),
+			  "a label for the rake scheme used that is saved into the XML file" )
+			( "rakecap", po::value< int >( & rakecap )->required( )->default_value( 0 ),
+			  "this amount is taken from every post-flop pot (usually, in limit), and is "
+			  "specified in the same units as sblind, bblind, and stacksize above" )
 			;
 
 		bool askingforhelp = false;
@@ -267,11 +274,18 @@ int main(int argc, char* argv[])
 			cout << setw( 30 ) << right << "Selective aggression:  " << aggselective << endl;
 #endif
 
+			//rake
+
+			cout << setw( 30 ) << right << "Rake label:  " << rakename << endl;
+			cout << setw( 30 ) << right << "Rake cap:  " << rakecap << endl;
+			if( ( rakename == "none" ) != ( rakecap == 0 ) )
+				throw Exception( "rake name doesn't match rake amount" );
+
 			//initialize the solver, open bin files and grab all memory
 
 			cout << endl;
 
-			Solver::initsolver( treesettings, cardsettings, randseed, nthreads, nlook, aggstatic, aggselective );
+			Solver::initsolver( treesettings, cardsettings, randseed, nthreads, nlook, aggstatic, aggselective, rakename, rakecap );
 		}
 		catch( std::exception & e )
 		{

@@ -26,6 +26,8 @@ unsigned Solver::num_threads = 0;
 unsigned Solver::n_lookahead = 0;
 Working_type Solver::aggression_static_mult = 0;
 Working_type Solver::aggression_selective_mult = 0;
+string Solver::m_rakename;
+int Solver::m_rakecap = 0;
 #ifdef DO_THREADS
 pthread_mutex_t Solver::threaddatalock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t Solver::signaler = PTHREAD_COND_INITIALIZER;
@@ -51,7 +53,7 @@ void Solver::control_c(int sig)
 	}
 }
 
-void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings, MTRand::uint32 randseed, unsigned nthreads, unsigned nlook, double aggstatic, double aggselective )
+void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings, MTRand::uint32 randseed, unsigned nthreads, unsigned nlook, double aggstatic, double aggselective, string rakename, int rakecap )
 {
 	//threads
 
@@ -70,6 +72,11 @@ void Solver::initsolver( const treesettings_t & treesettings, const cardsettings
 
 	aggression_static_mult = static_cast< Working_type >( 1.0 + aggstatic / 100.0 );
 	aggression_selective_mult = static_cast< Working_type >( 1.0 + ( aggstatic + aggselective ) / 100.0 );
+
+	//rake
+
+	m_rakename = rakename;
+	m_rakecap = rakecap;
 
 	//other init
 
@@ -206,7 +213,8 @@ void Solver::save(const string &filename, bool writedata)
 			tostr2( ( aggression_static_mult - 1 ) * 100.0 ) );
 	params->SetAttribute("aggselective", 
 			tostr2( ( aggression_selective_mult - aggression_static_mult ) * 100.0 ) );
-	params->SetAttribute("raketype", RAKE_TYPE);
+	params->SetAttribute("raketype", m_rakename);
+	params->SetAttribute("rakecap", m_rakecap);
 
 	//link xml node..
 
@@ -559,26 +567,50 @@ void Solver::threadloop()
 
 #endif  /*DO_THREADS*/
 
-inline tuple<Working_type, Working_type> Solver::utiltuple( int p0utility, bool awardthebonus )
+inline Working_type calculaterake( int winningutility, bool haveseenflop, int rakecap )
+{
+#if 0
+	// this method is accurate for all rakecap amounts
+	const Working_type raketaken = mymin< Working_type >( 
+			static_cast< Working_type >( haveseenflop * rakecap ),  
+			static_cast< Working_type >( 0.05 ) * ( 2 * winningutility ) );
+	return static_cast< Working_type >( winningutility ) - raketaken;
+#endif
+#if 1
+	// this method is only accurate for small rakecap's (i.e. high limit poker)
+	const Working_type raketaken = static_cast< Working_type >( haveseenflop * rakecap );
+	return static_cast< Working_type >( winningutility ) - raketaken;
+#endif
+}
+
+
+inline tuple<Working_type, Working_type> Solver::utiltuple( int p0utility, bool awardthebonus, bool haveseenflop )
 {
 #ifdef DO_AGGRESSION
 
 	const Working_type aggression_multiplier = awardthebonus ? aggression_selective_mult : aggression_static_mult;
 
 	if(p0utility>0)
-		return tuple<Working_type,Working_type>( aggression_multiplier * (Working_type)rake(p0utility), -(Working_type)p0utility);
+		return tuple<Working_type,Working_type>( 
+			aggression_multiplier * calculaterake( p0utility, haveseenflop, m_rakecap ),
+			static_cast< Working_type >( - p0utility ) );
 	else
-		return tuple<Working_type,Working_type>( (Working_type)p0utility, aggression_multiplier * (Working_type)rake(-p0utility));
+		return tuple< Working_type, Working_type >(
+			static_cast< Working_type >( p0utility ),
+			aggression_multiplier * calculaterake( - p0utility, haveseenflop, m_rakecap ) );
 
 #else 
 	//optimize for the case where aggression_multiplier is 1, 
 	// hope awardthebonus is optimized away
 
 	if(p0utility>0)
-		return tuple<Working_type,Working_type>( (Working_type)rake(p0utility), -(Working_type)p0utility);
+		return tuple< Working_type, Working_type >( 
+			calculaterake( p0utility, haveseenflop, m_rakecap ),
+			static_cast< Working_type >( - p0utility ) );
 	else
-		return tuple<Working_type,Working_type>( (Working_type)p0utility, (Working_type)rake(-p0utility));
-
+		return tuple< Working_type, Working_type >( 
+			static_cast< Working_type >( p0utility ),
+			calculaterake( - p0utility, haveseenflop, m_rakecap ) );
 #endif
 }
 
@@ -668,12 +700,12 @@ tuple<Working_type,Working_type> Solver::walker(const int gr, const int pot, con
 			// if it is a tie, twoprob0wins=1, awardthebonus is false, and it would have no effect in this case anyway
 			//
 		case CallAllin: //showdown
-			utility[i] = utiltuple(get_property(*tree, settings_tag()).stacksize * (twoprob0wins-1), 2*playeri == twoprob0wins );
+			utility[i] = utiltuple(get_property(*tree, settings_tag()).stacksize * (twoprob0wins-1), 2*playeri == twoprob0wins, true );
 			break;
 
 		case Call:
 			if(gr==RIVER) //showdown
-				utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (twoprob0wins-1), 2*playeri == twoprob0wins );
+				utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (twoprob0wins-1), 2*playeri == twoprob0wins, true );
 			else //moving to next game round
 			{
 				if((*tree)[node].type==P0Plays)
@@ -690,7 +722,7 @@ tuple<Working_type,Working_type> Solver::walker(const int gr, const int pot, con
 			// On a fold, we always want to award the bonus, as the folder is never the winner. And we want to award the
 			// behavior where we get the opponent to fold.
 			//
-			utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (2*playeri - 1), true ); //acting player is loser, utility is integer
+			utility[i] = utiltuple((pot+(*tree)[*e].potcontrib) * (2*playeri - 1), true, gr != PREFLOP ); //acting player is loser, utility is integer
 			break;
 
 		case Bet:

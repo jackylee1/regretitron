@@ -165,10 +165,6 @@ typedef FloatCustomSigned< uint8, 4, 18, true > CUSTOMFLOATNAME( Signed, uint8, 
 const bool THREADLOOPTRACE = false; //prints out debugging
 const bool WALKERDEBUG = false; //debug print
 
-//add your rake graduations in here if solving for a cash game
-const string RAKE_TYPE = "none"; //added to XML file
-inline int rake(int winningutility) { return winningutility; }
-
 #define IMPERFECT_RECALL 0 /* 0 = perfect recall */
 
 #define LIMIT 1
