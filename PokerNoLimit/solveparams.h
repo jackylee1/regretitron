@@ -160,12 +160,14 @@ typedef FloatCustomSigned< uint8, 4, 18, true > CUSTOMFLOATNAME( Signed, uint8, 
 #define DYNAMIC_ALLOC_REGRET 0 /*must be false for __float128 to work due to alignment issues*/
 #define DYNAMIC_ALLOC_COUNTS 0
 
-#define DO_THREADS /*undefine this to disable threading use*/
+//#define DO_THREADS /*undefine this to disable threading use*/
 #define DO_AGGRESSION /*undefine this to disable aggression support (could be faster)*/
 const bool THREADLOOPTRACE = false; //prints out debugging
 const bool WALKERDEBUG = false; //debug print
 
-#define IMPERFECT_RECALL 0 /* 0 = perfect recall */
+#ifdef DO_THREADS
+#define IMPERFECT_RECALL 1 /* 0 = perfect recall */
+#endif
 
 #define LIMIT 1
 
