@@ -189,8 +189,8 @@ uint64 SessionManager::TestSession( uint64 playerid, uint64 sessionid, MessageSe
 		}
 		else
 		{
-			otl_connect localdatabase( MYSQL_CONNECT_STRING ); //don't know if session connection will still work
-			otl_stream updatetests( 1, "update sessions set numtests = numtests + 1 where sessionid = :sessid<unsigned>", localdatabase );
+			findresult->second->database = std::auto_ptr< otl_connect >( new otl_connect( MYSQL_CONNECT_STRING ) ); //make a new connection in case this session is a bit stale
+			otl_stream updatetests( 1, "update sessions set numtests = numtests + 1 where sessionid = :sessid<unsigned>", * findresult->second->database );
 			updatetests << (unsigned)sessionid << endr;
 
 			response.sessiontype = SESSION_OPEN;
