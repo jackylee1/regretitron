@@ -34,11 +34,17 @@ enum Result
 class Playoff
 {
 public:
-	Playoff(string file1, string file2);
+	Playoff(string file1, string file2, double rakepct = 0, double rakecapbb = 0);
 	~Playoff();
 
 	void playsomegames(int64 number_game_pairs);
 	double getev() { return 1000.0 * (totalwinningsbot0/_bblind) / (2*totalpairsplayed); } //EV of file on LEFT
+	void getfullresult( double & leftresult, double & rightresult, double & rakeresult )
+	{ 
+		leftresult = 1000.0 * (totalwinningsbot0/_bblind) / (2*totalpairsplayed);
+		rightresult = 1000.0 * (totalwinningsbot1/_bblind) / (2*totalpairsplayed);
+		rakeresult = 1000.0 * (totalwinningsrake/_bblind) / (2*totalpairsplayed);
+	}
 	double get95interval() { return 4500.0 / sqrt(totalpairsplayed); } //95% confidence interval
 	int64 gettotalpairsplayed() { return totalpairsplayed; }
 
@@ -53,7 +59,7 @@ private:
 
 	void playgamepair();
 	Result playoutaround(Player nexttogo, double &pot);
-	double playonegame(CardMask priv[2], CardMask board[4], int twoprob0wins); //return utility to P0
+	double playonegame(CardMask priv[2], CardMask board[4], int twoprob0wins, int & gr); //return utility to P0
 
 	// private data members
 
@@ -61,7 +67,13 @@ private:
 	static const double _sblind;
 	static const double _bblind;
 	double _stacksize;
+	double _rakepct;
+	double _rakecapbb;
+	void assignrake( const double prerakewinnings, const int maxround, double & postrakewinnings, double & raketaken );
+	void assignwinnings( const double bot0prerakewinnings, const int maxround );
 	double totalwinningsbot0; //this refers to the bot ORIGINALLY placed in slot 0. (swaps always done in pairs)
+	double totalwinningsbot1;
+	double totalwinningsrake;
 	int64 totalpairsplayed;
 #if PLAYOFFDEBUG > 0
 	MTRand &mersenne;
@@ -73,9 +85,13 @@ private:
 const double Playoff::_sblind = 1.0;
 const double Playoff::_bblind = 2.0;
 
-Playoff::Playoff(string file1, string file2)
+Playoff::Playoff(string file1, string file2, double rakepct, double rakecapbb)
 	: _bots(2, NULL),
+	  _rakepct( rakepct ),
+	  _rakecapbb( rakecapbb ),
 	  totalwinningsbot0(0),
+	  totalwinningsbot1(0),
+	  totalwinningsrake(0),
 	  totalpairsplayed(0),
 #if PLAYOFFDEBUG > 0
 	  mersenne(playoff_rand) //alias to globally defined object
@@ -160,18 +176,45 @@ void Playoff::playgamepair()
 	//play a game each way, make sure to never swap once, as then we'd lose track of which bot is which
 	//_bots of zero is always player zero, _bots of one is always player one
 
-	double game1 = playonegame(priv, board, twoprob0wins); //returns utility of player/bot 0
+	int gr1, gr2; //max gameround that the game attained
+	double game1 = playonegame(priv, board, twoprob0wins, gr1); //returns utility of player/bot 0
 	swap(_bots[0], _bots[1]);
-	double game2 = -playonegame(priv, board, twoprob0wins); //returns utility of player/bot 0
+	double game2 = -playonegame(priv, board, twoprob0wins, gr2); //returns utility of player/bot 0
 	swap(_bots[0], _bots[1]);
 #if PLAYOFFDEBUG > 0
 	cout << game1 << "  " << (game2 != 0 ? game2 : 0) << endl; //avoid "-0" printing
 #endif
-	totalwinningsbot0 += game1 + game2;
+	assignwinnings( game1, gr1 );
+	assignwinnings( game2, gr2 );
 }
 
-double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0wins) //return utility to player/bot 0
+void Playoff::assignrake( const double prerakewinnings, const int maxround, double & postrakewinnings, double & raketaken )
 {
+	if( maxround >= FLOP && prerakewinnings > 0 )
+		raketaken = mymin( _rakecapbb * _bblind, _rakepct * ( 2 * prerakewinnings ) );
+	else
+		raketaken = 0;
+
+	postrakewinnings = prerakewinnings - raketaken;
+}
+
+void Playoff::assignwinnings( const double bot0prerakewinnings, const int maxround )
+{
+	const double bot1prerakewinnings = - bot0prerakewinnings;
+
+	double botpostrakewinnings[ 2 ], raketaken[ 2 ];
+	assignrake( bot0prerakewinnings, maxround, botpostrakewinnings[ 0 ], raketaken[ 0 ] );
+	assignrake( bot1prerakewinnings, maxround, botpostrakewinnings[ 1 ], raketaken[ 1 ] );
+
+	totalwinningsbot0 += botpostrakewinnings[ 0 ];
+	totalwinningsbot1 += botpostrakewinnings[ 1 ];
+	totalwinningsrake += raketaken[ 0 ] + raketaken[ 1 ];
+}
+
+double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0wins, int & gr) //return utility to player/bot 0
+{
+	gr = PREFLOP;
+
 	_bots[P0]->setnewgame(P0, priv[P0], _sblind, _bblind, _stacksize);
 	_bots[P1]->setnewgame(P1, priv[P1], _sblind, _bblind, _stacksize);
 	
@@ -184,7 +227,7 @@ double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0win
 		case GO: break;
 	}
 
-	for(int gr=FLOP; gr<4; gr++)
+	for(gr=FLOP; gr<4; gr++)
 	{
 		_bots[P0]->setnextround(gr, board[gr], pot);
 		_bots[P1]->setnextround(gr, board[gr], pot);
@@ -313,6 +356,32 @@ int main(int argc, char **argv)
 	//analysis will return true if it parsed the commands into something to do
 	if(doanalysis(argc, argv))
 		return 0;
+
+	//two files supplied, with rake. play them against each other, repeatedly, unless number is given.
+
+	else if( ( argc == 5 || argc == 6 ) && string( argv[ 1 ] ) == "rake" )
+	{
+		Playoff * myplayoff = new Playoff( argv[ 3 ], argv[ 4 ], 0.05, atof( argv[ 2 ] ) );
+		const int numgames = argc==6 ? atol(argv[5]) : 10000;
+playgamesrake:
+		myplayoff->playsomegames(numgames); 
+		cout << "After " << myplayoff->gettotalpairsplayed() << " pairs of games, ";
+		double leftresult, rightresult, rakeresult;
+		myplayoff->getfullresult( leftresult, rightresult, rakeresult );
+		double std = myplayoff->get95interval();
+		cout 
+			<< "left=" << setw( 10 ) << left << leftresult 
+			<< " right=" << setw( 10 ) << left << rightresult 
+			<< " rake=" << setw( 10 ) << left << rakeresult
+			<< "  +- " << std
+			<< endl;
+
+		if(argc == 5)
+		{
+			cout << "\033[1A"; //move cursor up one line
+			goto playgamesrake; //infinite loop
+		}
+	}
 
 	//two files supplied. play them against each other, repeatedly, unless number is given.
 
