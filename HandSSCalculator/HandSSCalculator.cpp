@@ -5,6 +5,7 @@
 #include "../MersenneTwister.h"
 #include <string>
 #include <list>
+#include <set>
 #include <iomanip>
 #include <limits>
 #include "../utility.h"
@@ -629,6 +630,17 @@ struct BoardChar
 	}
 };
 
+template < typename T, typename U >
+bool operator < ( const BoardChar< T > & one, const BoardChar< U > & two )
+{
+	for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+		if( one.c[ i ] < two.c[ i ] )
+			return true;
+		else if( one.c[ i ] > two.c[ i ] )
+			return false;
+	return false;
+}
+
 struct BoardStruct
 {
 	BoardStruct( ) : index( -1 ), cluster( -1 ) { }
@@ -653,9 +665,10 @@ struct IndexSorter
 	}
 };
 
-#if 1
+#if 0
 // assign each board to a cluster, then compute the initial centroids from that
 // this board assignment seems to be pretty good on its own (just uses index)
+const string KMEANSINITMETHOD = "index groupings";
 void initialize_kmeans( BoardVec & boards, CentroidVec & centroids )
 {
 	// assign the clusters by grouping near indices together
@@ -688,9 +701,10 @@ void initialize_kmeans( BoardVec & boards, CentroidVec & centroids )
 }
 #endif
 
-#if 0
+#if 1
 // assign each centroid to be a randomly selected board
 // this algorithm only assigns the centroids, not the boards
+const string KMEANSINITMETHOD = "randomly selected boards";
 void initialize_kmeans( BoardVec & boards, CentroidVec & centroids )
 {
 	// this algorithm is the same as my card shuffling algorithm
@@ -719,20 +733,39 @@ void clusterandstore( BoardVec & boards, int n_clusters, PackedBinFile & output,
 		const string & name )
 {
    	cerr << "For " << name << " clusters:" << endl;
+
+	{
+		std::set< BoardChar< int > > uniqueboards;
+		for( BoardVec::iterator i = boards.begin( ); i != boards.end( ); i++ )
+			uniqueboards.insert( i->characteristic );
+		cerr << uniqueboards.size( ) << " unique boards detected." << endl;
+	}
+
 	if( (unsigned)n_clusters >= boards.size( ) )
 		REPORT( "k >= n in kmeans" );
 	if( n_clusters <= 1 )
 		REPORT( "k <= 1 in kmeans" );
+
+	list< vector< int > > trialsclusters;
+	list< double > trialserrors;
+
+	/////////
+	goto clusternofault;
+clusterfault1:
+	cerr << "x" << flush;
+	goto clusternofault;
+clusternofault:
+	/////////
 
 	CentroidVec centroids( n_clusters );
 	initialize_kmeans( boards, centroids );
 	vector< int > clustercounts( n_clusters, 0 );
 	vector< double > clustererrors( n_clusters, 0 );
 	int n_iter = 0;
+	const int MAX_ITER_ALLOWED = 20;
 
 	if( ACTUALLYDOKMEANS )
 	{
-		const int MAX_ITER_ALLOWED = numeric_limits< int >::max( );
 
 		// loop through to find the first and second closest clusters for each point
 		// assign each board to its nearest centroid
@@ -797,7 +830,7 @@ void clusterandstore( BoardVec & boards, int n_clusters, PackedBinFile & output,
 		for( int i = 0; i < n_clusters; i++ )
 		{
 			if( clustercounts[ i ] == 0 )
-				REPORT( "cluster fault 1" );
+				goto clusterfault1;
 
 			centroids[ i ] /= clustercounts[ i ];
 
@@ -948,6 +981,7 @@ endqtran:
 
 	}
 
+
 	for( int i = 0; i < n_clusters; i++ )
 	{
 		clustercounts[ i ] = 0;
@@ -957,7 +991,6 @@ endqtran:
 
 	for( BoardVec::iterator i = boards.begin( ); i != boards.end( ); i++ )
 	{
-		output.store( i->index, i->cluster );
 		clustercounts[ i->cluster ]++;
 		centroids[ i->cluster ] += i->characteristic;
 	}
@@ -974,13 +1007,34 @@ endqtran:
 	}
 
 	cerr << "Final error: " << totalerror << endl;
-	cerr << "Iterations: " << n_iter << endl;
-	cerr << "Cluster number: size of cluster (wss error)" << endl;
+	cerr << "Iterations: " << n_iter;
+	if( n_iter > MAX_ITER_ALLOWED )
+		cerr << "(MAX ITER)";
+	cerr << endl << "Cluster number: size of cluster (wss error)" << endl;
 	for( int i = 0; i < n_clusters; i++ )
 	{
 		cerr << i << ": " << clustercounts[ i ] << " (" << clustererrors[ i ] << ")" << endl;
 	}
 	cerr << endl;
+
+	trialserrors.push_back( totalerror );
+	trialsclusters.push_back( vector< int >( ) );
+	vector< int > & lasttrial = trialsclusters.back( );
+	lasttrial.reserve( boards.size( ) );
+	for( unsigned i = 0; i < boards.size( ); i++ )
+		lasttrial[ i ] = boards[ i ].cluster;
+
+	if( trialserrors.size( ) < 20 )
+		goto clusternofault;
+
+	const list< double >::iterator besterror = min_element( trialserrors.begin( ), trialserrors.end( ) );
+	list< double >::iterator err = trialserrors.begin( ); 
+	list< vector< int > >::iterator vec = trialsclusters.begin( ); 
+	for( ; err != besterror; err++, vec++ );
+
+	cerr << ">>> Of " << trialserrors.size( ) << " trials, chose the one with error " << * besterror << endl;
+	for( unsigned i = 0; i < boards.size( ); i++ )
+		output.store( boards[ i ].index, vec->operator[]( i ) );
 }
 
 #if 0 /* this is Lloyd's algorithm (the really simple one) */
@@ -2318,10 +2372,12 @@ int main(int argc, char *argv[])
 		cout << "river bunches hands by HSS using fpcompare? " 
 			<< (RIVERBUNCHHISTBINS ? "Yes." : "No.") << endl;
 		cout << "(everything bunches hands by HSS using fpcompare, with possible exception of river.)" << endl;
-		cout << "Actually doing K-Means for board bins: " 
-			<< ( ACTUALLYDOKMEANS ? " Yes, using Hartigan-Wong with index groupings as initialization."
-							    : " No, using only index groupings." ) << endl;
-		cout << endl;
+		cout << "Actually doing K-Means for board bins: ";
+		if( ACTUALLYDOKMEANS )
+			cout << " Yes, using Hartigan-Wong with " << KMEANSINITMETHOD << " as initialization.";
+		else
+			cout << " No, using only index groupings.";
+		cout << endl << endl;
 	}
 
 	//these checks must be before other histbin checks
