@@ -34,7 +34,7 @@ enum Result
 class Playoff
 {
 public:
-	Playoff(string file1, string file2, double rakepct = 0, double rakecapbb = 0);
+	Playoff(string file1, string file2, double rakepct = 0, double rakecapbb = 0, double ssbb = 0);
 	~Playoff();
 
 	void playsomegames(int64 number_game_pairs);
@@ -85,7 +85,7 @@ private:
 const double Playoff::_sblind = 1.0;
 const double Playoff::_bblind = 2.0;
 
-Playoff::Playoff(string file1, string file2, double rakepct, double rakecapbb)
+Playoff::Playoff(string file1, string file2, double rakepct, double rakecapbb, double ssbb)
 	: _bots(2, NULL),
 	  _rakepct( rakepct ),
 	  _rakecapbb( rakecapbb ),
@@ -103,19 +103,24 @@ Playoff::Playoff(string file1, string file2, double rakepct, double rakecapbb)
 	_bots[1] = new BotAPI(file2, true, MTRand::gettimeclockseed(), BotAPI::botapinulllogger, BotAPI::botapinulllogger );
 	if(_bots[0]->islimit() != _bots[1]->islimit())
 		REPORT("You can't play a limit bot against a no-limit bot!");
-	double stacksizemult1 = _bots[0]->getstacksizemult();
-	double stacksizemult2 = _bots[1]->getstacksizemult();
-	if(!fpequal(stacksizemult1, stacksizemult2))
+	if( ! fpequal( ssbb, 0 ) )
+		_stacksize = ssbb * _bblind;
+	else
 	{
+		double stacksizemult1 = _bots[0]->getstacksizemult();
+		double stacksizemult2 = _bots[1]->getstacksizemult();
+		if(!fpequal(stacksizemult1, stacksizemult2))
+		{
 
-		_stacksize = _bots[0]->islimit() ? min(stacksizemult1,stacksizemult2) : (stacksizemult1+stacksizemult2) / 2.0;
-		cerr << "Warning: "+file1+" has stacksize "+tostring(stacksizemult1)+"bb while "+file2+" has stacksize "
+			_stacksize = _bots[0]->islimit() ? min(stacksizemult1,stacksizemult2) : (stacksizemult1+stacksizemult2) / 2.0;
+			cerr << "Warning: "+file1+" has stacksize "+tostring(stacksizemult1)+"bb while "+file2+" has stacksize "
 				+tostring(stacksizemult2)+"bb for "+(_bots[0]->islimit() ? "limit" : "no-limit")
 				+" poker... using "+tostring(_stacksize)+"bb." << endl;
-		_stacksize *= _bblind;
+			_stacksize *= _bblind;
+		}
+		else
+			_stacksize = stacksizemult1 * _bblind;
 	}
-	else
-		_stacksize = stacksizemult1 * _bblind;
 }
 
 Playoff::~Playoff()
@@ -223,7 +228,7 @@ double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0win
 	{
 		case P0FOLD: return -pot; //return utility to player/bot 0
 		case P1FOLD: return pot;
-		case CALLALLIN: return (twoprob0wins-1) * _stacksize;
+		case CALLALLIN: gr=4; return (twoprob0wins-1) * _stacksize;
 		case GO: break;
 	}
 
@@ -235,7 +240,7 @@ double Playoff::playonegame(CardMask priv[2], CardMask board[4], int twoprob0win
 		{
 			case P0FOLD: return -pot;
 			case P1FOLD: return pot;
-			case CALLALLIN: return (twoprob0wins-1) * _stacksize;
+			case CALLALLIN: gr=4; return (twoprob0wins-1) * _stacksize;
 			case GO: break;
 		}
 	}
@@ -357,12 +362,12 @@ int main(int argc, char **argv)
 	if(doanalysis(argc, argv))
 		return 0;
 
-	//two files supplied, with rake. play them against each other, repeatedly, unless number is given.
+	//two files supplied, with rake and ss. otherwise same as next case
 
-	else if( ( argc == 5 || argc == 6 ) && string( argv[ 1 ] ) == "rake" )
+	else if( ( argc == 6 || argc == 7 ) && string( argv[ 1 ] ) == "rakess" )
 	{
-		Playoff * myplayoff = new Playoff( argv[ 3 ], argv[ 4 ], 0.05, atof( argv[ 2 ] ) );
-		const int numgames = argc==6 ? atol(argv[5]) : 10000;
+		Playoff * myplayoff = new Playoff( argv[ 4 ], argv[ 5 ], 0.05, atof( argv[ 2 ] ), atof( argv[ 3 ] ) );
+		const int numgames = argc==7 ? atol(argv[6]) : 10000;
 playgamesrake:
 		myplayoff->playsomegames(numgames); 
 		cout << "After " << myplayoff->gettotalpairsplayed() << " pairs of games, ";
@@ -376,7 +381,7 @@ playgamesrake:
 			<< "  +- " << std
 			<< endl;
 
-		if(argc == 5)
+		if(argc == 6)
 		{
 			cout << "\033[1A"; //move cursor up one line
 			goto playgamesrake; //infinite loop
