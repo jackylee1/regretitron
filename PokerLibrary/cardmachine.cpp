@@ -12,6 +12,9 @@ using namespace std;
 //static non-integral data member initialization
 const int CardMachine::FLOPALYZER_MAX[4]= { 1, 6, 17, 37 };
 
+const int64 HACK2311_SIZE_THRESHOLD = 500000000;
+bool is2311( const int64 size ) { return size < 0 || size > HACK2311_SIZE_THRESHOLD; }
+
 CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uint32 randseed ) :
 	myparams(cardsettings),
 	cardsi_max(4, -1),
@@ -92,7 +95,7 @@ CardMachine::CardMachine(cardsettings_t cardsettings, bool issolver, MTRand::uin
 				index_max = INDEX23_MAX;
 			else if(gr==TURN)
 				index_max = INDEX231_MAX;
-			else if( myparams.usehistory )
+			else if( is2311( myparams.filesize[ gr ] ) )
 				index_max = INDEX2311_MAX;
 			else
 				index_max = INDEX25_MAX;
@@ -173,8 +176,16 @@ void CardMachine::getnewgame(int cardsi[4][2], int &twoprob0wins)
 		cardsi[FLOP][P1] = binfiles[FLOP]->retrieve(getindex23(priv[P1], board[FLOP]));
 		cardsi[TURN][P0] = binfiles[TURN]->retrieve(getindex231(priv[P0], board[FLOP], board[TURN]));
 		cardsi[TURN][P1] = binfiles[TURN]->retrieve(getindex231(priv[P1], board[FLOP], board[TURN]));
-		cardsi[RIVER][P0] = binfiles[RIVER]->retrieve(getindex25(priv[P0], board[FLOP], board[TURN], board[RIVER]));
-		cardsi[RIVER][P1] = binfiles[RIVER]->retrieve(getindex25(priv[P1], board[FLOP], board[TURN], board[RIVER]));
+		cardsi[RIVER][P0] = binfiles[RIVER]->retrieve(
+				is2311( myparams.filesize[ RIVER ] ) ?
+				getindex2311(priv[P0], board[FLOP], board[TURN], board[RIVER]) :
+				getindex25(priv[P0], board[FLOP], board[TURN], board[RIVER])
+				);
+		cardsi[RIVER][P1] = binfiles[RIVER]->retrieve(
+				is2311( myparams.filesize[ RIVER ] ) ?
+				getindex2311(priv[P1], board[FLOP], board[TURN], board[RIVER]) :
+				getindex25(priv[P1], board[FLOP], board[TURN], board[RIVER])
+				);
 	}
 
 	//insert the flopalyzer score in-place if requested
@@ -298,7 +309,11 @@ int CardMachine::getindices(int gr, const vector<CardMask> &cards, vector<int> &
 				cardsi = handi[0] = binfiles[TURN]->retrieve(getindex231(cards[PREFLOP],cards[FLOP],cards[TURN]));
 				break;
 			case RIVER:
-				cardsi = handi[0] = binfiles[RIVER]->retrieve(getindex25(cards[PREFLOP],cards[FLOP],cards[TURN],cards[RIVER]));
+				cardsi = handi[0] = binfiles[RIVER]->retrieve(
+						is2311( myparams.filesize[ RIVER ] ) ?
+						getindex2311(cards[PREFLOP],cards[FLOP],cards[TURN],cards[RIVER]) :
+						getindex25(cards[PREFLOP],cards[FLOP],cards[TURN],cards[RIVER])
+						);
 				break;
 			default:
 				REPORT("invalid gameround");
@@ -507,7 +522,11 @@ findpreflop:
 						return;
 					break;
 				case RIVER:
-					if( handi[0] == binfiles[gr]->retrieve( getindex25( cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER] ) ) )
+					if( handi[0] == binfiles[gr]->retrieve( 
+							is2311( myparams.filesize[ RIVER ] ) ?
+							getindex2311( cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER] ) :
+							getindex25( cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER] ) 
+							) )
 						return;
 					break;
 				default:
@@ -972,6 +991,9 @@ cardsettings_t CardMachine::makecardsettings(
 		}
 	};
 
+	const string riverfile = "bins/riverb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + 'b' + tostr( boardrbin ) + '-' + rbin;
+	const bool bigfile = is2311( boost::filesystem::file_size( riverfile + ".bins" ) );
+
 	cardsettings_t nohistoryretval =
 	{
 		{ INDEX2_MAX, fbinnum, tbinnum, rbinnum },
@@ -979,13 +1001,13 @@ cardsettings_t CardMachine::makecardsettings(
 			"",
 			"bins/flopb" + tostr( boardfbin ) + '-' + fbin,
 			"bins/turnb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + tbin,
-			"bins/riverb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + 'b' + tostr( boardrbin ) + '-' + rbin
+			riverfile
 		},
 		{
 			0,
 			PackedBinFile::numwordsneeded(fbinnum, INDEX23_MAX)*8,
 			PackedBinFile::numwordsneeded(tbinnum, INDEX231_MAX)*8,
-			PackedBinFile::numwordsneeded(rbinnum, INDEX25_MAX)*8
+			PackedBinFile::numwordsneeded(rbinnum, bigfile ? INDEX2311_MAX : INDEX25_MAX)*8
 		},
 		false, //use history
 		useflopalyzer, //use flopalyzer
