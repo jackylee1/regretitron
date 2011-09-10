@@ -1,0 +1,218 @@
+Index: PokerPlayerMFC/strategy.cpp
+===================================================================
+--- PokerPlayerMFC/strategy.cpp	(revision 232)
++++ PokerPlayerMFC/strategy.cpp	(working copy)
+@@ -65,6 +65,9 @@
+ 		cardsettings.useboardbins = 
+ 			cardbins->FirstChildElement("meta")->HasAttribute("useboardbins")
+ 			&& cardbins->FirstChildElement("meta")->GetAttribute<bool>("useboardbins");
++		cardsettings.useriverhandtype = 
++			cardbins->FirstChildElement("meta")->HasAttribute("useriverhandtype")
++			&& cardbins->FirstChildElement("meta")->GetAttribute<bool>("useriverhandtype");
+ 		for(int gr=0; gr<4; gr++)
+ 		{
+ 			if( cardsettings.useboardbins )
+Index: PokerLibrary/cardmachine.cpp
+===================================================================
+--- PokerLibrary/cardmachine.cpp	(revision 235)
++++ PokerLibrary/cardmachine.cpp	(working copy)
+@@ -12,6 +12,10 @@
+ //static non-integral data member initialization
+ const int CardMachine::FLOPALYZER_MAX[4]= { 1, 6, 17, 37 };
+ 
++// 7 = group quads & stflush into full house
++// 8 = give full house its own bin and quads & stflush their own bin
++const int CardMachine::RIVER_HANDTYPE_MAX = 7;
++
+ const int64 HACK2311_SIZE_THRESHOLD = 500000000;
+ bool is2311( const int64 size ) { return size < 0 || size > HACK2311_SIZE_THRESHOLD; }
+ 
+@@ -43,6 +47,9 @@
+ 		if(myparams.useflopalyzer) //multiply in flopalyzer
+ 			cardsi_max[gr] *= FLOPALYZER_MAX[gr];
+ 
++		if( myparams.useriverhandtype )
++			cardsi_max[ RIVER ] *= RIVER_HANDTYPE_MAX;
++
+ 		if(myparams.useboardbins && gr >= FLOP) //multiply in board bins
+ 			for(int boardi = FLOP; boardi <= gr; boardi ++ )
+ 				cardsi_max[gr] *= myparams.board_bin_max[boardi];
+@@ -242,6 +249,32 @@
+ 		twoprob0wins = 0;
+ 	else
+ 		twoprob0wins = 1;
++
++	//insert the hand type in-place if requested, only used on river
++
++	if( myparams.useriverhandtype )
++	{
++		// handtype values are:
++		// StdRules_HandType_NOPAIR    0
++		// StdRules_HandType_ONEPAIR   1
++		// StdRules_HandType_TWOPAIR   2
++		// StdRules_HandType_TRIPS     3
++		// StdRules_HandType_STRAIGHT  4
++		// StdRules_HandType_FLUSH     5
++		// StdRules_HandType_FULLHOUSE 6
++		// StdRules_HandType_QUADS     7
++		// StdRules_HandType_STFLUSH   8
++
++		int handtype0 = HandVal_HANDTYPE( r0 );
++		if( handtype0 >= RIVER_HANDTYPE_MAX ) 
++			handtype0 = RIVER_HANDTYPE_MAX - 1;
++		cardsi[ RIVER ][ P0 ] = combine( cardsi[ RIVER ][ P0 ], handtype0, RIVER_HANDTYPE_MAX );
++
++		int handtype1 = HandVal_HANDTYPE( r1 );
++		if( handtype1 >= RIVER_HANDTYPE_MAX ) 
++			handtype1 = RIVER_HANDTYPE_MAX - 1;
++		cardsi[ RIVER ][ P1 ] = combine( cardsi[ RIVER ][ P1 ], handtype1, RIVER_HANDTYPE_MAX );
++	}
+ }
+ 
+ //returns cardsi
+@@ -378,6 +411,22 @@
+ 		}
+ 	}
+ 
++	//insert the hand type in-place if requested, only used on river
++
++	if( gr == RIVER && myparams.useriverhandtype )
++	{
++		CardMask full;
++		CardMask_OR( full, cards[ PREFLOP ], cards[ FLOP ] );
++		CardMask_OR( full, full, cards[ TURN ] );
++		CardMask_OR( full, full, cards[ RIVER ] );
++
++		int handtype = HandVal_HANDTYPE( Hand_EVAL_N( full, 7 ) );
++		if( handtype >= RIVER_HANDTYPE_MAX ) 
++			handtype = RIVER_HANDTYPE_MAX - 1;
++
++		cardsi = combine( cardsi, handtype, RIVER_HANDTYPE_MAX );
++	}
++
+ 	return cardsi;
+ }	
+ 
+@@ -522,13 +571,29 @@
+ 						return;
+ 					break;
+ 				case RIVER:
+-					if( handi[0] == binfiles[gr]->retrieve( 
++				{
++					int tempvalue = binfiles[gr]->retrieve( 
+ 							is2311( myparams.filesize[ RIVER ] ) ?
+ 							getindex2311( cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER] ) :
+ 							getindex25( cards[PREFLOP], cards[FLOP], cards[TURN], cards[RIVER] ) 
+-							) )
++							);
++					if( myparams.useriverhandtype )
++					{
++						CardMask full;
++						CardMask_OR( full, cards[ PREFLOP ], cards[ FLOP ] );
++						CardMask_OR( full, full, cards[ TURN ] );
++						CardMask_OR( full, full, cards[ RIVER ] );
++
++						int handtype = HandVal_HANDTYPE( Hand_EVAL_N( full, 7 ) );
++						if( handtype >= RIVER_HANDTYPE_MAX ) 
++							handtype = RIVER_HANDTYPE_MAX - 1;
++
++						tempvalue = combine( tempvalue, handtype, RIVER_HANDTYPE_MAX );
++					}					
++					if( handi[0] == tempvalue )
+ 						return;
+ 					break;
++				}
+ 				default:
+ 					REPORT("bad gr");
+ 			}
+@@ -951,7 +1016,7 @@
+ cardsettings_t CardMachine::makecardsettings( 
+ 		string pfbin, string fbin, string tbin, string rbin,
+ 		int boardfbin, int boardtbin, int boardrbin,
+-		bool usehistory, bool useflopalyzer, bool useboardbins )
++		bool usehistory, bool useflopalyzer, bool useboardbins, bool useriverhandtype )
+ {
+ 	int pfbinnum = getnumbins( pfbin );
+ 	int fbinnum = getnumbins( fbin );
+@@ -976,6 +1041,7 @@
+ 		true, //use history
+ 		useflopalyzer, //use flopalyzer
+ 		useboardbins, //use board bins
++		useriverhandtype, //use river hand type
+ 		{ 0, boardfbin, boardtbin, boardrbin },
+ 		{
+ 			"",
+@@ -1012,6 +1078,7 @@
+ 		false, //use history
+ 		useflopalyzer, //use flopalyzer
+ 		useboardbins, //use board bins
++		useriverhandtype, //use river hand type
+ 		{ 0, boardfbin, boardtbin, boardrbin },
+ 		{
+ 			"",
+Index: PokerLibrary/cardmachine.h
+===================================================================
+--- PokerLibrary/cardmachine.h	(revision 232)
++++ PokerLibrary/cardmachine.h	(working copy)
+@@ -20,6 +20,7 @@
+ 	bool usehistory;
+ 	bool useflopalyzer;
+ 	bool useboardbins;
++	bool useriverhandtype;
+ 	int board_bin_max[4];
+ 	string boardbinsfilename[4];
+ 	int64 boardbinsfilesize[4];
+@@ -51,8 +52,9 @@
+ 	static cardsettings_t makecardsettings( 
+ 			string pfbin, string fbin, string tbin, string rbin,
+ 			int boardfbin, int boardtbin, int boardrbin,
+-			bool usehistory, bool useflopalyzer, bool useboardbins );
++			bool usehistory, bool useflopalyzer, bool useboardbins, bool useriverhandtype );
+ 
++	static const int RIVER_HANDTYPE_MAX;
+ private:
+ 	//we do not support copying.
+ 	CardMachine(const CardMachine& rhs);
+Index: PokerNoLimit/solver.cpp
+===================================================================
+--- PokerNoLimit/solver.cpp	(revision 234)
++++ PokerNoLimit/solver.cpp	(working copy)
+@@ -234,6 +234,7 @@
+ 	meta->SetAttribute("usehistory", cardmachine->getparams().usehistory);
+ 	meta->SetAttribute("useflopalyzer", cardmachine->getparams().useflopalyzer);
+ 	meta->SetAttribute("useboardbins", cardmachine->getparams().useboardbins);
++	meta->SetAttribute("useriverhandtype", cardmachine->getparams().useriverhandtype);
+ 	cardbins->LinkEndChild(meta);
+ 	for(int gr=0; gr<4; gr++) //regular bins
+ 	{
+Index: PokerNoLimit/pokernolimit.cpp
+===================================================================
+--- PokerNoLimit/pokernolimit.cpp	(revision 232)
++++ PokerNoLimit/pokernolimit.cpp	(working copy)
+@@ -137,6 +137,8 @@
+ 			  "number of turn bins" )
+ 			( "rbin", po::value< string >( )->required( ),
+ 			  "number of river bins" )
++			( "useriverhandtype", po::value< bool >( )->default_value( false )->required( ),
++			  ( "use river hand type (adds " + tostr( CardMachine::RIVER_HANDTYPE_MAX ) + "x to cardsimax)" ).c_str( ) )
+ 			( "useflopalyzer", po::value< bool >( )->default_value( false )->required( ),
+ 			  "use the cardmachine's flopalyzer or not" )
+ 			( "usehistory", po::value< bool >( ),
+@@ -252,7 +254,8 @@
+ 								?  varmap[ "usehistory" ].as< bool >( ) 
+ 								: ! varmap[ "useboardbins" ].as< bool >( ),
+ 					varmap[ "useflopalyzer" ].as< bool >( ),
+-					varmap[ "useboardbins" ].as< bool >( ) );
++					varmap[ "useboardbins" ].as< bool >( ),
++					varmap[ "useriverhandtype" ].as< bool >( ) );
+ 			cout << setw( 30 ) << right << "Preflop bins:  " << cardsettings.bin_max[ 0 ] << " (" << cardsettings.filename[ 0 ] << ")" << endl;
+ 			cout << setw( 30 ) << right << "Flop bins:  " << cardsettings.bin_max[ 1 ] << " (" << cardsettings.filename[ 1 ] << ")" << endl;
+ 			cout << setw( 30 ) << right << "Turn bins:  " << cardsettings.bin_max[ 2 ] << " (" << cardsettings.filename[ 2 ] << ")" << endl;
+@@ -260,6 +263,7 @@
+ 			cout << setw( 30 ) << right << "Using history:  " << cardsettings.usehistory << endl;
+ 			cout << setw( 30 ) << right << "Using flopalyzer:  " << cardsettings.useflopalyzer << endl;
+ 			cout << setw( 30 ) << right << "Using board bins:  " << cardsettings.useboardbins << endl;
++			cout << setw( 30 ) << right << "Using river hand type:  " << cardsettings.useriverhandtype << endl;
+ 			if( cardsettings.useboardbins )
+ 			{
+ 				cout << setw( 30 ) << right << "Flop board bins:  " << cardsettings.board_bin_max[ 1 ] << " (" << cardsettings.boardbinsfilename[ 1 ] << ")" << endl;
