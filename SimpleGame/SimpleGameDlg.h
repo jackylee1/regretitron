@@ -72,6 +72,7 @@ private:
 	ClientAPI * _mybot;
 #else
 	BotAPI * _mybot;
+	NullLogger nulllogger;
 #endif
 	MTRand cardrandom;
 	int handsplayed;

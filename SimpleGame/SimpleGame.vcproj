@@ -133,7 +133,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalIncludeDirectories="../pokereval/include;&quot;C:\Program Files (x86)\boost\boost_1_42&quot;"
-				PreprocessorDefinitions="_WINDOWS;NDEBUG;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;USE_NETWORK_CLIENT"
+				PreprocessorDefinitions="_WINDOWS;NDEBUG;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="false"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="2"

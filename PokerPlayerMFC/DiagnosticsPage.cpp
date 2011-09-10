@@ -23,7 +23,6 @@ DiagnosticsPage::DiagnosticsPage(CWnd* pParent /*=NULL*/)
 {
 	//this is the code to actually make this page display when it is created via new.
 	//Boom: http://www.codeproject.com/KB/dialog/gettingmodeless.aspx
-	logger( "*** Creating Diagnostics page " + tostr( this ) + " with pParent=GetDesktopWindow(). ***\n" );
 	Create(DiagnosticsPage::IDD, GetDesktopWindow());
 	ShowWindow(SW_SHOWNORMAL);
 
@@ -35,7 +34,6 @@ DiagnosticsPage::DiagnosticsPage(CWnd* pParent /*=NULL*/)
 
 DiagnosticsPage::~DiagnosticsPage()
 {
-	logger( "*** Destroying Diagnostics page " + tostr( this ) + ". ***\n" );
 }
 
 BOOL DiagnosticsPage::OnInitDialog()

@@ -369,7 +369,12 @@ bool CSimpleGameDlg::loadbotfile()
 	//load in the new file now.
 	if(_mybot == NULL)
 		delete _mybot; //will kill diag
-	_mybot = new BotAPI(string((LPCTSTR)filechooser.GetPathName()));
+	_mybot = new BotAPI(
+		string((LPCTSTR)filechooser.GetPathName()),
+		false,
+		MTRand::gettimeclockseed( ),
+		nulllogger,
+		nulllogger );
 	if(ShowDiagnostics.GetCheck())
 		_mybot->setdiagnostics(true, this);
 #endif
