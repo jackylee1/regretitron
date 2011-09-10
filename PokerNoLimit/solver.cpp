@@ -241,7 +241,7 @@ void Solver::save(const string &filename, bool writedata)
 		o << "round" << gr;
 		TiXmlElement * round = new TiXmlElement(o.str());
 		round->SetAttribute("nbins", cardmachine->getparams().bin_max[gr]);
-		round->SetAttribute("filesize", cardmachine->getparams().filesize[gr]);
+		round->SetAttribute("filesize", tostr( cardmachine->getparams().filesize[gr] ) );
 		TiXmlText * roundtext = new TiXmlText(cardmachine->getparams().filename[gr]);
 		round->LinkEndChild(roundtext);
 		cardbins->LinkEndChild(round);
