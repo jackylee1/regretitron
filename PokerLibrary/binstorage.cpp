@@ -97,9 +97,12 @@ void PackedBinFile::store(int64 index, int bin_num)
 	if(!_preloaded)
 		REPORT("You cannot store() to a non-preloaded BinFile");
 	if(index<0 || index>=_index_max ||  bin_num<0 || bin_num>=_bin_max)
-		REPORT("invalid parameters to store()");
+		REPORT("invalid parameters to store( " + tostr( index ) + ", " + tostr( bin_num ) + " )");
 
-	if( _haveseen && ( ( * _haveseen )[ index ] == 0 || bin_num != retrieve( index ) ) )
+	// For a while, I only incremented the count _haveseen[ index ] when the count was 0 or when the number 
+	// being stored was different than the one already stored. But the nesting algorithm in my binning
+	// code (in HandSSCalculator) relied on it to increment no matter what, so I preserve that here now.
+	if( _haveseen )//&& ( ( * _haveseen )[ index ] == 0 || bin_num != retrieve( index ) ) )
 		if( ( * _haveseen )[ index ]++ == 0xFF )
 			REPORT("you have stored to index "+tostring(index)+" over 255 times! _haveseen counter overflowed.");
 
