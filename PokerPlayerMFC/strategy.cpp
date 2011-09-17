@@ -137,7 +137,7 @@ Strategy::Strategy(string xmlfilename, bool preload, LoggerClass & strategylogge
 	int64 nextoffset = 4*MAX_NODETYPES*8; //should be start of data
 	for(int gr=0; gr<4; gr++)
 	{
-		for(int n=9; n>=2; n--) //loops must go in same order as done in memorymgr.
+		for(int n=MAX_ACTIONS; n>=2; n--) //loops must go in same order as done in memorymgr.
 		{
 			int64 thisoffset = strategyfile.Read<int64>();
 			if(thisoffset != nextoffset)
@@ -146,7 +146,7 @@ Strategy::Strategy(string xmlfilename, bool preload, LoggerClass & strategylogge
 			nextoffset = thisoffset + get_property(gettree(), maxorderindex_tag())[gr][n] * static_cast< int64 >( cardmach->getcardsimax(gr) ) * static_cast< int64 >(n+1);
 		}
 	}
-	if(dataoffset[0][7] != strategyfile.Tell() || strategyfilesize != nextoffset)
+	if(dataoffset[0][MAX_NODETYPES-1] != strategyfile.Tell() || strategyfilesize != nextoffset)
 		REPORT("Strategy file failed final error checks.");
 	setdirectory(olddirectory);
 }
