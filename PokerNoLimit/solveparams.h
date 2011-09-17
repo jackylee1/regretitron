@@ -138,10 +138,10 @@
 #define CUSTOMFLOATNAME( sign, temp1, temp2, temp3, temp4 ) CUSTOMFLOATNAME_( sign, temp1, temp2, temp3, temp4 )
 
 //unsigned are good for river stratn
-typedef FloatCustomUnsigned< uint8, 4, 18, true > CUSTOMFLOATNAME( Unsigned, uint8, 4, 18, true );
+typedef FloatCustomUnsigned< uint8, 4, 22, false > CUSTOMFLOATNAME( Unsigned, uint8, 4, 22, false );
 
 //signed are good for river regret
-typedef FloatCustomSigned< uint8, 4, 18, true > CUSTOMFLOATNAME( Signed, uint8, 4, 18, true );
+typedef FloatCustomSigned< uint8, 4, 22, false > CUSTOMFLOATNAME( Signed, uint8, 4, 22, false );
 
 //stratn's are write only
 #define SOLVER_TYPES (9, ( \
@@ -149,18 +149,19 @@ typedef FloatCustomSigned< uint8, 4, 18, true > CUSTOMFLOATNAME( Signed, uint8, 
 ( PFlopStratn_type, double ), \
 ( FlopStratn_type, double ), \
 ( TurnStratn_type, double ), \
-( RiverStratn_type, float ), \
+( RiverStratn_type, /*float*/ CUSTOMFLOATNAME( Unsigned, uint8, 4, 22, false )   ), \
 ( PFlopRegret_type, float ), \
 ( FlopRegret_type, float ), \
 ( TurnRegret_type, float ), \
-( RiverRegret_type, float )))
+( RiverRegret_type, /*float*/ CUSTOMFLOATNAME( Signed, uint8, 4, 22, false )   )))
 
 #define SEPARATE_STRATN_REGRET 1
 #define DYNAMIC_ALLOC_STRATN 0 /*must be false for __float128 to work due to alignment issues*/
 #define DYNAMIC_ALLOC_REGRET 0 /*must be false for __float128 to work due to alignment issues*/
 #define DYNAMIC_ALLOC_COUNTS 0
 
-//#define DO_THREADS /*undefine this to disable threading use*/
+
+#define DO_THREADS /*undefine this to disable threading use*/
 #define DO_AGGRESSION /*undefine this to disable aggression support (could be faster)*/
 const bool THREADLOOPTRACE = false; //prints out debugging
 const bool WALKERDEBUG = false; //debug print
