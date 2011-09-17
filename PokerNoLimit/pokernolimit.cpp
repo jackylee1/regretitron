@@ -65,16 +65,10 @@ void simulate(int64 iter)
 	   << iterstring(Solver::gettotal() + iter) << " ... " << flush;
 	if(prevrate > 0) cout << "expect to finish at " << timestring(time(NULL)+iter/prevrate) << " ... " << flush;
 
-	double timetaken, compactthistime, compacttotal; //seconds
-	int64 ncompactings, spaceused, spacetotal; //bytes, number
-	boost::tie(timetaken, compactthistime, compacttotal, ncompactings, spaceused, spacetotal) = Solver::solve(iter);
+	double timetaken = Solver::solve(iter); // returns seconds taken
 	prevrate = iter / timetaken;
 
-	cout << "Took " << timeival(timetaken) << " (" << fixed << setprecision(1) << prevrate << " per second)" << endl
-		<< "Spent " << timeival(compactthistime) << " (" << 100.0*compactthistime/timetaken << "%) compacting " 
-		<< ncompactings << " times, using " << space(spaceused) << " of total " << space(spacetotal) << " allocated ("
-		<< 100.0*spaceused/spacetotal << "%), have spent total of " << timeival(compacttotal) << " ("
-		<< 100.0*compacttotal/Solver::gettotaltime() << "%) compacting." << endl;
+	cout << "Took " << timeival(timetaken) << " (" << fixed << setprecision(1) << prevrate << " per second)" << endl;
 }
 
 

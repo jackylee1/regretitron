@@ -108,7 +108,7 @@ void MemoryManager::readstratt( Working_type * stratt, int gr, int numa, int act
 	if (gr==3)
 	{
 		RiverRegret_type * regret;
-		riverdata_oldmethod[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		riverdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computestratt(stratt, regret, numa);
 	}
 	else if (gr == 2)
@@ -137,7 +137,7 @@ void MemoryManager::readstratn( unsigned char * buffer, unsigned char & checksum
 	if (gr == 3)
 	{
 		RiverStratn_type * stratn;
-		riverdata_oldmethod[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
+		riverdata[numa]->getstratn( combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
 		computeprobs( buffer, checksum, stratn, numa );
 	}
 	else if (gr == 2)
@@ -165,7 +165,7 @@ void MemoryManager::writestratn( int gr, int numa, int actioni, int cardsi, Work
 	if (gr == 3)
 	{
 		RiverStratn_type * stratn;
-		riverdata_oldmethod[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
+		riverdata[numa]->getstratn(combine(cardsi, actioni, getactmax(gr,numa)), stratn, numa);
 		computestratn(stratn, prob, stratt, numa);
 	}
 	else if (gr == 2)
@@ -195,7 +195,7 @@ void MemoryManager::writeregret( int gr, int numa, int actioni, int cardsi,
 	if (gr == 3)
 	{
 		RiverRegret_type * regret;
-		riverdata_oldmethod[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
+		riverdata[numa]->getregret(combine(cardsi, actioni, getactmax(gr,numa)), regret, numa);
 		computeregret<P>(regret, prob, avgutility, utility, numa);
 	}
 	else if (gr == 2)
@@ -241,10 +241,11 @@ double getsize(int r)
 MemoryManager::MemoryManager(const BettingTree &bettingtree, const CardMachine &cardmachine)
 	: cardmach( cardmachine )
 	, tree( bettingtree )
-	, pflopdata( boost::extents[boost::multi_array_types::extent_range(2,10)] )
-	, flopdata( boost::extents[boost::multi_array_types::extent_range(2,10)] )
-	, turndata( boost::extents[boost::multi_array_types::extent_range(2,10)] )
-	, riverdata_oldmethod( boost::extents[boost::multi_array_types::extent_range(2,10)] )
+	  // extent_range creates the range [start, end), thus the "+1" is needed
+	, pflopdata( boost::extents[boost::multi_array_types::extent_range(2,MAX_ACTIONS+1)] )
+	, flopdata( boost::extents[boost::multi_array_types::extent_range(2,MAX_ACTIONS+1)] )
+	, turndata( boost::extents[boost::multi_array_types::extent_range(2,MAX_ACTIONS+1)] )
+	, riverdata( boost::extents[boost::multi_array_types::extent_range(2,MAX_ACTIONS+1)] )
 {
 	for(int gr=0; gr<4; gr++) 
 		for(int a=2; a<=MAX_ACTIONS; a++)
@@ -333,31 +334,30 @@ MemoryManager::MemoryManager(const BettingTree &bettingtree, const CardMachine &
 	//allocate for river
 
 #if SEPARATE_STRATN_REGRET
-	for(int n=2; n<10; n++) riverdata_oldmethod[n] = getactmax(3,n) > 0 ? new DataContainer< RiverStratn_type, RiverRegret_type >(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
+	for(int n=2; n<=MAX_ACTIONS; n++) riverdata[n] = getactmax(3,n) > 0 ? new DataContainer< RiverStratn_type, RiverRegret_type >(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
 #else
-	for(int n=2; n<10; n++) riverdata_oldmethod[n] = getactmax(3,n) > 0 ? new DataContainer< RiverStratn_type >(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
+	for(int n=2; n<=MAX_ACTIONS; n++) riverdata[n] = getactmax(3,n) > 0 ? new DataContainer< RiverStratn_type >(n, getactmax(3,n)*cardmach.getcardsimax(3)) : NULL;
 #endif
 
 	//allocate for preflop, flop, and turn.
 
 #if SEPARATE_STRATN_REGRET
-	for(int n=2; n<10; n++) pflopdata[n] = getactmax(0,n) > 0 ? new DataContainer< PFlopStratn_type, PFlopRegret_type >(n, getactmax(0,n)*cardmach.getcardsimax(0)) : NULL;
-	for(int n=2; n<10; n++) flopdata[n] = getactmax(1,n) > 0 ? new DataContainer< FlopStratn_type, FlopRegret_type >(n, getactmax(1,n)*cardmach.getcardsimax(1)) : NULL;
-	for(int n=2; n<10; n++) turndata[n] = getactmax(2,n) > 0 ? new DataContainer< TurnStratn_type, TurnRegret_type >(n, getactmax(2,n)*cardmach.getcardsimax(2)) : NULL;
+	for(int n=2; n<=MAX_ACTIONS; n++) pflopdata[n] = getactmax(0,n) > 0 ? new DataContainer< PFlopStratn_type, PFlopRegret_type >(n, getactmax(0,n)*cardmach.getcardsimax(0)) : NULL;
+	for(int n=2; n<=MAX_ACTIONS; n++) flopdata[n] = getactmax(1,n) > 0 ? new DataContainer< FlopStratn_type, FlopRegret_type >(n, getactmax(1,n)*cardmach.getcardsimax(1)) : NULL;
+	for(int n=2; n<=MAX_ACTIONS; n++) turndata[n] = getactmax(2,n) > 0 ? new DataContainer< TurnStratn_type, TurnRegret_type >(n, getactmax(2,n)*cardmach.getcardsimax(2)) : NULL;
 #else
-	for(int n=2; n<10; n++) pflopdata[n] = getactmax(0,n) > 0 ? new DataContainer<PFlopStratn_type>(n, getactmax(0,n)*cardmach.getcardsimax(0)) : NULL;
-	for(int n=2; n<10; n++) flopdata[n] = getactmax(1,n) > 0 ? new DataContainer<FlopStratn_type>(n, getactmax(1,n)*cardmach.getcardsimax(1)) : NULL;
-	for(int n=2; n<10; n++) turndata[n] = getactmax(2,n) > 0 ? new DataContainer<TurnStratn_type>(n, getactmax(2,n)*cardmach.getcardsimax(2)) : NULL;
+	for(int n=2; n<=MAX_ACTIONS; n++) pflopdata[n] = getactmax(0,n) > 0 ? new DataContainer<PFlopStratn_type>(n, getactmax(0,n)*cardmach.getcardsimax(0)) : NULL;
+	for(int n=2; n<=MAX_ACTIONS; n++) flopdata[n] = getactmax(1,n) > 0 ? new DataContainer<FlopStratn_type>(n, getactmax(1,n)*cardmach.getcardsimax(1)) : NULL;
+	for(int n=2; n<=MAX_ACTIONS; n++) turndata[n] = getactmax(2,n) > 0 ? new DataContainer<TurnStratn_type>(n, getactmax(2,n)*cardmach.getcardsimax(2)) : NULL;
 #endif
 }
 
 MemoryManager::~MemoryManager()
 {
-	for(int n=2; n<10; n++) if(pflopdata[n] != NULL) delete pflopdata[n];
-	for(int n=2; n<10; n++) if(flopdata[n] != NULL) delete flopdata[n];
-	for(int n=2; n<10; n++) if(turndata[n] != NULL) delete turndata[n];
-	for(int n=2; n<10; n++) if(riverdata_oldmethod[n] != NULL) delete riverdata_oldmethod[n];
-
+	for(int n=2; n<=MAX_ACTIONS; n++) delete pflopdata[n];
+	for(int n=2; n<=MAX_ACTIONS; n++) delete flopdata[n];
+	for(int n=2; n<=MAX_ACTIONS; n++) delete turndata[n];
+	for(int n=2; n<=MAX_ACTIONS; n++) delete riverdata[n];
 }
 
 int64 MemoryManager::save(const string &filename)
@@ -374,7 +374,7 @@ int64 MemoryManager::save(const string &filename)
 
 	for(int r=0; r<4; r++)
 	{
-		for(int n=9; n>=2; n--)
+		for(int n=MAX_ACTIONS; n>=2; n--)
 		{
 			// seek to beginning and write the offset
 			f.seekp(tableoffset); 
@@ -402,13 +402,3 @@ int64 MemoryManager::save(const string &filename)
 	return dataoffset;
 }
 
-//provide access to HugeBuffer functions via public MemoryManager functions, these are used by Solver
-int64 MemoryManager::CompactMemory()
-{
-	return -1;
-}
-
-int64 MemoryManager::GetHugeBufferSize()
-{
-	return -1;
-}

@@ -155,6 +155,10 @@ typedef FloatCustomSigned< uint8, 4, 22, false > CUSTOMFLOATNAME( Signed, uint8,
 ( TurnRegret_type, float ), \
 ( RiverRegret_type, /*float*/ CUSTOMFLOATNAME( Signed, uint8, 4, 22, false )   )))
 
+// this option affects the MemoryManager... When set to 0, uses a different data 
+// structure that may result in more memory locality... For each gameround (preflop, 
+// flop, turn, and river), the same datatype must be used for both stratn and regret.
+// When set to 1, no restriction.
 #define SEPARATE_STRATN_REGRET 1
 
 #define DO_THREADS /*undefine this to disable threading use*/
@@ -166,11 +170,13 @@ const bool WALKERDEBUG = false; //debug print
 #define IMPERFECT_RECALL 1 /* 0 = perfect recall */
 #endif
 
-//controls how large the arrays are that are allocated in the stack in walker.
-//they need to accomodate the largest number of actions that we might see
+// controls how large the arrays are that are allocated in the stack in walker.
+// they need to accomodate the largest number of actions that we might see.
+// A value of 3 is appropriate for Limit poker.
+// A value of MAX_ACTIONS is the most that can be used.
+const int MAX_ACTIONS_SOLVER = MAX_ACTIONS;
 
-// const int MAX_ACTIONS_SOLVER = 3;
-const int MAX_ACTIONS_SOLVER = MAX_ACTIONS; //defined in PokerLibrary/constants.h
+// ----------------------------------------------------------
 
 //tuples are ( name, type ), otherwise this is COMPLETE MAGIC
 #define TYPEDEF( tuple ) typedef BOOST_PP_TUPLE_ELEM(2,1,tuple) BOOST_PP_TUPLE_ELEM(2,0,tuple);

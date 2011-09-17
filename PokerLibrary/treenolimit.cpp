@@ -342,8 +342,8 @@ Vertex createlimittree(BettingTree &tree, const int max_actions, LoggerClass & t
 {
 	//erase whatevers there
 	tree.clear(); //shouldn't erase properties
-	get_property(tree, maxorderindex_tag()).resize(extents[4][multi_array_types::extent_range(2,10)]);
-	for(int i=0; i<4; i++) for(int j=2; j<10; j++) get_property(tree, maxorderindex_tag())[i][j] = 0;
+	get_property(tree, maxorderindex_tag()).resize(extents[4][multi_array_types::extent_range(2,MAX_ACTIONS+1)]);
+	for(int i=0; i<4; i++) for(int j=2; j<=MAX_ACTIONS; j++) get_property(tree, maxorderindex_tag())[i][j] = 0;
 
 	const int &SB = get_property(tree, settings_tag()).sblind;
 	const int &BB = get_property(tree, settings_tag()).bblind;
@@ -558,8 +558,8 @@ Vertex createnolimittree(BettingTree &tree, const int max_actions, LoggerClass &
 {
 	//erase whatevers there
 	tree.clear(); //shouldn't erase properties
-	get_property(tree, maxorderindex_tag()).resize(extents[4][multi_array_types::extent_range(2,10)]);
-	for(int i=0; i<4; i++) for(int j=2; j<10; j++) get_property(tree, maxorderindex_tag())[i][j] = 0;
+	get_property(tree, maxorderindex_tag()).resize(extents[4][multi_array_types::extent_range(2,MAX_ACTIONS+1)]);
+	for(int i=0; i<4; i++) for(int j=2; j<=MAX_ACTIONS; j++) get_property(tree, maxorderindex_tag())[i][j] = 0;
 
 	const int &SB = get_property(tree, settings_tag()).sblind;
 	const int &BB = get_property(tree, settings_tag()).bblind;

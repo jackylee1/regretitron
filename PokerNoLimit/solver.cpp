@@ -15,8 +15,6 @@ using boost::tuple;
 int64 Solver::iterations; //number of iterations remaining
 int64 Solver::total = 0; //number of iterations done total
 double Solver::inittime;
-double Solver::secondscompacting = 0;
-int64 Solver::numbercompactings = 0;
 CardMachine * Solver::cardmachine = NULL;
 BettingTree * Solver::tree = NULL;
 Vertex Solver::treeroot;
@@ -43,15 +41,6 @@ vector< bool > Solver::dataguardturnp1;
 #endif
 #endif
 
-void Solver::control_c(int sig)
-{
-	cout << "\033[2D"; // back up 2 chars to erase the ^C
-	if(memory!=NULL)
-	{
-		cout << "User requested compact.." << endl;
-		memory->SetMasterCompactFlag();
-	}
-}
 
 void Solver::initsolver( const treesettings_t & treesettings, const cardsettings_t & cardsettings, MTRand::uint32 randseed, unsigned nthreads, unsigned nlook, double aggstatic, double aggselective, string rakename, int rakecap )
 {
@@ -79,8 +68,6 @@ void Solver::initsolver( const treesettings_t & treesettings, const cardsettings
 	m_rakecap = rakecap;
 
 	//other init
-
-	//signal(SIGINT, control_c); // Register the signal handler for the SIGINT signal (Ctrl+C)
 
 	tree = new BettingTree(treesettings); //the settings are taken from solveparams.h
 	ConsoleLogger treelogger;
@@ -298,19 +285,10 @@ void Solver::save(const string &filename, bool writedata)
 }
 
 //function called by main()
-tuple<
-	double, //time taken
-	double, //seconds compacting this cycle
-	double, //cumulative seconds compacting
-	int64, //number of compactings this cycle
-	int64, //bytes used
-	int64 //total bytes available
->
+double //time taken
 Solver::solve(int64 iter) 
 { 
 	double starttime = getdoubletime();
-	double secondscompactingstarted = secondscompacting;
-	int64 ncompactingsstarted = numbercompactings;
 	if( iter <= n_lookahead )
 	{
 		total += iter;
@@ -343,15 +321,8 @@ Solver::solve(int64 iter)
 		solvers[0].threadloop();
 	}
 
-	//return much useful data
-	return boost::make_tuple(
-			getdoubletime() - starttime,
-			secondscompacting - secondscompactingstarted,
-			secondscompacting,
-			numbercompactings - ncompactingsstarted,
-			memory->CompactMemory(),
-			memory->GetHugeBufferSize()
-			);
+	//return time taken
+	return getdoubletime() - starttime;
 }
 
 
@@ -363,14 +334,6 @@ void* Solver::callthreadloop(void* mysolver)
 	return NULL;
 }
 
-inline void Solver::docompact()
-{
-	double timestart = getdoubletime();
-	memory->CompactMemory();
-	memory->ClearMasterCompactFlag();
-	numbercompactings++;
-	secondscompacting += (getdoubletime() - timestart);
-}
 
 #ifdef DO_THREADS /*covers next few functions*/
 
@@ -436,13 +399,7 @@ bool Solver::isalldataclear()
 
 		while(iterations != 0)
 		{
-			if(needtocompact && all flags are clear)
-			{
-				//no point in: setting all flags, unlocking, signalling, locking, clearing flags -- but we could.
-				compact;
-				clear compact flag;
-			}
-			else if(!needtocompact && any flags are clear)
+			if(any flags are clear)
 			{
 				set data's flag;
 				unlock;
@@ -479,15 +436,9 @@ void Solver::threadloop()
 
 	ThreadDebug("starting while loop....");
 
-	while(iterations!=0) //each loop does one iteration or compacts or sleeps
+	while(iterations!=0) //each loop does one iteration or sleeps
 	{
-		if(memory->GetMasterCompactFlag() && isalldataclear())
-		{
-			ThreadDebug("....COMPACTING MEMORY....");
-			docompact();
-			ThreadDebug("....DONE COMPACTING MEMORY....");
-		}
-		else if(!memory->GetMasterCompactFlag() && getreadydata(my_data_it))
+		if(getreadydata(my_data_it))
 		{
 
 			memcpy(cardsi, my_data_it->cardsi, sizeof(cardsi)); //copy that data into our non-static variables
@@ -531,10 +482,7 @@ void Solver::threadloop()
 		}
 		else
 		{
-			if(memory->GetMasterCompactFlag()) 
-				ThreadDebug("....sleeping (waiting for compact)");
-			else if(!memory->GetMasterCompactFlag()) 
-				ThreadDebug("....sleeping (waiting for iteration data)");
+			ThreadDebug("....sleeping (waiting for iteration data)");
 			pthread_cond_wait(&signaler, &threaddatalock); //sleep with lock, wake up with lock
 			ThreadDebug("waking up! ....");
 		}
@@ -549,19 +497,12 @@ void Solver::threadloop()
 
 void Solver::threadloop()
 {
-	while(iterations!=0) //each loop does one iteration or compacts or sleeps
+	while(iterations!=0) //each loop does one iteration
 	{
-		if(memory->GetMasterCompactFlag())
-		{
-			docompact();
-		}
-		else
-		{
-			cardmachine->getnewgame(cardsi, twoprob0wins);
-			iterations--;
-			if(WALKERDEBUG) cout << "ITERATION: " << total-iterations << endl << endl;
-			walker(PREFLOP,0,treeroot,1,1);
-		}
+		cardmachine->getnewgame(cardsi, twoprob0wins);
+		iterations--;
+		if(WALKERDEBUG) cout << "ITERATION: " << total-iterations << endl << endl;
+		walker(PREFLOP,0,treeroot,1,1);
 	}
 }
 

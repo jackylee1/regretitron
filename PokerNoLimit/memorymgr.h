@@ -212,17 +212,13 @@ public:
 
 	int64 save(const string &filename); //returns length of file written
 	
-	int getactmax(int r, int nacts) { return get_property(tree, maxorderindex_tag())[r][nacts]; } //for convenience
-
-	inline void SetMasterCompactFlag() { }
-	inline void ClearMasterCompactFlag() { }
-	inline bool GetMasterCompactFlag() { return false; }
-	int64 CompactMemory(); //returns space used in hugebuffer
-	int64 GetHugeBufferSize(); //returns space available in hugebuffer
 private:
 	//we do not support copying.
 	MemoryManager(const MemoryManager& rhs);
 	MemoryManager& operator=(const MemoryManager& rhs);
+
+	//for convenience
+	int getactmax(int r, int nacts) { return get_property(tree, maxorderindex_tag())[r][nacts]; } 
 
 	//might as well keep these things around
 	const CardMachine &cardmach;
@@ -241,9 +237,9 @@ private:
 #endif
 
 #if SEPARATE_STRATN_REGRET
-	boost::multi_array< DataContainer< RiverStratn_type, RiverRegret_type >*, 1 > riverdata_oldmethod;
+	boost::multi_array< DataContainer< RiverStratn_type, RiverRegret_type >*, 1 > riverdata;
 #else
-	boost::multi_array< DataContainer< RiverStratn_type >*, 1 > riverdata_oldmethod;
+	boost::multi_array< DataContainer< RiverStratn_type >*, 1 > riverdata;
 #endif
 
 };
