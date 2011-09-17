@@ -122,6 +122,8 @@ int main(int argc, char* argv[])
 			  "used with threading, this build not compiled with theading support, ignored" )
 #endif
 
+			( "limit", po::value< bool >( )->default_value( true )->required( ),
+			  "limit, or no-limit, that is the question." )
 			( "sblind", po::value< int >( )->required( ),
 			  "small blind size (integer value)" )
 			( "bblind", po::value< int >( )->required( ),
@@ -231,6 +233,19 @@ int main(int argc, char* argv[])
 					varmap[ "stacksize" ].as< int >( ) );
 			cout << setw( 30 ) << right << "Blinds:  " << treesettings.sblind << " / " << treesettings.bblind << endl;
 			cout << setw( 30 ) << right << "Stacksize:  " << treesettings.stacksize << " (" << fixed << setprecision( 2 ) << (double)treesettings.stacksize / treesettings.bblind << " big blinds)" << endl;
+
+			////////////////// temporary implementation /////////////////////
+			if( varmap[ "limit" ].as< bool >( ) == false )
+			{
+				treesettings.limit = false;
+				cout << setw( 30 ) << right << "Limit poker:  " << "No! Playing no-limit!" << endl;
+			}
+			else
+			{
+				treesettings.limit = true;
+				cout << setw( 30 ) << right << "Limit poker:  " << "yes, limit." << endl;
+			}
+			/////////////////////////////////////////////////////////////////
 
 			//card settings
 

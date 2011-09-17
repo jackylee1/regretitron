@@ -156,10 +156,6 @@ typedef FloatCustomSigned< uint8, 4, 22, false > CUSTOMFLOATNAME( Signed, uint8,
 ( RiverRegret_type, /*float*/ CUSTOMFLOATNAME( Signed, uint8, 4, 22, false )   )))
 
 #define SEPARATE_STRATN_REGRET 1
-#define DYNAMIC_ALLOC_STRATN 0 /*must be false for __float128 to work due to alignment issues*/
-#define DYNAMIC_ALLOC_REGRET 0 /*must be false for __float128 to work due to alignment issues*/
-#define DYNAMIC_ALLOC_COUNTS 0
-
 
 #define DO_THREADS /*undefine this to disable threading use*/
 #define DO_AGGRESSION /*undefine this to disable aggression support (could be faster)*/
@@ -170,18 +166,11 @@ const bool WALKERDEBUG = false; //debug print
 #define IMPERFECT_RECALL 1 /* 0 = perfect recall */
 #endif
 
-#define LIMIT 1
-
 //controls how large the arrays are that are allocated in the stack in walker.
 //they need to accomodate the largest number of actions that we might see
-#if LIMIT
-const int MAX_ACTIONS_SOLVER = 3;
-#else
-const int MAX_ACTIONS_SOLVER = MAX_ACTIONS; //defined in PokerLibrary/constants.h
-#endif
 
-//do not pollute and do not allow use
-#undef LIMIT
+// const int MAX_ACTIONS_SOLVER = 3;
+const int MAX_ACTIONS_SOLVER = MAX_ACTIONS; //defined in PokerLibrary/constants.h
 
 //tuples are ( name, type ), otherwise this is COMPLETE MAGIC
 #define TYPEDEF( tuple ) typedef BOOST_PP_TUPLE_ELEM(2,1,tuple) BOOST_PP_TUPLE_ELEM(2,0,tuple);

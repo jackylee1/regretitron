@@ -198,9 +198,6 @@ private:
 };
 #endif
 
-class HugeBuffer;
-class CardsiContainer;
-
 class MemoryManager
 {
 public:
@@ -213,23 +210,13 @@ public:
 	template < int P >
 	void writeregret( int gr, int numa, int actioni, int cardsi, Working_type prob, Working_type avgutility, tuple<Working_type,Working_type> * utility );
 
-	void savecounts(const string & filename);
 	int64 save(const string &filename); //returns length of file written
 	
-	int riveractionimax();
-	int getnumafromriveractioni(int ractioni);
-	int getactionifromriveractioni(int ractioni);
 	int getactmax(int r, int nacts) { return get_property(tree, maxorderindex_tag())[r][nacts]; } //for convenience
 
-#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET
-	inline void SetMasterCompactFlag() { mastercompactflag = true; }
-	inline void ClearMasterCompactFlag() { mastercompactflag = false; }
-	inline bool GetMasterCompactFlag() { return mastercompactflag; }
-#else
 	inline void SetMasterCompactFlag() { }
 	inline void ClearMasterCompactFlag() { }
 	inline bool GetMasterCompactFlag() { return false; }
-#endif
 	int64 CompactMemory(); //returns space used in hugebuffer
 	int64 GetHugeBufferSize(); //returns space available in hugebuffer
 private:
@@ -240,7 +227,6 @@ private:
 	//might as well keep these things around
 	const CardMachine &cardmach;
 	const BettingTree &tree;
-	int riveractioni(int numa, int actioni);
 
 	//each is a pointer to a large array allocated on the heap
 	//one such array per gameround per type of node.
@@ -253,21 +239,13 @@ private:
 	boost::multi_array< DataContainer< FlopStratn_type >*, 1 > flopdata;
 	boost::multi_array< DataContainer< TurnStratn_type >*, 1 > turndata;
 #endif
-#if !DYNAMIC_ALLOC_STRATN && !DYNAMIC_ALLOC_REGRET /*both use old method*/
+
 #if SEPARATE_STRATN_REGRET
 	boost::multi_array< DataContainer< RiverStratn_type, RiverRegret_type >*, 1 > riverdata_oldmethod;
 #else
 	boost::multi_array< DataContainer< RiverStratn_type >*, 1 > riverdata_oldmethod;
 #endif
-#elif !DYNAMIC_ALLOC_STRATN /*only stratn uses old method*/
-	boost::multi_array< DataContainerSingle< RiverStratn_type >*, 1 > riverdata_stratn;
-#elif !DYNAMIC_ALLOC_REGRET /*only regret uses old method*/
-	boost::multi_array< DataContainerSingle< RiverRegret_type >*, 1 > riverdata_regret;
-#endif
-#if DYNAMIC_ALLOC_STRATN || DYNAMIC_ALLOC_REGRET /*at least one uses the new method*/
-	CardsiContainer* riverdata; //new method, slower, but less memory
-	volatile bool mastercompactflag;
-#endif
+
 };
 
 #endif
