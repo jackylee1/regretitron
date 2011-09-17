@@ -6,19 +6,24 @@
 #include <string>
 #include <list>
 #include <set>
+#include <bitset>
+#include <map>
 #include <iomanip>
 #include <limits>
 #include "../utility.h"
 #include "../PokerLibrary/floaterfile.h"
+#include <boost/math/special_functions/round.hpp>
 using namespace std;
 
 const string BINSFOLDER = ""; //current directory
 const floater EPSILON = 1e-12;
 const bool RIVERBUNCHHISTBINS = false;
-const float hand_list_multiplier = 2.5; //to keep it from overflowing (nominally 1.11 for regular bin sizes larger if using 169 PF bins)
+const float hand_list_multiplier = 1.3; //to keep it from overflowing (nominally 1.11 for regular bin sizes larger if using 169 PF bins)
 const float chunky_bin_tolerance = hand_list_multiplier*0.95;
 MTRand binrand;
 const bool ACTUALLYDOKMEANS = true;
+const int RIVER_HANDTYPE_MAX = 8;
+const double HSSKMEANSFACTOR = 2.1;
 
 //------------- R i v e r   E V -------------------
 
@@ -577,211 +582,550 @@ void calculatebins(const int numboardcards, const int n_bins, const FloaterFile 
 	});
 }
 
+//-------------- N e w   B i n s   C a l c u l a t i o n ---------------
+
+struct FPLess
+{
+	bool operator( )( const floater & a, const floater & b )
+	{
+		return a < b && ! fpcompare( a, b );
+	}
+};
+
+class Binner
+{
+public:
+	Binner( )
+		: m_totalhands( 0 )
+	{ }
+
+	void Add( int64 index, floater quality )
+	{
+		HandValue & myval = m_map[ quality ];
+		myval.m_weight++;
+		m_totalhands++;
+		myval.m_indices.insert( index );
+	}
+
+	void Bin( PackedBinFile & output, int numbins, const bool qualityisev )
+	{
+		if( numbins == 0 )
+		{
+			if( m_totalhands || m_map.size( ) )
+				REPORT( "binning hands into zero bins" );
+			return;
+		}
+
+		DetermineBins( numbins, qualityisev );
+
+		for( HandMap::iterator i = m_map.begin( ); i != m_map.end( ); i++ )
+			for( set< int64 >::iterator j = i->second.m_indices.begin( ); j != i->second.m_indices.end( ); j++ )
+				output.store( *j, i->second.m_bin );
+	}
+
+	int64 GetTotalSize( ) { return m_totalhands; }
+	int64 GetCompressedSize( ) { return m_map.size( ); }
+
+private:
+	void DetermineBins( int numbins, const bool qualityisev )
+	{
+		const bool print = false;
+		bool chunky = false;
+		float expected = (float)m_totalhands/numbins; //expected bins per hand
+		float tolerance = 1 + (hand_list_multiplier-1)/2;
+		ostringstream status;
+		int currentbin=0;
+		int currentbinsize=0;
+		int64 n_hands_left = m_totalhands;
+
+		status << " binning " << m_totalhands << " hands (" << m_map.size( )
+			<< " compressed) into " << numbins << " bins. expect " << expected << " hands per bin "
+			<< "(tolerance = " << tolerance << ")..." << endl;
+
+		if( numbins == 1 )
+		{
+			for( HandMap::iterator i = m_map.begin( ); i != m_map.end( ); i++ )
+				i->second.m_bin = 0;
+		}
+		else if( qualityisev || (int)m_map.size( ) < 5 * numbins )
+		{
+#if 0 /* old slow method O(n^2) */
+			// each pass through the loop removes one bin
+			while( m_map.size( ) > (unsigned)numbins )
+			{
+				double bestscore = numeric_limits< double >::infinity( );
+				HandMap::iterator bestelleft;
+				HandMap::iterator bestelright;
+				for( HandMap::iterator i = m_map.begin( ), j = ++m_map.begin( ); 
+						j != m_map.end( ); i++, j++ )
+				{
+					double thisscore = calcscore( i, j );
+					if( thisscore < bestscore )
+					{
+						bestelleft = i;
+						bestelright = j;
+						bestscore = thisscore;
+					}
+				}
+
+				//condense the two into one
+				pair< floater, HandValue > condensed;
+				condensed.second.m_weight = bestelleft->second.m_weight + bestelright->second.m_weight;
+				condensed.second.m_indices.insert( bestelleft->second.m_indices.begin( ), bestelleft->second.m_indices.end( ) );
+				condensed.second.m_indices.insert( bestelright->second.m_indices.begin( ), bestelright->second.m_indices.end( ) );
+				condensed.first = 
+					( bestelleft->first * bestelleft->second.m_weight + 
+					bestelright->first * bestelright->second.m_weight ) /
+					condensed.second.m_weight;
+				const int oldsize = m_map.size( );
+				if( bestelleft == m_map.begin( ) )
+				{
+					m_map.erase( bestelleft );
+					m_map.erase( bestelright );
+					m_map.insert( m_map.begin( ), condensed );
+				}
+				else
+				{
+					m_map.erase( bestelleft-- );
+					m_map.erase( bestelright );
+					m_map.insert( bestelleft, condensed );
+				}
+				if( m_map.size( ) != static_cast< unsigned >( oldsize - 1 ) )
+					REPORT( "condensed was annilated\n" );
+			}
+#else /* new fast method O(n) */
+			typedef multimap< double, HandMap::iterator > SpaceMap;
+			SpaceMap spacemap;
+			typedef map< floater, SpaceMap::iterator, FPLess > ElementMap;
+			ElementMap elementmap;
+
+			//prime the workings
+			if( ! m_map.empty( ) )
+				for( HandMap::iterator i = m_map.begin( ), j = ++m_map.begin( ); 
+						j != m_map.end( ); i++, j++ )
+				{
+					double thisscore = calcscore( i, j );
+					SpaceMap::iterator spaceiter = spacemap.insert( SpaceMap::value_type( thisscore, i ) );
+					pair< ElementMap::iterator, bool > elementresult = elementmap.insert( ElementMap::value_type( i->first, spaceiter ) );
+					if( ! elementresult.second )
+						REPORT( "faulty insertion!" );
+				}
+
+			// each pass through the loop removes one bin
+			while( m_map.size( ) > (unsigned)numbins )
+			{
+				SpaceMap::iterator spacemapbest = spacemap.begin( );
+				HandMap::iterator handmapleft = spacemapbest->second;
+				HandMap::iterator handmapright = handmapleft;
+				handmapright++;
+				const bool moreleft = ( handmapleft != m_map.begin( ) );
+				const bool moreright = ( handmapright != --m_map.end( ) );
+				ElementMap::iterator elementleft = elementmap.find( handmapleft->first );
+				ElementMap::iterator elementright = elementmap.find( handmapright->first );
+				if( elementleft->second != spacemapbest )
+					REPORT( "bad spacemap/elementmap back ptr" );
+				if( elementleft == elementright || elementleft == elementmap.end( ) || ( elementright == elementmap.end( ) ) == moreright )
+					REPORT( "bad elementmap lookup" );
+				HandMap::iterator handmapleftleft = m_map.end( );
+				ElementMap::iterator elementleftleft = elementmap.end( );
+				SpaceMap::iterator spacetoleft = spacemap.end( );
+				if( moreleft )
+				{
+					--( handmapleftleft = handmapleft );
+					--( elementleftleft = elementleft );
+					spacetoleft = elementleftleft->second;
+				}
+				HandMap::iterator handmaprightright = m_map.end( );
+				SpaceMap::iterator spacetoright = spacemap.end( );
+				if( moreright )
+				{
+					++( handmaprightright = handmapright );
+					spacetoright = elementright->second;
+				}
+
+				//condense the two into one in HandMap
+				pair< floater, HandValue > handmapcondensed;
+				handmapcondensed.second.m_weight = handmapleft->second.m_weight + handmapright->second.m_weight;
+				handmapcondensed.second.m_indices.insert( handmapleft->second.m_indices.begin( ), handmapleft->second.m_indices.end( ) );
+				handmapcondensed.second.m_indices.insert( handmapright->second.m_indices.begin( ), handmapright->second.m_indices.end( ) );
+				handmapcondensed.first = 
+					( handmapleft->first * handmapleft->second.m_weight + 
+					  handmapright->first * handmapright->second.m_weight ) /
+					handmapcondensed.second.m_weight;
+				const uint64 oldsize = m_map.size( );
+				if( m_map.size( ) != elementmap.size( ) + 1 )
+					REPORT( "bad element map size" );
+				if( m_map.size( ) != spacemap.size( ) + 1 )
+					REPORT( "bad space map size" );
+				m_map.erase( handmapleft );
+				m_map.erase( handmapright );
+				HandMap::iterator condensediter = m_map.insert( handmapcondensed ).first;
+				elementmap.erase( elementleft );
+				spacemap.erase( spacemapbest );
+				if( moreright )
+				{
+					elementmap.erase( elementright );
+					spacemap.erase( spacetoright );
+					//recalculate score of spacetoright and put it back in (assign spacetoright to be the new iterator)
+					spacetoright = spacemap.insert( SpaceMap::value_type( calcscore( condensediter, handmaprightright ), condensediter ) );
+					elementmap.insert( ElementMap::value_type( handmapcondensed.first, spacetoright ) );
+				}
+				if( moreleft )
+				{
+					spacemap.erase( spacetoleft );
+					//recalculate score of spacetoleft and put it back in (assign spacetoleft to be the new iterator)
+					spacetoleft = spacemap.insert( SpaceMap::value_type( calcscore( handmapleftleft, condensediter ), handmapleftleft ) );
+					elementleftleft->second = spacetoleft;
+				}
+				if( m_map.size( ) != oldsize - 1 )
+					REPORT( "handmapcondensed was annilated\n" );
+				if( m_map.size( ) != elementmap.size( ) + 1 )
+					REPORT( "bad element map size" );
+				if( m_map.size( ) != spacemap.size( ) + 1 )
+					REPORT( "bad space map size" );
+			}
+#endif
+
+			for( HandMap::iterator i = m_map.begin( ); i != m_map.end( ); i++ )
+			{
+				status << "  bin " << currentbin << " has avg quality " << i->first << " with " << i->second.m_weight << " hands (" << 100.0*i->second.m_weight/expected << "% of expected)" << endl;
+
+				if(i->second.m_weight > expected * tolerance || i->second.m_weight < expected / tolerance)
+					chunky = true;
+
+				i->second.m_bin = currentbin++;
+			}
+
+			currentbin--; //matches how other algo leaves currentbin as last bin used
+		}
+		else
+		{
+			for( HandMap::iterator i = m_map.begin( ); i != m_map.end( ); i++ )
+			{
+				//increment bins if needed
+
+				if(currentbinsize + i->second.m_weight/2 > n_hands_left/(numbins-currentbin) && currentbinsize > 0)
+				{
+					//done with this bin; go to next bin
+					status << "  bin " << currentbin << " has " << currentbinsize << " hands (" <<
+						100.0*currentbinsize/expected << "% of expected)" << endl;
+
+					if(currentbinsize > expected * tolerance || currentbinsize < expected / tolerance)
+						chunky = true;
+
+					n_hands_left -= currentbinsize;
+					currentbin++;
+					currentbinsize=0;
+					//should automatically never increment currentbin past N_BINS-1
+					if(currentbin==numbins) REPORT("determinebins has reached a fatal error");
+				}
+
+				//then always save hand to current bin
+
+				i->second.m_bin = currentbin;
+				currentbinsize +=i->second.m_weight;
+			}
+
+			status << "  bin " << currentbin << " has " << currentbinsize << " hands (" <<
+				100.0*currentbinsize/expected << "% of expected)";
+			if(currentbinsize != n_hands_left) //this would just be a bug
+				REPORT("Did not bin the right amount of hands!");
+		}
+
+		if(currentbin != numbins-1) //as mentioned in comments, this is possible
+			cerr << "\nWarning: "+tostring(numbins)+" is too many bins; we used "+tostring(currentbin+1)+". Could not find enough hands to fill them. "
+				+"We were binning "+tostring(m_totalhands)+" hands. ("+tostring(m_map.size( ))+" compressed)." << endl;
+		if(chunky)
+			cerr << endl << "Warning: This binning process has produced chunky bins, report follows:\n"
+				<< status.str() << endl;
+		if(print)
+			cout << endl << status.str() << flush;
+	}
+
+
+	struct HandValue
+	{
+		HandValue( ) 
+		  : m_weight( 0 )
+		  , m_bin( -1 ) 
+		{ }
+		int32 m_weight;
+		int32 m_bin;
+		set< int64 > m_indices;
+	};
+
+	typedef std::map< floater, HandValue, FPLess > HandMap;
+	HandMap m_map;
+	int64 m_totalhands;
+
+	double calcscore( HandMap::const_iterator left, HandMap::const_iterator right )
+	{
+		return
+			static_cast< double >( left->second.m_weight ) * 
+			static_cast< double >( right->second.m_weight ) * 
+			static_cast< double >( right->first - left->first ) *
+			static_cast< double >( right->first - left->first );
+	}
+};
 
 //------------ B o a r d   C l u s t e r i n g -------------
 
 const int CHARCOUNT = 10;
 
-template< typename T >
-struct BoardChar
+template< typename T, int DIMS >
+struct ClusterChar
 {
-	BoardChar( ) { zero( ); }
-	T c[ CHARCOUNT * CHARCOUNT ];
+	ClusterChar( ) { zero( ); }
+	T c[ DIMS ];
 	void zero( ) { memset( c, 0, sizeof( c ) ); } 
 
 	template < typename U >
-	BoardChar< T > & operator=( const BoardChar< U > & that )
+	ClusterChar< T, DIMS > & operator=( const ClusterChar< U, DIMS > & that )
 	{
-		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+		for( int i = 0; i < DIMS; i++ )
 			c[ i ] = that.c[ i ];
 		return * this;
 	}
 
 	template < typename U >
-	BoardChar< T > & operator+=( const BoardChar< U > & that )
+	ClusterChar< T, DIMS > & operator+=( const ClusterChar< U, DIMS > & that )
 	{
-		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+		for( int i = 0; i < DIMS; i++ )
 			c[ i ] += that.c[ i ];
 		return * this;
 	}
 
 	template < typename U >
-	BoardChar< T > & operator/=( const U & that )
+	ClusterChar< T, DIMS > & operator/=( const U & that )
 	{
-		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+		for( int i = 0; i < DIMS; i++ )
 			c[ i ] /= that;
 		return * this;
 	}
 
 	template < typename U >
-	void add( int & count, const BoardChar< U > & that )
+	ClusterChar< T, DIMS > & operator*=( const U & that )
 	{
-		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
-			c[ i ] = ( c[ i ] * count + that.c[ i ] ) / ( count + 1 );
-		count++;
+		for( int i = 0; i < DIMS; i++ )
+			c[ i ] *= that;
+		return * this;
 	}
 
 	template < typename U >
-	void subtract( int & count, const BoardChar< U > & that )
+	void add( int & elements, int & count, const ClusterChar< U, DIMS > & that, int weight )
 	{
-		for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
-			c[ i ] = ( c[ i ] * count - that.c[ i ] ) / ( count - 1 );
-		count--;
+		for( int i = 0; i < DIMS; i++ )
+			c[ i ] = ( c[ i ] * count + that.c[ i ] * weight ) / ( count + weight );
+		count += weight;
+		elements++;
+	}
+
+	template < typename U >
+	void subtract( int & elements, int & count, const ClusterChar< U, DIMS > & that, int weight )
+	{
+		for( int i = 0; i < DIMS; i++ )
+			c[ i ] = ( c[ i ] * count - that.c[ i ] * weight ) / ( count - weight );
+		count -= weight;
+		elements--;
 	}
 };
+// can't use commas in a macro so i need these typedefs for the macros that go through cards ( i use pokereval's macros )
+typedef ClusterChar< int, CHARCOUNT * CHARCOUNT > BoardChar;
+typedef ClusterChar< double, 1 > Hand1Char;
+typedef ClusterChar< double, 2 > Hand2Char;
 
-template < typename T, typename U >
-bool operator < ( const BoardChar< T > & one, const BoardChar< U > & two )
+template < int DIMS >
+bool operator < ( const ClusterChar< int, DIMS > & left, const ClusterChar< int, DIMS > & right )
 {
-	for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
-		if( one.c[ i ] < two.c[ i ] )
+	for( int i = 0; i < DIMS; i++ )
+		if( left.c[ i ] == right.c[ i ] )
+			continue;
+		else if( left.c[ i ] < right.c[ i ] )
 			return true;
-		else if( one.c[ i ] > two.c[ i ] )
+		else if( left.c[ i ] > right.c[ i ] )
 			return false;
-	return false;
+	return false; // all dims are equal
 }
 
-struct BoardStruct
+template < int DIMS >
+bool operator < ( const ClusterChar< double, DIMS > & left, const ClusterChar< double, DIMS > & right )
 {
-	BoardStruct( ) : index( -1 ), cluster( -1 ) { }
-	BoardStruct( int64 myindex ) 
-		: index( myindex )
-		, cluster( -1 )
-	{ }
-	int64 index;
-	BoardChar< int > characteristic;
-	int cluster;
-};
-typedef std::vector< BoardStruct > BoardVec;
-typedef std::vector< BoardChar< double > > CentroidVec;
+	for( int i = 0; i < DIMS; i++ )
+		if( fpcompare( left.c[ i ], right.c[ i ] ) )
+			continue;
+		else if( left.c[ i ] < right.c[ i ] )
+			return true;
+		else if( left.c[ i ] > right.c[ i ] )
+			return false;
+	return false; // all dims are equal
+}
 
 inline double square( double x ) { return x * x; }
 
-struct IndexSorter
-{
-	bool operator( )( const BoardStruct & a, const BoardStruct & b )
-	{
-		return a.index < b.index;
-	}
-};
-
-#if 0
-// assign each board to a cluster, then compute the initial centroids from that
-// this board assignment seems to be pretty good on its own (just uses index)
-const string KMEANSINITMETHOD = "index groupings";
-void initialize_kmeans( BoardVec & boards, CentroidVec & centroids )
-{
-	// assign the clusters by grouping near indices together
-	// the way I do it, each cluster gets an equal number of boards (up to rounding)
-
-	int count = 0;
-	sort( boards.begin( ), boards.end( ), IndexSorter( ) );
-	const int stride = ( boards.size( ) + centroids.size( ) - 1 ) / centroids.size( );
-
-	// assign the cluster and sum up the centroids in one go
-
-	vector< int > centroidcounts( centroids.size( ), 0 );
-	for( CentroidVec::iterator c = centroids.begin( ); c != centroids.end( ); c++ )
-		c->zero( ); // zero out the centroid vectors
-	for( BoardVec::iterator b = boards.begin( ); b != boards.end( ); b++ )
-	{
-		b->cluster = ( ( count++ / stride ) % centroids.size( ) );
-		centroids[ b->cluster ] += b->characteristic;
-		centroidcounts[ b->cluster ]++;
-	}
-
-	// make sure we assigned everything and calculate the centroids
-	
-	for( unsigned i = 0; i < centroids.size( ); i++ )
-	{
-		if( centroidcounts[ i ] == 0 )
-			REPORT( "kmeans fault not enough boards" );
-		centroids[ i ] /= centroidcounts[ i ];
-	}
-}
-#endif
-
-#if 1
-// assign each centroid to be a randomly selected board
-// this algorithm only assigns the centroids, not the boards
-const string KMEANSINITMETHOD = "randomly selected boards";
-void initialize_kmeans( BoardVec & boards, CentroidVec & centroids )
-{
-	// this algorithm is the same as my card shuffling algorithm
-
-	vector< int > boardstouse( boards.size( ) );
-	for( unsigned i = 0; i < boards.size( ); i++ )
-		boardstouse[ i ] = i;
-	for( unsigned i = 0; i < centroids.size( ); i++ )
-	{
-		swap( boardstouse[ i ], boardstouse[ i + binrand.randInt( boards.size( ) - 1 - i ) ] );
-		centroids[ i ] = boards[ boardstouse[ i ] ].characteristic;
-	}
-}
-#endif
-
-template< typename T1, typename T2 >
-double get_distance( BoardChar< T1 > & b1, BoardChar< T2 > & b2 )
+template< typename T1, typename T2, int DIMS >
+double get_distance( const ClusterChar< T1, DIMS > & b1, const ClusterChar< T2, DIMS > & b2 )
 {
 	double total = 0;
-	for( int i = 0; i < CHARCOUNT * CHARCOUNT; i++ )
+	for( int i = 0; i < DIMS; i++ )
 		total += square( b1.c[ i ] - b2.c[ i ] );
 	return sqrt( total );
 }
 
-void clusterandstore( BoardVec & boards, int n_clusters, PackedBinFile & output, 
-		const string & name )
-{
-   	cerr << "For " << name << " clusters:" << endl;
 
+
+//const string KMEANSINITMETHOD = "index groupings";
+const string KMEANSINITMETHOD = "randomly selected boards";
+template < typename T, int DIMS >
+class Clusterer
+{
+public:
+	Clusterer( )
+		: m_totalhands( 0 )
+	{ }
+
+	void Add( int64 index, const ClusterChar< T, DIMS > & quality )
 	{
-		std::set< BoardChar< int > > uniqueboards;
-		for( BoardVec::iterator i = boards.begin( ); i != boards.end( ); i++ )
-			uniqueboards.insert( i->characteristic );
-		cerr << uniqueboards.size( ) << " unique boards detected." << endl;
+		HandValue & myval = m_map[ quality ];
+		myval.m_weight++;
+		m_totalhands++;
+		myval.m_indices.insert( index );
 	}
 
-	if( (unsigned)n_clusters >= boards.size( ) )
-		REPORT( "k >= n in kmeans" );
-	if( n_clusters <= 1 )
-		REPORT( "k <= 1 in kmeans" );
-
-	list< vector< int > > trialsclusters;
-	list< double > trialserrors;
-
-	/////////
-	goto clusternofault;
-clusterfault1:
-	cerr << "x" << flush;
-	goto clusternofault;
-clusternofault:
-	/////////
-
-	CentroidVec centroids( n_clusters );
-	initialize_kmeans( boards, centroids );
-	vector< int > clustercounts( n_clusters, 0 );
-	vector< double > clustererrors( n_clusters, 0 );
-	int n_iter = 0;
-	const int MAX_ITER_ALLOWED = 20;
-
-	if( ACTUALLYDOKMEANS )
+	void Cluster( PackedBinFile & output, int numclusters, const string & name )
 	{
+		if( numclusters == 0 )
+		{
+			if( m_totalhands || m_map.size( ) )
+				REPORT( "clustering hands into zero clusters" );
+			return;
+		}
+
+		DetermineClusters( numclusters, name );
+
+		for( typename HandMap::iterator i = m_map.begin( ); i != m_map.end( ); i++ )
+			for( set< int64 >::iterator j = i->second.m_indices.begin( ); j != i->second.m_indices.end( ); j++ )
+				output.store( *j, i->second.m_bin );
+	}
+
+	int64 GetTotalSize( ) { return m_totalhands; }
+	int64 GetCompressedSize( ) { return m_map.size( ); }
+
+private:
+
+#if 0
+	// assign each board to a cluster, then compute the initial centroids from that
+	// this board assignment seems to be pretty good on its own (just uses index)
+	void initialize_kmeans( vector< ClusterStruct< T, DIMS > > & boards, vector< ClusterChar< double, DIMS > > & centroids )
+	{
+		// assign the clusters by grouping near indices together
+		// the way I do it, each cluster gets an equal number of boards (up to rounding)
+
+		int count = 0;
+		sort( boards.begin( ), boards.end( ), IndexSorter( ) );
+		const int stride = ( boards.size( ) + centroids.size( ) - 1 ) / centroids.size( );
+
+		// assign the cluster and sum up the centroids in one go
+
+		vector< int > centroidcounts( centroids.size( ), 0 );
+		for( typename vector< ClusterChar< double, DIMS > >::iterator c = centroids.begin( ); c != centroids.end( ); c++ )
+			c->zero( ); // zero out the centroid vectors
+		for( typename vector< ClusterStruct< T, DIMS > >::iterator b = boards.begin( ); b != boards.end( ); b++ )
+		{
+			b->cluster = ( ( count++ / stride ) % centroids.size( ) );
+			centroids[ b->cluster ] += b->characteristic;
+			centroidcounts[ b->cluster ]++;
+		}
+
+		// make sure we assigned everything and calculate the centroids
+		
+		for( unsigned i = 0; i < centroids.size( ); i++ )
+		{
+			if( centroidcounts[ i ] == 0 )
+				REPORT( "kmeans fault not enough boards" );
+			centroids[ i ] /= centroidcounts[ i ];
+		}
+	}
+#endif
+
+#if 1
+	// assign each centroid to be a randomly selected board
+	// this algorithm only assigns the centroids, not the boards
+	void initialize_kmeans( vector< ClusterChar< double, DIMS > > & centroids )
+	{
+		// this algorithm is the same as my card shuffling algorithm
+
+		vector< int > boardstouse( m_map.size( ) );
+		for( unsigned i = 0; i < m_map.size( ); i++ )
+			boardstouse[ i ] = i;
+		for( unsigned i = 0; i < centroids.size( ); i++ )
+			swap( boardstouse[ i ], boardstouse[ i + binrand.randInt( m_map.size( ) - 1 - i ) ] );
+		sort( boardstouse.begin( ), boardstouse.begin( ) + centroids.size( ) );
+		int last = 0;
+		typename HandMap::iterator boardtouse = m_map.begin( );
+		for( unsigned i = 0; i < centroids.size( ); i++ )
+		{
+			for( int j = last; j < boardstouse[ i ]; j++ )
+				boardtouse++;
+			last = boardstouse[ i ];
+			centroids[ i ] = boardtouse->first;
+		}
+	}
+#endif
+
+	// I ported this code myself from some Fortran code I found
+	// I hope it is still correct, I don't fully understand it's workings...
+	// some portions are opaque, and the original had 1-character variables.
+	// Still, I adapted it to use a weighted approach, i.e., not to just put
+	// 24 of the same thing in there, but to put it in once with a 24 weight.
+	// I hope I did the weighting correctly... It seemed releatively straight-forward
+	// but if I could remove it I would. It turned out not to even solve the problem
+	// I was trying to solve (I think there was a different bug, an int that should
+	// have been a double).
+	void DetermineClusters( int n_clusters, const string & name )
+	{
+		vector< typename HandMap::iterator > elements( m_map.size( ) );
+		{
+			typename HandMap::iterator iter = m_map.begin( );
+			for( unsigned i = 0; i < m_map.size( ); i++ )
+				elements[ i ] = iter++;
+		}
+
+		cerr << "For " << name << " clusters:" << endl;
+		cerr << "clustering " << m_totalhands << " total (" << m_map.size( ) << " compressed) into " << n_clusters << " clusters." << endl;
+
+		if( (unsigned)n_clusters >= elements.size( ) )
+			REPORT( "k >= n in kmeans" );
+		if( n_clusters <= 1 )
+			REPORT( "k <= 1 in kmeans" );
+
+		list< vector< int > > trialsclusters;
+		list< double > trialserrors;
+
+beginclustering:
+
+		vector< ClusterChar< double, DIMS > > centroids( n_clusters );
+		initialize_kmeans( centroids );
+		vector< int > clustercounts( n_clusters, 0 );
+		vector< int > clusterelements( n_clusters, 0 );
+		vector< double > clustererrors( n_clusters, 0 );
+		int n_iter = 0;
+		const int MAX_ITER_ALLOWED = 100;
 
 		// loop through to find the first and second closest clusters for each point
 		// assign each board to its nearest centroid
 
-		vector< int > secondcluster( boards.size( ) ); //second closest cluster
-		for( unsigned i = 0; i < boards.size( ); i++ )
+		vector< int > secondcluster( elements.size( ) ); //second closest cluster
+		for( unsigned i = 0; i < elements.size( ); i++ )
 		{
 			// prime the loop with the first two centroids
 
-			boards[ i ].cluster = 0;
+			elements[ i ]->second.m_bin = 0;
 			secondcluster[ i ] = 1;
-			int distance1 = get_distance( boards[ i ].characteristic, centroids[ 0 ] );
-			int distance2 = get_distance( boards[ i ].characteristic, centroids[ 1 ] );
+			double distance1 = get_distance( elements[ i ]->first, centroids[ 0 ] );
+			double distance2 = get_distance( elements[ i ]->first, centroids[ 1 ] );
 			if( distance2 < distance1 )
 			{
-				swap( boards[ i ].cluster, secondcluster[ i ] );
+				swap( elements[ i ]->second.m_bin, secondcluster[ i ] );
 				swap( distance1, distance2 );
 			}
 
@@ -789,13 +1133,13 @@ clusternofault:
 
 			for( int j = 2; j < n_clusters; j++ )
 			{
-				int newdistance = get_distance( boards[ i ].characteristic, centroids[ j ] );
+				double newdistance = get_distance( elements[ i ]->first, centroids[ j ] );
 				if( newdistance < distance1 )
 				{
 					distance2 = distance1;
 					distance1 = newdistance;
-					secondcluster[ i ] = boards[ i ].cluster;
-					boards[ i ].cluster = j;
+					secondcluster[ i ] = elements[ i ]->second.m_bin;
+					elements[ i ]->second.m_bin = j;
 				}
 				else if( newdistance < distance2 )
 				{
@@ -805,15 +1149,19 @@ clusternofault:
 			}
 		}
 
-		// recompute the cluster centroids by averaging the boards that were assigned to them
+		// recompute the cluster centroids by averaging the elements that were assigned to them
 
 		for( int i = 0; i < n_clusters; i++ )
 			centroids[ i ].zero( );
 
-		for( unsigned i = 0; i < boards.size( ); i++ )
+		for( unsigned i = 0; i < elements.size( ); i++ )
 		{
-			clustercounts[ boards[ i ].cluster ]++;
-			centroids[ boards[ i ].cluster ] += boards[ i ].characteristic;
+			clusterelements[ elements[ i ]->second.m_bin ]++;
+			clustercounts[ elements[ i ]->second.m_bin ] += elements[ i ]->second.m_weight;
+
+			ClusterChar< T, DIMS > temp = elements[ i ]->first;
+			temp *= elements[ i ]->second.m_weight;
+			centroids[ elements[ i ]->second.m_bin ] += temp;
 		}
 
 
@@ -825,12 +1173,13 @@ clusternofault:
 		vector< bool > itran( n_clusters, true );
 		vector< int > ncp( n_clusters, -1 );
 		unsigned indx = 0;
-		vector< double > d( boards.size( ), 0 );
+		vector< double > d( elements.size( ), 0 );
 		vector< int > live( n_clusters, 0 );
+
 		for( int i = 0; i < n_clusters; i++ )
 		{
 			if( clustercounts[ i ] == 0 )
-				goto clusterfault1;
+				REPORT( "clusterfault1" );
 
 			centroids[ i ] /= clustercounts[ i ];
 
@@ -849,27 +1198,27 @@ clusternofault:
 
 			for( int i = 0; i < n_clusters; i++ )
 				if( itran[ i ] )
-					live[ i ] = boards.size( ) + 1; //TODO ???
+					live[ i ] = elements.size( ) + 1;
 
-			for( int i = 0; static_cast< unsigned >( i ) < boards.size( ); i++ )
+			for( int i = 0; static_cast< unsigned >( i ) < elements.size( ); i++ )
 			{
 				indx++;
-				int L1 = boards[ i ].cluster;
+				int L1 = elements[ i ]->second.m_bin;
 				int L2 = secondcluster[ i ];
 				int LL = L2;
 
-				if( clustercounts[ L1 ] > 1 )
+				if( clusterelements[ L1 ] > 1 )
 				{
 					if( ncp[ L1 ] != 0 )
-						d[ i ] = an1[ L1 ] * get_distance( boards[ i ].characteristic, centroids[ L1 ] );
+						d[ i ] = an1[ L1 ] * get_distance( elements[ i ]->first, centroids[ L1 ] );
 
-					double R2 = an2[ L2 ] * get_distance( boards[ i ].characteristic, centroids[ L2 ] );
+					double R2 = an2[ L2 ] * get_distance( elements[ i ]->first, centroids[ L2 ] );
 
 					for( int j = 0; j < n_clusters; j++ )
 					{
 						if( ( i < live[ L1 ] || i < live[ L2 ] ) && j != L1 && j != LL )
 						{
-							const double newdist = get_distance( boards[ i ].characteristic, centroids[ j ] );
+							const double newdist = get_distance( elements[ i ]->first, centroids[ j ] );
 							if( newdist < R2 / an2[ j ] )
 							{
 								R2 = newdist * an2[ j ];
@@ -885,12 +1234,12 @@ clusternofault:
 					else
 					{
 						indx = 0;
-						live[ L1 ] = boards.size( ) + i;
-						live[ L2 ] = boards.size( ) + i;
+						live[ L1 ] = elements.size( ) + i;
+						live[ L2 ] = elements.size( ) + i;
 						ncp[ L1 ] = i;
 						ncp[ L2 ] = i;
-						centroids[ L1 ].subtract( clustercounts[ L1 ], boards[ i ].characteristic );
-						centroids[ L2 ].add( clustercounts[ L2 ], boards[ i ].characteristic );
+						centroids[ L1 ].subtract( clusterelements[ L1 ], clustercounts[ L1 ], elements[ i ]->first, elements[ i ]->second.m_weight );
+						centroids[ L2 ].add( clusterelements[ L2 ], clustercounts[ L2 ], elements[ i ]->first, elements[ i ]->second.m_weight );
 						if( clustercounts[ L1 ] == 1 )
 							an1[ L1 ] = numeric_limits< double >::infinity( );
 						else
@@ -898,12 +1247,12 @@ clusternofault:
 						an2[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] + 1 );
 						an1[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] - 1 );
 						an2[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] + 1 );
-						boards[ i ].cluster = L2;
+						elements[ i ]->second.m_bin = L2;
 						secondcluster[ i ] = L1;
 					}
 				}
 
-				if( indx == boards.size( ) )
+				if( indx == elements.size( ) )
 					goto endoptra;
 
 			}
@@ -911,12 +1260,12 @@ clusternofault:
 			for( int j = 0; j < n_clusters; j++ )
 			{
 				itran[ j ] = false;
-				live[ j ] -= boards.size( );
+				live[ j ] -= elements.size( );
 			}
 
 endoptra:
 
-			if( indx == boards.size( ) )
+			if( indx == elements.size( ) )
 				break;
 
 			// this is the quick transfer stage
@@ -926,31 +1275,31 @@ endoptra:
 
 			while( true )
 			{
-				for( unsigned i = 0; i < boards.size( ); i++ )
+				for( unsigned i = 0; i < elements.size( ); i++ )
 				{
 					icoun++;
 					istep++;
-					int L1 = boards[ i ].cluster;
+					int L1 = elements[ i ]->second.m_bin;
 					int L2 = secondcluster[ i ];
 
-					if( clustercounts[ L1 ] > 1 )
+					if( clusterelements[ L1 ] > 1 )
 					{
 						if( ncp[ L1 ] >= istep )
-							d[ i ] = an1[ L1 ] * get_distance( boards[ i ].characteristic, centroids[ L1 ] );
+							d[ i ] = an1[ L1 ] * get_distance( elements[ i ]->first, centroids[ L1 ] );
 
 						if( ncp[ L1 ] > istep || ncp[ L2 ] > istep )
 						{
-							const double newdist = get_distance( boards[ i ].characteristic, centroids[ L2 ] );
+							const double newdist = get_distance( elements[ i ]->first, centroids[ L2 ] );
 							if( newdist < d[ i ] / an2[ L2 ] )
 							{
 								icoun = 0;
 								indx = 0;
 								itran[ L1 ] = true;
 								itran[ L2 ] = true;
-								ncp[ L1 ] = istep + boards.size( );
-								ncp[ L2 ] = istep + boards.size( );
-								centroids[ L1 ].subtract( clustercounts[ L1 ], boards[ i ].characteristic );
-								centroids[ L2 ].add( clustercounts[ L2 ], boards[ i ].characteristic );
+								ncp[ L1 ] = istep + elements.size( );
+								ncp[ L2 ] = istep + elements.size( );
+								centroids[ L1 ].subtract( clusterelements[ L1 ], clustercounts[ L1 ], elements[ i ]->first, elements[ i ]->second.m_weight );
+								centroids[ L2 ].add( clusterelements[ L2 ], clustercounts[ L2 ], elements[ i ]->first, elements[ i ]->second.m_weight );
 								if( clustercounts[ L1 ] == 1 )
 									an1[ L1 ] = numeric_limits< double >::infinity( );
 								else
@@ -958,13 +1307,13 @@ endoptra:
 								an2[ L1 ] = static_cast< double >( clustercounts[ L1 ] ) / ( clustercounts[ L1 ] + 1 );
 								an1[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] - 1 );
 								an2[ L2 ] = static_cast< double >( clustercounts[ L2 ] ) / ( clustercounts[ L2 ] + 1 );
-								boards[ i ].cluster = L2;
+								elements[ i ]->second.m_bin = L2;
 								secondcluster[ i ] = L1;
 							}
 						}
 					}
 
-					if( icoun == boards.size( ) )
+					if( icoun == elements.size( ) )
 						goto endqtran;
 				}
 			}
@@ -979,141 +1328,88 @@ endqtran:
 				ncp[ i ] = 0;
 		}
 
-	}
-
-
-	for( int i = 0; i < n_clusters; i++ )
-	{
-		clustercounts[ i ] = 0;
-		clustererrors[ i ] = 0;
-		centroids[ i ].zero( );
-	}
-
-	for( BoardVec::iterator i = boards.begin( ); i != boards.end( ); i++ )
-	{
-		clustercounts[ i->cluster ]++;
-		centroids[ i->cluster ] += i->characteristic;
-	}
-
-	for( int i = 0; i < n_clusters; i++ )
-		centroids[ i ] /= clustercounts[ i ];
-
-	double totalerror = 0;
-	for( BoardVec::iterator i = boards.begin( ); i != boards.end( ); i++ )
-	{
-		const double newerror = square( get_distance( i->characteristic, centroids[ i->cluster ] ) );
-		clustererrors[ i->cluster ] += newerror;
-		totalerror +=newerror;
-	}
-
-	cerr << "Final error: " << totalerror << endl;
-	cerr << "Iterations: " << n_iter;
-	if( n_iter > MAX_ITER_ALLOWED )
-		cerr << "(MAX ITER)";
-	cerr << endl << "Cluster number: size of cluster (wss error)" << endl;
-	for( int i = 0; i < n_clusters; i++ )
-	{
-		cerr << i << ": " << clustercounts[ i ] << " (" << clustererrors[ i ] << ")" << endl;
-	}
-	cerr << endl;
-
-	trialserrors.push_back( totalerror );
-	trialsclusters.push_back( vector< int >( ) );
-	vector< int > & lasttrial = trialsclusters.back( );
-	lasttrial.reserve( boards.size( ) );
-	for( unsigned i = 0; i < boards.size( ); i++ )
-		lasttrial[ i ] = boards[ i ].cluster;
-
-	if( trialserrors.size( ) < 20 )
-		goto clusternofault;
-
-	const list< double >::iterator besterror = min_element( trialserrors.begin( ), trialserrors.end( ) );
-	list< double >::iterator err = trialserrors.begin( ); 
-	list< vector< int > >::iterator vec = trialsclusters.begin( ); 
-	for( ; err != besterror; err++, vec++ );
-
-	cerr << ">>> Of " << trialserrors.size( ) << " trials, chose the one with error " << * besterror << endl;
-	for( unsigned i = 0; i < boards.size( ); i++ )
-		output.store( boards[ i ].index, vec->operator[]( i ) );
-}
-
-#if 0 /* this is Lloyd's algorithm (the really simple one) */
-	const double MAX_ERROR_ALLOWED = 0;
-
-	// start iterations
-	CentroidVec newcentroidssum( n_clusters );
-	double old_error = 0, error = 1e200; // sum of squared euclidean distance
-	int n_iter = 0;
-
-	while( myabs( error - old_error ) > MAX_ERROR_ALLOWED )
-	{
-		n_iter++;
-
-		// save error from last step
-		old_error = error, error = 0;
-		int changed = 0;
-
-		// clear old counts and temp centroids
 		for( int i = 0; i < n_clusters; i++ )
 		{
-			counts[ i ] = 0;
-			newcentroidssum[ i ].zero( );
+			clusterelements[ i ] = 0;
+			clustercounts[ i ] = 0;
+			clustererrors[ i ] = 0;
+			centroids[ i ].zero( );
 		}
 
-		for( BoardVec::iterator b = boards.begin( ); b != boards.end( ); b++ )
+		for( typename HandMap::iterator i = m_map.begin( ); i != m_map.end( ); i++ )
 		{
-			// identify the closest cluster
-			double min_distance = 1e200;
-			int bestcluster = b->cluster;
-			for( int clus = 0; clus < n_clusters; clus++ )
-			{
-				double distance = get_distance( b->characteristic, centroids[ clus ] );
-				if (distance < min_distance) 
-				{
-					bestcluster = clus;
-					min_distance = distance;
-				}
-			}
-			if( b->cluster != bestcluster )
-			{
-				changed++;
-				b->cluster = bestcluster;
-			}
+			clusterelements[ i->second.m_bin ]++;
+			clustercounts[ i->second.m_bin ] += i->second.m_weight;
 
-			// update size and temp centroid of the destination cluster
-			newcentroidssum[ bestcluster ] += b->characteristic;
-			counts[ bestcluster ]++;
-			// update standard error
-			error += min_distance;
+			ClusterChar< T, DIMS > temp = i->first;
+			temp *= i->second.m_weight;
+			centroids[ i->second.m_bin ] += temp;
 		}
 
 		for( int i = 0; i < n_clusters; i++ )
+			centroids[ i ] /= clustercounts[ i ];
+
+		double totalerror = 0;
+		for( typename HandMap::iterator i = m_map.begin( ); i != m_map.end( ); i++ )
 		{
-			if( counts[ i ] )
-				for( int j = 0; j < CHARCOUNT * CHARCOUNT; j++ )
-					centroids[ i ].c[ j ] = newcentroidssum[ i ].c[ j ] / counts[ i ];
-			else
-			{
-				cerr << "iteration " << n_iter << ": hit 0 count for cluster " << i << " choosing random board to re-center" << endl;
-				const unsigned randboard = binrand.randInt( boards.size( ) - 1 );
-				BoardVec::iterator b = boards.begin( );
-				for( unsigned x = 0; x < randboard; x++ )
-					b++;
-				centroids[ i ] = b->characteristic;
-			}
+			const double newerror = square( get_distance( i->first, centroids[ i->second.m_bin ] ) );
+			clustererrors[ i->second.m_bin ] += newerror;
+			totalerror +=newerror;
 		}
 
-		if( MAX_ITER_ALLOWED > 0 && n_iter >= MAX_ITER_ALLOWED ) 
-			break;
+		cerr << "Final error: " << totalerror << endl;
+		cerr << "Iterations: " << n_iter;
+		if( n_iter > MAX_ITER_ALLOWED )
+			cerr << "(MAX ITER)";
+		cerr << endl << "Cluster number: size of cluster (wss error)" << endl;
+		for( int i = 0; i < n_clusters; i++ )
+		{
+			cerr << i << ": " << clustercounts[ i ] << " (" << clustererrors[ i ] << ")" << endl;
+		}
+		cerr << endl;
+
+		trialserrors.push_back( totalerror );
+		trialsclusters.push_back( vector< int >( ) );
+		vector< int > & lasttrial = trialsclusters.back( );
+		lasttrial.resize( elements.size( ) );
+		for( unsigned i = 0; i < elements.size( ); i++ )
+			lasttrial[ i ] = elements[ i ]->second.m_bin;
+
+		if( trialserrors.size( ) < 20 )
+			goto beginclustering;
+
+		const list< double >::iterator besterror = min_element( trialserrors.begin( ), trialserrors.end( ) );
+		list< double >::iterator err = trialserrors.begin( ); 
+		list< vector< int > >::iterator vec = trialsclusters.begin( ); 
+		for( ; err != besterror; err++, vec++ );
+
+		cerr << ">>> Of " << trialserrors.size( ) << " trials, chose the one with error " << * besterror << endl;
+		for( unsigned i = 0; i < elements.size( ); i++ )
+			elements[ i ]->second.m_bin = vec->operator[]( i );
 	}
-#endif
+
+	struct HandValue
+	{
+		HandValue( ) 
+			: m_weight( 0 )
+			  , m_bin( -1 ) 
+		{ }
+		int32 m_weight;
+		int32 m_bin;
+		set< int64 > m_indices;
+	};
+
+	typedef std::map< ClusterChar< T, DIMS >, HandValue > HandMap;
+	HandMap m_map;
+	int64 m_totalhands;
+};
 
 void saveboardflopclusters( int n_new )
 {
 	cout << "generating b" << n_new << " flop clusters..." << endl;
 
 	//the final list of boards we are trying to construct
-	BoardVec boards;
+	Clusterer< int, CHARCOUNT * CHARCOUNT > boards;
 
 	//the bin file that will receive the output
 	PackedBinFile output(n_new, INDEX3_MAX);
@@ -1141,30 +1437,27 @@ void saveboardflopclusters( int n_new )
 
 		//create a new BoardStruct with its index
 		const int64 index = getindex3( cards_flop );
-		boards.push_back( BoardStruct( index ) );
+		BoardChar charac;
 
-		if( ACTUALLYDOKMEANS || true )
+		//characterize it:
+		//for each private hand
+		CardMask cards_hole;
+		ENUMERATE_2_CARDS_D( cards_hole, cards_flop,
 		{
-			BoardStruct & newboard = boards.back( );
+			//lookup that hand's preflop 10-bin and flop 10-bin
+			const int pre = prebins.retrieve( getindex2( cards_hole ) );
+			const int post = postbins.retrieve( getindex23( cards_hole, cards_flop ) );
 
-			//characterize it:
-			//for each private hand
-			CardMask cards_hole;
-			ENUMERATE_2_CARDS_D( cards_hole, cards_flop,
-			{
-				//lookup that hand's preflop 10-bin and flop 10-bin
-				const int pre = prebins.retrieve( getindex2( cards_hole ) );
-				const int post = postbins.retrieve( getindex23( cards_hole, cards_flop ) );
-
-				//increment that element of the array
-				newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
-			});
-		}
+			//increment that element of the array
+			charac.c[ combine( pre, post, CHARCOUNT ) ]++;
+		});
+	
+		boards.Add( index, charac );
 	});
 	cout << endl;
 
 	//pass the whole thing to clustering and storing to output
-	clusterandstore( boards, n_new, output, "flopb" + tostr( n_new ) );
+	boards.Cluster( output, n_new, "flopb" + tostr( n_new ) );
 
 	} // end of n_new == 1 case
 
@@ -1203,7 +1496,7 @@ void saveboardturnclusters( const int n_flop, const int n_new )
 	for( int myflopcluster = 0; myflopcluster < n_flop; myflopcluster++ )
 	{
 		//the final list of boards we are trying to construct
-		BoardVec boards;
+		Clusterer< int, CHARCOUNT * CHARCOUNT > boards;
 
 		//enumerate through all flops, 
 		CardMask cards_flop;
@@ -1221,32 +1514,29 @@ void saveboardturnclusters( const int n_flop, const int n_new )
 			{
 				//create a new BoardStruct with its index
 				const int64 index = getindex31( cards_flop, card_turn );
-				boards.push_back( BoardStruct( index ) );
+				BoardChar board;
 
-				if( ACTUALLYDOKMEANS || true )
+				//characterize it:
+				//for each private hand
+				CardMask cards_hole;
+				CardMask cards_used;
+				CardMask_OR( cards_used, cards_flop, card_turn );
+				ENUMERATE_2_CARDS_D( cards_hole, cards_used,
 				{
-					BoardStruct & newboard = boards.back( );
+					//lookup that hand's preflop 10-bin and flop 10-bin
+					const int pre = prebins.retrieve( getindex23( cards_hole, cards_flop ) );
+					const int post = postbins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
 
-					//characterize it:
-					//for each private hand
-					CardMask cards_hole;
-					CardMask cards_used;
-					CardMask_OR( cards_used, cards_flop, card_turn );
-					ENUMERATE_2_CARDS_D( cards_hole, cards_used,
-					{
-						//lookup that hand's preflop 10-bin and flop 10-bin
-						const int pre = prebins.retrieve( getindex23( cards_hole, cards_flop ) );
-						const int post = postbins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
+					//increment that element of the array
+					board.c[ combine( pre, post, CHARCOUNT ) ]++;
+				});
 
-						//increment that element of the array
-						newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
-					});
-				}
+				boards.Add( index, board );
 			});
 		});
 
 		//pass the whole thing to clustering and storing to output
-		clusterandstore( boards, n_new, output, "turnb" + tostr( n_flop ) + "-b" + tostr( n_new ) + " (doing " + tostr( myflopcluster ) + ")" );
+		boards.Cluster( output, n_new, "turnb" + tostr( n_flop ) + "-b" + tostr( n_new ) + " (doing " + tostr( myflopcluster ) + ")" );
 	}
 	cout << endl;
 
@@ -1288,15 +1578,11 @@ void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new
 
 	//for each flop + turn cluster
 	int x = 0;
-	BoardVec boards;
 	for( int myflopcluster = 0; myflopcluster < n_flop; myflopcluster++ )
 	{
 		for( int myturncluster = 0; myturncluster < n_turn; myturncluster++ )
 		{
-			//the final list of boards we are trying to construct
-			const int oldcap = boards.capacity( );
-			boards.resize( 0 );
-			boards.reserve( oldcap );
+			Clusterer< int, CHARCOUNT * CHARCOUNT > boards;
 
 			//enumerate through all flops, 
 			CardMask cards_flop;
@@ -1326,33 +1612,30 @@ void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new
 
 						//create a new BoardStruct with its index
 						const int64 index = getindex311( cards_flop, card_turn, card_river );
-						boards.push_back( BoardStruct( index ) );
+						BoardChar board;
 
-						if( ACTUALLYDOKMEANS )
+						//characterize it:
+						//for each private hand
+						CardMask cards_hole;
+						CardMask cards_used2;
+						CardMask_OR( cards_used2, cards_used, card_river );
+						ENUMERATE_2_CARDS_D( cards_hole, cards_used2,
 						{
-							BoardStruct & newboard = boards.back( );
+							//lookup that hand's preflop 10-bin and flop 10-bin
+							const int pre = prebins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
+							const int post = postbins.retrieve( getindex2311( cards_hole, cards_flop, card_turn, card_river ) );
 
-							//characterize it:
-							//for each private hand
-							CardMask cards_hole;
-							CardMask cards_used2;
-							CardMask_OR( cards_used2, cards_used, card_river );
-							ENUMERATE_2_CARDS_D( cards_hole, cards_used2,
-							{
-								//lookup that hand's preflop 10-bin and flop 10-bin
-								const int pre = prebins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
-								const int post = postbins.retrieve( getindex2311( cards_hole, cards_flop, card_turn, card_river ) );
+							//increment that element of the array
+							board.c[ combine( pre, post, CHARCOUNT ) ]++;
+						});
 
-								//increment that element of the array
-								newboard.characteristic.c[ combine( pre, post, CHARCOUNT ) ]++;
-							});
-						}
+						boards.Add( index, board );
 					});
 				});
 			});
 
 			//pass the whole thing to clustering and storing to output
-			clusterandstore( boards, n_new, output, "riverb" + tostr( n_flop ) + "-b" + tostr( n_turn ) + "-b" + tostr( n_new ) + " (doing " + tostr( myflopcluster) + ", " + tostr( myturncluster ) + ")" );
+			boards.Cluster( output, n_new, "riverb" + tostr( n_flop ) + "-b" + tostr( n_turn ) + "-b" + tostr( n_new ) + " (doing " + tostr( myflopcluster) + ", " + tostr( myturncluster ) + ")" );
 		}
 	}
 	cout << endl;
@@ -1364,6 +1647,141 @@ void saveboardriverclusters( const int n_flop, const int n_turn, const int n_new
 }
 
 //---------------- B i n   S t o r i n g ------------------
+
+void saveflopbinclusters( int n_flopclusters, int n_flopnew )
+{
+	cout << "generating b" << n_flopclusters << " - " << n_flopnew << " flop bins via K-Means method..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_flopnew, INDEX23_MAX );
+
+	//the data used to bin the hands
+	const FloaterFile flophss( "flopHSS", INDEX23_MAX );
+	const FloaterFile flopev( "flopEV", INDEX23_MAX );
+
+	//the bin information that will have the history
+	const PackedBinFile flopclusters(
+			BINSFOLDER + "flopb" + tostr( n_flopclusters ),
+			-1, n_flopclusters, INDEX3_MAX, true );
+
+	//for each flop cluster
+	int x = 0;
+	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
+	{
+		//the final list of boards we are trying to construct
+		Clusterer< double, 2 > hands;
+
+		//enumerate through all flops, 
+		CardMask cards_flop;
+		ENUMERATE_3_CARDS(cards_flop,
+		{
+
+			if(x++ % (277 * n_flopclusters) == 0) cout << '.' << flush;
+
+			// reject the ones not in the current flop cluster of interest
+			if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
+				continue;
+
+			//enumerate through all private cards
+			CardMask cards_hole;
+			ENUMERATE_2_CARDS_D(cards_hole, cards_flop,
+			{
+				//create a new RawHand with its index
+				const int64 index = getindex23( cards_hole, cards_flop );
+				Hand2Char hand;
+				hand.c[ 0 ] = flopev[ index ];
+				hand.c[ 1 ] = flophss[ index ] * HSSKMEANSFACTOR;
+				hands.Add( index, hand );
+			});
+		});
+		//pass the whole thing to clustering and storing to output
+		hands.Cluster( output, n_flopnew, "flopb" + tostr( n_flopclusters ) + "-" + tostr( n_flopnew ) );
+	}
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "flopb" + tostr( n_flopclusters ) + "-" + tostr( n_flopnew ) );
+}
+
+void saveturnbinclusters( int n_flopclusters, int n_turnclusters, int n_turnnew )
+{
+	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - " << n_turnnew << " turn bins via K-Means method..." << endl;
+
+	//the bin file that will receive the output
+	PackedBinFile output( n_turnnew, INDEX231_MAX );
+
+	//the data used to bin the hands
+	const FloaterFile turnhss( "turnHSS", INDEX24_MAX );
+	const FloaterFile turnev( "turnEV", INDEX24_MAX );
+
+	//the bin information that will have the history
+	const PackedBinFile flopclusters(
+			BINSFOLDER + "flopb" + tostr( n_flopclusters ),
+			-1, n_flopclusters, INDEX3_MAX, true );
+
+	//the bin information that will have the history
+	const PackedBinFile turnclusters(
+			BINSFOLDER + "turnb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ),
+			-1, n_turnclusters, INDEX31_MAX, true );
+
+	//for each flop + turn cluster
+	int x = 0;
+	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
+	{
+		for( int myturncluster = 0; myturncluster < n_turnclusters; myturncluster++ )
+		{
+			//the final list of boards we are trying to construct
+			Clusterer< double, 2 > hands;
+
+			//enumerate through all flops, 
+			CardMask cards_flop;
+			ENUMERATE_3_CARDS(cards_flop,
+			{
+
+				if(x++ % (277 * n_flopclusters * n_turnclusters) == 0) cout << '.' << flush;
+
+				// reject the ones not in the current flop cluster of interest
+				if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
+					continue;
+
+				//enumerate through all turns
+				CardMask card_turn;
+				ENUMERATE_1_CARDS_D(card_turn, cards_flop,
+				{
+					// reject the ones not in the current turn cluster of interest
+					if( turnclusters.retrieve( getindex31( cards_flop, card_turn ) ) != myturncluster )
+						continue;
+
+					//enumerate through all hole cards
+					CardMask cards_hole;
+					CardMask cards_used;
+					CardMask_OR( cards_used, cards_flop, card_turn );
+					ENUMERATE_2_CARDS_D(cards_hole, cards_used,
+					{
+
+						//create a new RawHand with its index
+						const int64 index231 = getindex231( cards_hole, cards_flop, card_turn );
+						CardMask cards_board;
+						CardMask_OR( cards_board, cards_flop, card_turn );
+						const int64 index24 = getindex2N( cards_hole, cards_board, 4 );
+						Hand2Char hand;
+						hand.c[ 0 ] = turnev[ index24 ];
+						hand.c[ 1 ] = turnhss[ index24 ] * HSSKMEANSFACTOR;
+						hands.Add( index231, hand );
+
+					});
+				});
+			});
+
+			//pass the whole thing to clustering and storing to output
+			hands.Cluster( output, n_turnnew, "turnb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-" + tostr( n_turnnew ) );
+		}
+	}
+	cout << endl;
+
+	//save the file
+	cout << output.save( BINSFOLDER + "turnb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-" + tostr( n_turnnew ) );
+}
 
 
 /*
@@ -1394,7 +1812,7 @@ void saveflopbins( int n_flopclusters, int n_flopnew )
 	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
 	{
 		//the final list of boards we are trying to construct
-		vector< RawHand > hands;
+		Binner hands;
 
 		//enumerate through all flops, 
 		CardMask cards_flop;
@@ -1413,12 +1831,12 @@ void saveflopbins( int n_flopclusters, int n_flopnew )
 			{
 				//create a new RawHand with its index
 				const int64 index = getindex23( cards_hole, cards_flop );
-				hands.push_back( RawHand( index, flophss[ index ] ) );
+				hands.Add( index, flophss[ index ] );
 			});
 		});
 
 		//pass the whole thing to my binandstore routine
-		binandstore( hands, output, n_flopnew, hands.size( ) );
+		hands.Bin( output, n_flopnew, false );
 	}
 	cout << endl;
 
@@ -1463,11 +1881,7 @@ void saveturnbins( const int n_flopclusters, const int n_turnclusters, const int
 		for( int myturncluster = 0; myturncluster < n_turnclusters; myturncluster++ )
 		{
 			//the final list of boards we are trying to construct
-			vector< RawHand > hands;
-			if( n_flopclusters * n_turnclusters <= 2 )
-				//most it can use if n_flopclusters == n_turnclusters == 1
-				//linux does not actually allocate unless used.
-				hands.reserve( 1221511200 ); 
+			Binner hands;
 
 			//enumerate through all flops, 
 			CardMask cards_flop;
@@ -1500,14 +1914,14 @@ void saveturnbins( const int n_flopclusters, const int n_turnclusters, const int
 						CardMask cards_board;
 						CardMask_OR( cards_board, cards_flop, card_turn );
 						const int64 index24 = getindex2N( cards_hole, cards_board, 4 );
-						hands.push_back( RawHand( index231, turnhss[ index24 ] ) );
+						hands.Add( index231, turnhss[ index24 ] );
 
 					});
 				});
 			});
 
 			//pass the whole thing to my binandstore routine
-			binandstore( hands, output, n_turnnew, hands.size( ) );
+			hands.Bin( output, n_turnnew, false );
 		}
 	}
 	cout << endl;
@@ -1554,7 +1968,7 @@ void nestflopbins( const int n_flopclusters, const int n_flopbins, const int n_f
 		for( int myflopbin = 0; myflopbin < n_flopbins; myflopbin++ )
 		{
 			//the final list of boards we are trying to construct
-			vector< RawHand > hands;
+			Binner hands;
 
 			//enumerate through all flops, 
 			CardMask cards_flop;
@@ -1577,13 +1991,13 @@ void nestflopbins( const int n_flopclusters, const int n_flopbins, const int n_f
 
 					//create a new RawHand with its index
 					const int64 index = getindex23( cards_hole, cards_flop );
-					hands.push_back( RawHand( index, flopev[ index ] ) );
+					hands.Add( index, flopev[ index ] );
 
 				});
 			});
 
 			//pass the whole thing to my binandstore routine
-			binandstore( hands, output, n_flopnew, hands.size( ) );
+			hands.Bin( output, n_flopnew, true );
 
 			//I don't know which ones I just stored. A super hack is to only 
 			// re-set the ones that have been stored exactly once.
@@ -1614,10 +2028,27 @@ void nestflopbins( const int n_flopclusters, const int n_flopbins, const int n_f
 	            takenote
 	    binandstore
 		*/
+/* this is the correct algorithm. I think what i do below is exactly the 
+   same. or better in the places where it differs
+
+  for(fcl)
+    for(tcl)
+	  for(rcl)
+	    foreach(flop)
+		  if(!fcl) continue
+		  foreach(turn)
+		    if(!tcl) continue
+		    foreach(river)
+		      if(!rcl) continue
+			  foreach(priv)
+	            takenote
+	    binandstore
+		*/
 void saveriverbins( const int n_flopclusters, const int n_turnclusters, const int n_riverclusters, const int n_rivernew )
 {
-#if 1
-// INDEX25 easy way. same idea as below but it can be done MUCH more easily with only INDEX25!
+#if 0
+// INDEX25 easy way, no memory, runs in seconds. choose divisions in riverEV numbers for 
+// river bin divisions, possible since all hole cards are in computation.
 
 	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - b" << n_riverclusters << " - " << n_rivernew << " river bins..." << endl;
 
@@ -1643,77 +2074,9 @@ void saveriverbins( const int n_flopclusters, const int n_turnclusters, const in
 
 // ...................................
 
-#if 0
-// INDEX2311 easy way, less memory, idea will be to choose divisions in riverEV numbers for river bin 
-// divisions, possible since all hole cards are in computation, would like to prove is same as hard way.
-
-	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - b" << n_riverclusters << " - " << n_rivernew << " river bins..." << endl;
-
-	//the bin file that will receive the output
-	PackedBinFile output( n_rivernew, INDEX2311_MAX );
-
-	//the data used to bin the hands
-	const FloaterFile riverev( "riverEV", INDEX25_MAX );
-
-	int x = 0;
-
-	//enumerate through all flops, 
-	CardMask cards_flop;
-	ENUMERATE_3_CARDS(cards_flop,
-	{
-		if(x++ % (277) == 0) cout << '.' << flush;
-
-		//enumerate through all turns
-		CardMask card_turn;
-		ENUMERATE_1_CARDS_D(card_turn, cards_flop,
-		{
-			//enumerate through all rivers
-			CardMask card_river;
-			CardMask cards_used;
-			CardMask_OR( cards_used, cards_flop, card_turn );
-			ENUMERATE_1_CARDS_D(card_river, cards_used,
-			{
-				//enumerate through all hole cards
-				CardMask cards_hole;
-				CardMask cards_used2;
-				CardMask_OR( cards_used2, cards_used, card_river );
-				ENUMERATE_2_CARDS_D(cards_hole, cards_used2,
-				{
-
-					//create a new RawHand with its index
-					const int64 index2311 = getindex2311( cards_hole, cards_flop, card_turn, card_river );
-					if( output.isstored( index2311 ) != 1 )
-					{
-						CardMask cards_board;
-						CardMask_OR( cards_board, cards_flop, card_turn );
-						CardMask_OR( cards_board, cards_board, card_river );
-						const int64 index25 = getindex2N( cards_hole, cards_board, 5 );
-						const floater value = riverev[ index25 ];
-
-						int bin = static_cast< int >( value * n_rivernew );
-						if( bin == n_rivernew )
-							bin--;
-
-						output.store( index2311, bin );
-					}
-
-				});
-			});
-		});
-	});
-
-	cout << endl;
-
-	//save the file
-	cout << output.save( BINSFOLDER + "riverb" + tostr( n_flopclusters ) + "-b" + tostr( n_turnclusters ) + "-b" + tostr( n_riverclusters ) + "-" + tostr( n_rivernew ) );
-
-#endif 
-
-// ..........................................
-
-#if 0
-// hard way, tons memory, idea is to put ALL river hands that match board bins into a bid array 
-// and sort, definitely correct. Most naturally uses INDEX2311
+#if 1
+// hand way, takes four days to run. Idea is to build several buckets of hands based on
+// their hand type, and then sort and bin within each bucket. Uses INDEX2311.
 
 	cout << "generating b" << n_flopclusters << " - b" << n_turnclusters << " - b" << n_riverclusters << " - " << n_rivernew << " river bins..." << endl;
 
@@ -1737,7 +2100,6 @@ void saveriverbins( const int n_flopclusters, const int n_turnclusters, const in
 			-1, n_riverclusters, INDEX311_MAX, true );
 
 	//for each flop + turn + river cluster
-	vector< RawHand > hands;
 	int x = 0;
 	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
 	{
@@ -1746,14 +2108,7 @@ void saveriverbins( const int n_flopclusters, const int n_turnclusters, const in
 			for( int myrivercluster = 0; myrivercluster < n_riverclusters; myrivercluster++ )
 			{
 				//the final list of boards we are trying to construct
-				hands.resize( 0 );
-				const double reservesize 
-					= ( 22100.0 / n_flopclusters ) // 52 c 3 == 22100
-					* ( 49.0 / n_turnclusters )
-					* ( 48.0 / n_riverclusters )
-					* 1081.0 // 47 c 2 == 1081
-					* hand_list_multiplier;
-				hands.reserve( static_cast< uint64 >( reservesize ) );
+				vector< Binner > hands( RIVER_HANDTYPE_MAX );
 
 				//enumerate through all flops, 
 				CardMask cards_flop;
@@ -1797,15 +2152,109 @@ void saveriverbins( const int n_flopclusters, const int n_turnclusters, const in
 								CardMask_OR( cards_board, cards_flop, card_turn );
 								CardMask_OR( cards_board, cards_board, card_river );
 								const int64 index25 = getindex2N( cards_hole, cards_board, 5 );
-								hands.push_back( RawHand( index2311, riverev[ index25 ] ) );
 
+								CardMask full_hand;
+								CardMask_OR( full_hand, cards_board, cards_hole );
+								HandVal handvalue = Hand_EVAL_N( full_hand, 7 );
+								int handtype = HandVal_HANDTYPE( handvalue );
+								if( handtype < 0 || handtype >= 9 )
+									REPORT( "invalid handtype return from pokereval" );
+								if( handtype >= RIVER_HANDTYPE_MAX )
+									handtype = RIVER_HANDTYPE_MAX - 1;
+								// handtype values are:
+								// StdRules_HandType_NOPAIR    0
+								// StdRules_HandType_ONEPAIR   1
+								// StdRules_HandType_TWOPAIR   2
+								// StdRules_HandType_TRIPS     3
+								// StdRules_HandType_STRAIGHT  4
+								// StdRules_HandType_FLUSH     5
+								// StdRules_HandType_FULLHOUSE 6
+								// StdRules_HandType_QUADS     7
+								// StdRules_HandType_STFLUSH   8
+
+								hands[ handtype ].Add( index2311, riverev[ index25 ] );
 							});
 						});
 					});
 				});
 
-				//pass the whole thing to my binandstore routine
-				binandstore( hands, output, n_rivernew, hands.size( ) );
+				//figure out how many bins for each handtype
+
+				double totalweight = 0;
+				//I tested this parameter at 0.75 and 1.0 as well, this worked best
+				// 0.75 beat 1.0 by about 1.2 mb/h
+				// 0.60 beat 0.75 by about 0.06 mb/h
+				const double powerfactor = 0.6;
+				vector< double > weights( RIVER_HANDTYPE_MAX );
+				for( int i = 0; i < RIVER_HANDTYPE_MAX; i++ )
+					totalweight += weights[ i ] = pow( static_cast< double >( hands[ i ].GetTotalSize( ) ), powerfactor );
+
+				vector< int > numbins( RIVER_HANDTYPE_MAX );
+				bitset< RIVER_HANDTYPE_MAX > bincapped( 0 );
+				int binsleft = n_rivernew;
+				int totalbins = 0;
+				int maxbins = 0;
+				int maxbinsindex = -1;
+				while( true )
+				{
+					for( int i = 0; i < RIVER_HANDTYPE_MAX; i++ )
+						if( ! bincapped[ i ] )
+						{
+							numbins[ i ] = mymax( 1L, boost::math::lround( binsleft * weights[ i ] / totalweight ) );
+							if( numbins[ i ] >= maxbins )
+							{
+								maxbins = numbins[ i ];
+								maxbinsindex = i;
+							}
+						}
+
+					bool didcapping = false;
+					for( int i = 0; i < RIVER_HANDTYPE_MAX; i++ )
+						if( numbins[ i ] > hands[ i ].GetCompressedSize( ) )
+						{
+							numbins[ i ] = hands[ i ].GetCompressedSize( );
+							binsleft -= numbins[ i ];
+							totalweight -= weights[ i ];
+							didcapping = true;
+							bincapped[ i ] = true;
+						}
+					if( ! didcapping )
+						break;
+					if( bincapped.all( ) )
+						goto skipadjustment;
+				}
+
+				for( int i = 0; i < RIVER_HANDTYPE_MAX; i++ )
+					totalbins += numbins[ i ];
+				if( totalbins > n_rivernew - 4 )
+					numbins[ maxbinsindex ] -= totalbins - n_rivernew;
+skipadjustment:
+
+				//print info
+
+				cerr << endl << "For b" << myflopcluster << " - b" << myturncluster << " - b" << myrivercluster << endl;
+				if( totalbins > n_rivernew - 4 )
+					cerr << "handtype " << maxbinsindex << " was changed by " << n_rivernew - totalbins << " to make " << n_rivernew << " total bins" << endl;
+				for( int i = 0; i < RIVER_HANDTYPE_MAX; i++ )
+					cerr << i << ": weight=" << weights[ i ] << " compsize=" << hands[ i ].GetCompressedSize( ) << " numbins=" << numbins[ i ] << endl;
+
+				//finally calculate the bins
+
+				int binoffsetnumber = 0;
+				for( int i = 0; i < RIVER_HANDTYPE_MAX; i++ )
+				{
+					hands[ i ].Bin( output, numbins[ i ], true );
+					if( numbins[ i ] )
+						for( int64 j = 0; j < INDEX2311_MAX; j++ )
+							if( output.isstored( j ) == 1 )
+							{
+								const int mynum = output.retrieve( j );
+								if( mynum < 0 || mynum >= numbins[ i ] )
+									REPORT( "found a " + tostr( mynum ) + " stored once." );
+								output.store( j, output.retrieve( j ) + binoffsetnumber );
+							}
+					binoffsetnumber += numbins[ i ];
+				}
 			}
 		}
 	}
@@ -1857,67 +2306,61 @@ void nestturnbins( const int n_flopclusters, const int n_turnclusters, const int
 			-1, n_turnbins, INDEX231_MAX, true );
 
 	//for each flop + turn + river cluster
+
+	//the final list of boards we are trying to construct
+	vector< Binner > hands( n_flopclusters * n_turnclusters * n_turnbins );
+
 	int x = 0;
-	for( int myflopcluster = 0; myflopcluster < n_flopclusters; myflopcluster++ )
+
+	//enumerate through all flops, 
+	CardMask cards_flop;
+	ENUMERATE_3_CARDS(cards_flop,
 	{
-		for( int myturncluster = 0; myturncluster < n_turnclusters; myturncluster++ )
+
+		if(x++ % (277) == 0) cout << '.' << flush;
+
+		// reject the ones not in the current flop cluster of interest
+		int myflopcluster = flopclusters.retrieve( getindex3( cards_flop ) );
+
+		//enumerate through all turns
+		CardMask card_turn;
+		ENUMERATE_1_CARDS_D(card_turn, cards_flop,
 		{
-			for( int myturnbin = 0; myturnbin < n_turnbins; myturnbin++ )
+			// reject the ones not in the current turn cluster of interest
+			int myturncluster = turnclusters.retrieve( getindex31( cards_flop, card_turn ) );
+
+			//enumerate through all rivers
+			CardMask cards_hole;
+			CardMask cards_used;
+			CardMask_OR( cards_used, cards_flop, card_turn );
+			ENUMERATE_2_CARDS_D(cards_hole, cards_used,
 			{
-				//the final list of boards we are trying to construct
-				vector< RawHand > hands;
+				// reject the ones not in the current turn cluster of interest
+				int myturnbin = turnbins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) );
 
-				//enumerate through all flops, 
-				CardMask cards_flop;
-				ENUMERATE_3_CARDS(cards_flop,
-				{
+				//create a new RawHand with its index
+				const int64 index231 = getindex231( cards_hole, cards_flop, card_turn );
+				CardMask cards_board;
+				CardMask_OR( cards_board, cards_flop, card_turn );
+				const int64 index24 = getindex2N( cards_hole, cards_board, 4 );
+				hands[ combine( myflopcluster, myturncluster, n_turnclusters, myturnbin, n_turnbins ) ].Add( index231, turnev[ index24 ] );
 
-					if(x++ % (277 * n_flopclusters * n_turnclusters * n_turnbins) == 0) cout << '.' << flush;
+			});
+		});
+	});
 
-					// reject the ones not in the current flop cluster of interest
-					if( flopclusters.retrieve( getindex3( cards_flop ) ) != myflopcluster )
-						continue;
+	//pass the whole thing to my binandstore routine
+	for( int k = 0; k < n_flopclusters * n_turnclusters * n_turnbins; k++ )
+	{
+		hands[ k ].Bin( output, n_turnnew, true );
 
-					//enumerate through all turns
-					CardMask card_turn;
-					ENUMERATE_1_CARDS_D(card_turn, cards_flop,
-					{
-						// reject the ones not in the current turn cluster of interest
-						if( turnclusters.retrieve( getindex31( cards_flop, card_turn ) ) != myturncluster )
-							continue;
-
-						//enumerate through all rivers
-						CardMask cards_hole;
-						CardMask cards_used;
-						CardMask_OR( cards_used, cards_flop, card_turn );
-						ENUMERATE_2_CARDS_D(cards_hole, cards_used,
-						{
-							// reject the ones not in the current turn cluster of interest
-							if( turnbins.retrieve( getindex231( cards_hole, cards_flop, card_turn ) ) != myturnbin )
-								continue;
-
-							//create a new RawHand with its index
-							const int64 index231 = getindex231( cards_hole, cards_flop, card_turn );
-							CardMask cards_board;
-							CardMask_OR( cards_board, cards_flop, card_turn );
-							const int64 index24 = getindex2N( cards_hole, cards_board, 4 );
-							hands.push_back( RawHand( index231, turnev[ index24 ] ) );
-
-						});
-					});
-				});
-
-				//pass the whole thing to my binandstore routine
-				binandstore( hands, output, n_turnnew, hands.size( ) );
-
-				//I don't know which ones I just stored. A super hack is to only 
-				// re-set the ones that have been stored exactly once.
-				for( int64 i = 0; i < INDEX231_MAX; i++ )
-					if( output.isstored( i ) == 1 )
-						output.store( i, combine( myturnbin, output.retrieve( i ), n_turnnew ) );
-			}
-		}
+		//I don't know which ones I just stored. A super hack is to only 
+		// re-set the ones that have been stored exactly once.
+		for( int64 i = 0; i < INDEX231_MAX; i++ )
+			if( output.isstored( i ) == 1 )
+				output.store( i, combine( k % n_turnbins, output.retrieve( i ), n_turnnew ) );
 	}
+
 	cout << endl;
 
 	//save the file
@@ -2274,30 +2717,54 @@ void makehistbin(int pf, int ftr)
 }
 
 
-void makeboardbins( int bf, int bt, int br, string f, string t, int r )
+void makeboardbins( int bf, int bt, int br, string f, string t, int r, string which )
 {
 	size_t fx = f.find( "x" );
 	size_t tx = t.find( "x" );
 	int f1 = fromstr< int >( f.substr( 0, fx ) );
-	int f2 = ( fx == string::npos ? 0 : fromstr< int >( f.substr( fx + 1 ) ) );
+	int f2 = ( fx == string::npos ? -1 : fromstr< int >( f.substr( fx + 1 ) ) );
 	int t1 = fromstr< int >( t.substr( 0, tx ) );
-	int t2 = ( tx == string::npos ? 0 : fromstr< int >( t.substr( tx + 1 ) ) );
+	int t2 = ( tx == string::npos ? -1 : fromstr< int >( t.substr( tx + 1 ) ) );
 	
-	saveboardflopclusters( bf );
-	saveboardturnclusters( bf, bt );
-	saveboardriverclusters( bf, bt, br );
+	for( int i = 0; i < 6; i++ )
+		if( which.length( ) != 6 || ( which[ i ] != '0' && which[ i ] != '1' ) )
+			throw Exception( "The which string must be six zeros and ones, but is '" + which + "'" );
 
-	saveflopbins( bf, f1 );
+	if( which[ 0 ] == '1' )
+		saveboardflopclusters( bf );
 
-	if( f2 )
-		nestflopbins( bf, f1, f2 );
+	if( which[ 1 ] == '1' )
+		saveboardturnclusters( bf, bt );
 
-	saveturnbins( bf, bt, t1 );
+	if( which[ 2 ] == '1' )
+		saveboardriverclusters( bf, bt, br );
 
-	if( t2 )
-		nestturnbins( bf, bt, t1, t2 );
+	if( which[ 3 ] == '1' )
+	{
+		if( f2 == 0 )
+			saveflopbinclusters( bf, f1 );
+		else
+		{
+			saveflopbins( bf, f1 );
+			if( f2 > 0 )
+				nestflopbins( bf, f1, f2 );
+		}
+	}
 
-	saveriverbins( bf, bt, br, r );
+	if( which[ 4 ] == '1' )
+	{
+		if( t2 == 0 )
+			saveturnbinclusters( bf, bt, t1 );
+		else
+		{
+			saveturnbins( bf, bt, t1 );
+			if( t2 > 0 )
+				nestturnbins( bf, bt, t1, t2 );
+		}
+	}
+
+	if( which[ 5 ] == '1' )
+		saveriverbins( bf, bt, br, r );
 }
 
 	/*
@@ -2404,14 +2871,15 @@ int main(int argc, char *argv[])
 		makehistbin(atoi(argv[2]), atoi(argv[2]));
 
 	//generate one round of boardbins
-	else if(argc == 8 && strcmp("boardbins", argv[1])==0)
+	else if(argc == 9 && strcmp("boardbins", argv[1])==0)
 		makeboardbins( 
 				atoi( argv[ 2 ] ),
 				atoi( argv[ 3 ] ),
 				atoi( argv[ 4 ] ),
 				argv[ 5 ],
 				argv[ 6 ],
-				atoi( argv[ 7 ] ) );
+				atoi( argv[ 7 ] ),
+			    argv[ 8 ] );
 
 #ifdef COMPILE_TESTCODE
 	//test
@@ -2430,8 +2898,11 @@ int main(int argc, char *argv[])
 			case 25: indexmax = INDEX25_MAX; break;
 			case 231: indexmax = INDEX231_MAX; break;
 			case 2311: indexmax = INDEX2311_MAX; break;
+			case 3: indexmax = INDEX3_MAX; break;
+			case 31: indexmax = INDEX31_MAX; break;
+			case 311: indexmax = INDEX311_MAX; break;
 			default: 
-			   cout << "Usage: indextype must be 23, 24, 25, 231, or 2311" << endl; 
+			   cout << "Usage: indextype must be 23, 24, 25, 231, 2311, 3, 31, or 311" << endl; 
 			   exit(-1);
 		}
 
@@ -2725,7 +3196,7 @@ int main(int argc, char *argv[])
 		cout << "Create history bins:           " << argv[0] << " histbin n_pflop n_flop-turn-river" << endl;
 		cout << "Create history bins:           " << argv[0] << " histbin n_bins" << endl;
 		cout << "Create one round of hist bins: " << argv[0] << " histbin (preflop | flop | flopnest | turn | turnnest | river) n_bins ... n_bins" << endl;
-		cout << "Create old-style board bins:   " << argv[0] << " boardbins n_flopclusters n_turnclusters n_riverclusters flopbins turnbins n_riverbins" << endl;
+		cout << "Create old-style board bins:   " << argv[0] << " boardbins n_flopclusters n_turnclusters n_riverclusters flopbins turnbins n_riverbins whichstr" << endl;
 #ifdef COMPILE_TESTCODE
 		cout << "Test indexing function:        " << argv[0] << " test" << endl;
 #endif
