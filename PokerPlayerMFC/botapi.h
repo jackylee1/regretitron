@@ -16,8 +16,7 @@ enum Action
 {
 	FOLD, //a player has folded
 	CALL, //ends the betting, continuing at next round, could be calling all-in
-	BET,  //keeps the betting going. could be check
-	BETALLIN //this is a bet of all-in
+	BET   //keeps the betting going. could be check, or betting all-in
 };
 
 

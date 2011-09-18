@@ -4,7 +4,7 @@
 #include "../utility.h"
 using boost::asio::ip::tcp;
 
-const uint8 SERVER_PROTOCOL_VERSION = 3;
+const uint8 SERVER_PROTOCOL_VERSION = 4;
 
 template< typename STRUCT > inline void WriteStruct( tcp::socket & sock, const STRUCT & msg )
 {
@@ -50,9 +50,10 @@ enum MessageTypeEnum
 
 enum GameTypeEnum
 {
-	GAME_SIMPLEGAME = 0,
-	GAME_POKERACADEMY = 1,
-	GAME_REALMONEY_NORAKE = 10
+	GAME_PLAYMONEY_LIMIT = 1,
+	GAME_PLAYMONEY_NOLIMIT = 2,
+	GAME_REALMONEY_LIMIT = 10,
+	GAME_REALMONEY_NOLIMIT = 20
 };
 
 enum SessionTypeEnum

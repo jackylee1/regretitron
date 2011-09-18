@@ -285,12 +285,12 @@ Result Playoff::playoutaround(Player nexttogo, double &pot)
 			}
 		}
 
-		//The bot bet: either BET or BETALLIN. Either way, continue the loop.
+		//The bot bet: either regular or all-in. Either way, continue the loop.
 
 		_bots[P0]->doaction(nexttogo, act, amount);
 		_bots[P1]->doaction(nexttogo, act, amount);
 		nexttogo = (nexttogo == P0) ? P1 : P0;
-		if(act == BETALLIN || fpequal(pot+amount, _stacksize)) prev_act_was_allin = true;
+		if(fpequal(pot+amount, _stacksize)) prev_act_was_allin = true;
 	}
 }
 

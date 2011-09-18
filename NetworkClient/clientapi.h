@@ -13,8 +13,7 @@ enum Action
 {
 	FOLD, //a player has folded
 	CALL, //ends the betting, continuing at next round, could be calling all-in
-	BET,  //keeps the betting going. could be check
-	BETALLIN //this is a bet of all-in
+	BET   //keeps the betting going. could be check or a bet all-in
 };
 
 
@@ -47,7 +46,6 @@ public:
 	}
 	void endofgame( );  // for when cards are unknown
 	void endofgame( CardMask opponentcards ); //for when cards are known
-	bool islimit( ) { return true; } 
 
 	//part of BotAPI not implemented in ClientAPI
 	string getxmlfile() const { return "Using network client."; }

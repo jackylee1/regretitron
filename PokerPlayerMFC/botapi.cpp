@@ -281,7 +281,6 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 			ACTIONSTRING( FOLD )
 			ACTIONSTRING( CALL )
 			ACTIONSTRING( BET )
-			ACTIONSTRING( BETALLIN )
 		}
 	}
 
@@ -309,17 +308,11 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 	if( pl == myplayer && ( a != lastchosenaction || ! fpequal( amount/multiplier, lastchosenamount ) ) )
 		REPORT( "Bot failed to get filled on its orders exactly." );
 
-	if(a == BETALLIN && pl == myplayer && offtreebetallins) 
-	//if true, there would be no all-in node to find
-	//we just bet an allin, instead of call, due to offtreebetallins
-		return;
-
 	switch(a)
 	{
 	case FOLD:  dofold (pl, amount/multiplier); break;
 	case CALL:  docall (pl, amount/multiplier); break;
 	case BET:   dobet  (pl, amount/multiplier); break;
-	case BETALLIN: if(islimit()) REPORT("For limit, BotAPI does not use BETALLIN externally."); doallin(pl); break;
 	default:    REPORT("You advanced tree with an invalid action.");
 	}
 
@@ -534,7 +527,7 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 					// an opponent bet when we did not have the tree to handle it. we treated it as a BetAllin.
 					// the bot has chosen to respond by "calling all-in". In reality, we are not all-in.
 					// But now we will be.
-					myact = BETALLIN;
+					myact = BET;
 				}
 				else
 					myact = CALL;
@@ -542,10 +535,7 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 
 			case BetAllin:
 				amount = multiplier * (truestacksize - actualpot);
-				if(islimit()) //in limit, we acknowledge that a "bet allin" is actually a bet that we can't fully cover...
-					myact = BET;
-				else
-					myact = BETALLIN;
+				myact = BET;
 				break;
 
 			case Bet:
@@ -816,8 +806,7 @@ void BotAPI::dobet(Player pl, double amount)
 
 	if( ! ( 
 				amount == 0 || // either we are checking, or...
-				( fpgreatereq( amount, mintotalwager( ) ) && fpgreater( truestacksize, actualpot + amount ) ) || // from the min bet to less than stacksize
-				( islimit( ) && fpequal( truestacksize, actualpot + amount ) ) // ... or this is limit and it is the stacksize
+				( fpgreatereq( amount, mintotalwager( ) ) && fpgreatereq( truestacksize, actualpot + amount ) ) // from the min bet to stacksize
 		  ) )
 		REPORT( "Invalid bet amount. "
 				  "(amount=" + tostr( multiplier * amount )
@@ -825,6 +814,18 @@ void BotAPI::dobet(Player pl, double amount)
 				+ " truestacksize=" + tostr( multiplier * truestacksize )
 				+ " actualpot=" + tostr( multiplier * actualpot )
 				+ ")" );
+
+	//check if this is actually an all-in bet in no-limit
+	if( ! islimit( ) && fpequal( truestacksize, actualpot + amount ) )
+	{
+		if( pl == myplayer && offtreebetallins ) 
+			//if true, there would be no all-in node to find
+			//we just bet an allin, instead of call, due to offtreebetallins
+			return;
+
+		doallin( pl );
+		return;
+	}
 
 	//NO LIMIT: try to find the bet action that will set the new perceived pot closest to the actual.
 	// if no bet actions, then offtreebetallins is invoked to handle this human's behavior that my tree does not have.
@@ -902,7 +903,7 @@ void BotAPI::dobet(Player pl, double amount)
 //used by NO-LIMIT only.
 void BotAPI::doallin(Player pl)
 {
-	if(islimit()) REPORT("The doallin function is for no-limit only. Limit communicates these as 'bets'.");
+	if(islimit()) REPORT("The doallin function is for no-limit only.");
 	EIter e, elast;
 	for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++)
 		if((currstrat->gettree())[*e].type == BetAllin)
