@@ -39,8 +39,11 @@ Strategy::Strategy(string xmlfilename, bool preload, LoggerClass & strategylogge
 		//check version
 
 		Element* root = doc.FirstChildElement("strategy");
-		if(!root->HasAttribute("version") || root->GetAttribute<int>("version") != SAVE_FORMAT_VERSION)
-			REPORT("Unsupported XML file (older/newer version).", KNOWN);
+		if( ! root->HasAttribute( "version" ) )
+			REPORT( "Unsupported XML file (version information tag appears absent)", KNOWN);
+		const int savefileversion = root->GetAttribute< int >( "version" );
+		if( savefileversion != SAVE_FORMAT_VERSION )
+			REPORT( "Unsupported XML file (savefile's version: " + tostr( savefileversion ) + ", this executable's version: " + tostr( SAVE_FORMAT_VERSION ) + ").", KNOWN);
 
 		//set CardMachine
 

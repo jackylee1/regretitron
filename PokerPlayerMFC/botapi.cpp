@@ -70,8 +70,11 @@ BotAPI::BotAPI(string xmlfile, bool preload, MTRand::uint32 randseed,
 		else //we actually have a portfolio
 		{
 			//check version
-			if(!root->HasAttribute("version") || root->GetAttribute<int>("version") != PORTFOLIO_VERSION)
-				REPORT("Unsupported portfolio XML file (older/newer version).",KNOWN);
+			if( ! root->HasAttribute( "version" ) )
+				REPORT( "Unsupported portfolio XML file (version tag appears to be absent)" );
+			const int portfoliofileversion = root->GetAttribute< int >( "version" );
+			if( portfoliofileversion != PORTFOLIO_VERSION )
+				REPORT( "Unsupported portfolio XML file (file's version: " + tostr( portfoliofileversion ) + ", this executable's version: " + tostr( PORTFOLIO_VERSION ) + ").", KNOWN);
 
 			//set working directory to portfolio directory
 			string newdirectory = xmlfile.substr(0,xmlfile.find_last_of("/\\"));
@@ -85,6 +88,9 @@ BotAPI::BotAPI(string xmlfile, bool preload, MTRand::uint32 randseed,
 				string botfile = child->GetText( );
 				mystrats.push_back(new Strategy(botfile, preload, m_logger));
 				m_logger( "Loaded bot from " + botfile.substr( botfile.find_last_of( "/\\" ) + 1 ) );
+				if( get_property( mystrats.front( )->gettree( ), settings_tag( ) ).limit != 
+						get_property( mystrats.back( )->gettree( ), settings_tag( ) ).limit )
+					REPORT( "This portfolio file contains both limit and no-limit strategies.", KNOWN );
 			}
 
 			if(root->GetAttribute<unsigned>("size") != mystrats.size())
@@ -143,7 +149,12 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 		if(islimit() && fpgreater( mymin(stacksize/bblind, 24.0), stacksizemult_i )) // 24bbs is the largest limit game
 			continue;
 
-		double error = myabs(stacksizemult_i - stacksize / bblind);
+		// Ways to compare two ratios A(ctual) and B(ot):
+		//    error = abs( A - B ) (doesn't seem too good) 
+		//    error = abs( A / B - 1 ) (looks okay)
+		//    error = abs( log( A ) - log( B ) ) (looks good)
+		// none of these has any effect in limit, where we don't have to compare bots larger than A to bots smaller than A
+		double error = myabs( std::log( stacksizemult_i ) - std::log( stacksize / bblind ) );
 
 		if(error < besterror)
 		{
@@ -244,16 +255,6 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 	cards.push_back(newboard);
 	currentgr = gr;
 
-	EIter e, elast;
-	for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++)
-	{
-		if((currstrat->gettree())[*e].type == Call)
-		{
-			currentnode = target(*e, currstrat->gettree());
-			break;
-		}
-	}
-
 	if( fpequal( actualpot, truestacksize ) ) //all-in
 		if( currentgr == RIVER )
 			bot_status = WAITING_ENDOFGAME;
@@ -318,7 +319,7 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 	case FOLD:  dofold (pl, amount/multiplier); break;
 	case CALL:  docall (pl, amount/multiplier); break;
 	case BET:   dobet  (pl, amount/multiplier); break;
-	case BETALLIN: if(islimit()) REPORT("NO ALLIN 4 u!"); doallin(pl); break;
+	case BETALLIN: if(islimit()) REPORT("For limit, BotAPI does not use BETALLIN externally."); doallin(pl); break;
 	default:    REPORT("You advanced tree with an invalid action.");
 	}
 
@@ -336,8 +337,6 @@ namespace
 // this one returns more info
 void BotAPI::getactionstring( Action act, double amount, string & actionstr, int & level )
 {
-	if( ! islimit( ) ) REPORT( "getbotaction with actionstr is only written for limit." );
-
 	// ********************************************************************
 	// settings that control the behavior of the strings eminated from here
 	// chipfmt: a function that formats money printed
@@ -371,17 +370,17 @@ void BotAPI::getactionstring( Action act, double amount, string & actionstr, int
 	// and also when i'm the big blind and the small blind only called
 	else if( fpequal( actualinv[ P0 ], actualinv[ P1 ] ) )
 	{
+		// checking.. either from the big blind, or from zero
 		if( fpequal( adjamount, actualinv[ P0 ] ) )
 		{
 			actionstr = "Check";
 			level = 1;
 		}
+		// betting where i could have checked
 		else
 		{
 			if( fpequal( 0, actualinv[ P0 ] ) )
 				actionstr = "Bet " + chipfmt( amount );
-			// the actualinv's can only be equal to each other AND zero when 
-			// the SB called and we have the option to bet from the big blind.
 			else if( raiseamtabove )
 				actionstr = "Bet additional " + chipfmt( amtaboveme );
 			else
@@ -427,8 +426,8 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 
 	if(bot_status != WAITING_ACTION) REPORT("bot is waiting for a round or is inconsistent state");
 	if(!playerequal(myplayer, currstrat->gettree()[currentnode].type)) REPORT("You asked for an answer when the bot thought action was on opp.");
-	if(fpgreatereq(actualpot+actualinv[P0],truestacksize) && fpgreatereq(actualpot+actualinv[P1],truestacksize))
-		REPORT("You're asking me what to do when we've already all-in'd.");
+	if( fpgreatereq( actualpot + actualinv[ myplayer ], truestacksize ) )
+		REPORT( "You're asking me what to do when we've already all-in'd." );
 
 	//get the probabilities
 
@@ -526,13 +525,19 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 				break;
 
 			case CallAllin:
+				if( out_degree( currentnode, currstrat->gettree( ) ) != 2 )
+					REPORT( "CallAllIn node found and not at a 2-membered node" );
 				amount = multiplier * (truestacksize - actualpot);
-				if(!offtreebetallins) //as it should be
-					myact = CALL;
-				else if(islimit() || out_degree(currentnode, currstrat->gettree()) != 2)
-				{ REPORT("Limit, or I thought we should be at a 2-membered node now! (fold or call all-in)"); exit(0); }
-				else //but sometimes, we treat these nodes as BET all in instead of call.
+				if( offtreebetallins )
+				{
+					if( islimit( ) ) REPORT( "offtreebetallins = true in limit" );
+					// an opponent bet when we did not have the tree to handle it. we treated it as a BetAllin.
+					// the bot has chosen to respond by "calling all-in". In reality, we are not all-in.
+					// But now we will be.
 					myact = BETALLIN;
+				}
+				else
+					myact = CALL;
 				break;
 
 			case BetAllin:
@@ -556,13 +561,32 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 				}
 				else //all-ins would be handled above
 				{
-					amount = multiplier * ((currstrat->gettree())[*eanswer].potcontrib + actualinv[1-myplayer]-perceivedinv[1-myplayer]);
+					const int & potc = ( currstrat->gettree( ) )[ * eanswer ].potcontrib;
+
+					amount = multiplier * ( potc + actualinv[ 1 - myplayer ] - perceivedinv[ 1 - myplayer ] );
+
 					if(fpgreater(multiplier * mintotalwager(), amount))
 					{
 						if( & m_logger != & botapinulllogger )
 							m_logger( "Warning: adjusting bet amount from " + tostr( amount ) + " to " + tostr( multiplier * mintotalwager() ) + "." );
 						amount = multiplier * mintotalwager();
 					}
+
+					if( & m_logger != & botapinulllogger )
+					{
+						ostringstream o;
+						o << "Translating bot's bet to outside world in no-limit:\n"
+							<< "   Bot perceives it is at $" << tostr2( multiplier * perceivedinv[ myplayer ] )
+							<< " vs $" << tostr2( multiplier * perceivedinv[ 1 - myplayer ] )
+							<< " (at stacksize $" << tostr2( multiplier * get_property( currstrat->gettree( ), settings_tag( ) ).stacksize ) << ")"
+							<< " and now wishes to bet $" << tostr2( multiplier * potc ) << '\n'
+							<< "   In actuality it is at $" << tostr2( multiplier * actualinv[ myplayer ] )
+							<< " vs $" << tostr2( multiplier * actualinv[ 1 - myplayer ] )
+							<< " (at stacksize $" << tostr2( multiplier * truestacksize ) << ")"
+							<< " and will actually be betting $" << tostr2( multiplier * amount ) << "\n\n";
+						m_logger( o.str( ) );
+					}
+
 					myact = BET;
 				}
 				break;
@@ -747,6 +771,32 @@ void BotAPI::docall(Player pl, double amount)
 			m_logger( "       Opponent has called $" + tostr2( multiplier * amount ) + " (added $" + tostr2( multiplier * ( amount - actualinv[ pl ] ) ) + " to pot)\n" );
 	}
 
+
+	// find call edge and advance the tree
+
+	EIter e, elast;
+	for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++)
+	{
+		if( (currstrat->gettree())[*e].type == Call )
+		{
+			currentnode = target(*e, currstrat->gettree());
+			goto foundcalledge;
+		}
+		else if( (currstrat->gettree())[*e].type == CallAllin )
+		{
+			if( ! fpequal( actualpot + amount, truestacksize ) )
+				REPORT( "On a call, a CallAllin edge was found but the amount was not consitant with Calling allin."
+						  " amount=" + tostr( multiplier * amount )
+						+ " truestacksize=" + tostr( multiplier * truestacksize )
+						+ " actualpot=" + tostr( multiplier * actualpot ) );
+			currentnode = target(*e, currstrat->gettree());
+			goto foundcalledge;
+		}
+	}
+	REPORT( "Could not find an edge of type Call in the tree." );
+foundcalledge:
+
+
 	actualinv[pl] = actualinv[1-pl];
 	perceivedinv[pl] = perceivedinv[1-pl];
 	if( currentgr == 3 )
@@ -757,13 +807,24 @@ void BotAPI::docall(Player pl, double amount)
 
 //a "bet" by definition continues the betting round
 //this amount has been DIVIDED by multiplier
+//in no-limit, this should NOT be passed in an amount equal to stacksize (this would be all-in, and the below function would service that)
+//in limit, this COULD be passed in an amount equal to stacksize. This is to match the outside world notion of all bets being "bets" in limit, rather than allin's.
 void BotAPI::dobet(Player pl, double amount)
 {
 
 	//error checking 
 
-	if(fpgreater(mintotalwager(), amount) || fpgreater(actualpot + amount, truestacksize))
-		REPORT("Invalid bet amount");
+	if( ! ( 
+				amount == 0 || // either we are checking, or...
+				( fpgreatereq( amount, mintotalwager( ) ) && fpgreater( truestacksize, actualpot + amount ) ) || // from the min bet to less than stacksize
+				( islimit( ) && fpequal( truestacksize, actualpot + amount ) ) // ... or this is limit and it is the stacksize
+		  ) )
+		REPORT( "Invalid bet amount. "
+				  "(amount=" + tostr( multiplier * amount )
+				+ " mintotalwager( )=" + tostr( multiplier * mintotalwager( ) )
+				+ " truestacksize=" + tostr( multiplier * truestacksize )
+				+ " actualpot=" + tostr( multiplier * actualpot )
+				+ ")" );
 
 	//NO LIMIT: try to find the bet action that will set the new perceived pot closest to the actual.
 	// if no bet actions, then offtreebetallins is invoked to handle this human's behavior that my tree does not have.
@@ -815,7 +876,19 @@ void BotAPI::dobet(Player pl, double amount)
 					m_logger( "       Opponent has bet $" + tostr2( multiplier * amount ) + " (added $" + tostr2( multiplier * ( amount - actualinv[ pl ] ) ) + " to pot)" );
 			}
 			if(!fpequal(besterror, 0))
-				m_logger( "       Note: The best betting action represented in our tree is $" + tostr2( currstrat->gettree()[*ebest].potcontrib * multiplier ) + " with error $" + tostr2( multiplier * besterror ) + ".\n" );
+			{
+				ostringstream o;
+				o << "Translating outside world's bet to bot tree\n"
+					<< "   Received a bet from " << ( pl == myplayer ? "myself the bot" : "opponent" ) << " of amount $" << tostr2( multiplier * amount )
+					<< " with the bot at $" << tostr2( multiplier * actualinv[ myplayer ] )
+					<< " and the opponent at $" << tostr2( multiplier * actualinv[ 1 - myplayer ] )
+					<< " (at stacksize $" << tostr2( multiplier * truestacksize ) << ")\n"
+					<< "   Bot translates this to a bet of $" << tostr2( currstrat->gettree()[*ebest].potcontrib * multiplier )
+					<< " with the bot at $" << tostr2( multiplier * perceivedinv[ myplayer ] )
+					<< " and the opponent at $" << tostr2( multiplier * perceivedinv[ 1 - myplayer ] )
+					<< " (at stacksize $" << tostr2( multiplier * get_property( currstrat->gettree( ), settings_tag( ) ).stacksize ) << ")\n\n";
+				m_logger( o.str( ) );
+			}
 			else if( pl != myplayer )
 				m_logger( "" ); // ensure a newline in this case to keep log spacing nice
 		}
@@ -829,7 +902,7 @@ void BotAPI::dobet(Player pl, double amount)
 //used by NO-LIMIT only.
 void BotAPI::doallin(Player pl)
 {
-	if(islimit()) REPORT("!");
+	if(islimit()) REPORT("The doallin function is for no-limit only. Limit communicates these as 'bets'.");
 	EIter e, elast;
 	for(tie(e, elast) = out_edges(currentnode, currstrat->gettree()); e!=elast; e++)
 		if((currstrat->gettree())[*e].type == BetAllin)
@@ -862,30 +935,41 @@ void BotAPI::processmyturn()
 #endif
 }
 
+// pre-multiplier (internal) number returned
+// potcontrib style number returned
+// zero is not counted as a wager if checking
 double BotAPI::mintotalwager()
 {
-	const NodeType &acting = currstrat->gettree()[currentnode].type;
+	const int & BB = get_property( currstrat->gettree( ), settings_tag( ) ).bblind;
+	const NodeType & acting = currstrat->gettree( )[ currentnode ].type;
+	
 	double minwager;
 
 	//calling from the SBLIND is a special case of how much we can wager
-	if(currentgr == PREFLOP && fpgreater(get_property(currstrat->gettree(), settings_tag()).bblind, actualinv[playerindex(acting)]))
-		minwager = get_property(currstrat->gettree(), settings_tag()).bblind;
+	if( currentgr == PREFLOP && fpgreater( BB, actualinv[ playerindex( acting ) ] ) )
+		minwager = BB;
 	
-	//we're going first and nothing's been bet yet
-	else if(currentgr != PREFLOP && acting==P0Plays && fpequal(actualinv[1-playerindex(acting)],0))
-		minwager = 0;
+	// limit follows a standard formula
+	else if( islimit( ) )
+	{
+		if( currentgr == PREFLOP || currentgr == FLOP )
+			minwager = actualinv[ 1 - playerindex( acting ) ] + BB;
+		else
+			minwager = actualinv[ 1 - playerindex( acting ) ] + 2 * BB;
+	}
 
-	//otherwise, this is the standard formula that FullTilt seems to follow
+	// no-limit, this is the standard formula that FullTilt seems to follow
 	else
-		minwager = actualinv[1-playerindex(acting)] 
-			+ mymax((double)get_property(currstrat->gettree(), settings_tag()).bblind, 
-			        actualinv[1-playerindex(acting)]-actualinv[playerindex(acting)] );
+	{
+		minwager = actualinv[ 1 - playerindex( acting ) ] 
+			+ mymax( (double)BB, actualinv[ 1 - playerindex( acting ) ] - actualinv[ playerindex( acting ) ] );
+	}
 
 	//lastly check to see if the only available action is going all-in
-	if (actualpot + minwager > truestacksize)
-		return truestacksize - actualpot;
-	else
-		return minwager;
+	if( actualpot + minwager > truestacksize )
+		minwager = truestacksize - actualpot;
+
+	return minwager;
 }
 
 #ifdef _MFC_VER
