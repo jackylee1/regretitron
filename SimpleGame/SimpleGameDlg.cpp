@@ -199,21 +199,7 @@ BOOL CSimpleGameDlg::OnInitDialog()
 		OpenBotButton.LoadBitmaps(IDB_OPEN1, IDB_OPEN1, IDB_OPEN1, IDB_OPEN2);
 		OpenBotButton.SizeToContent();
 
-		unsigned gametype;
-		while(!getuserinput("Choices:\n"
-			"   Enter \"1\" to start a new Tournament (Full Tilt style, 2 person heads-up sit-n-go)\n"
-			"   Enter \"2\" to start a Cash Game at default bankroll\n"
-			"   Enter another number to set the starting bankroll for a "
-			+tostring(cashsblind*2)+"/"+tostring(cashbblind*2)+" Cash Game", gametype));
-		if(gametype == 1)
-			OnMenuNewTourney();
-		else if(gametype == 2)
-			OnMenuPlayCashGame();
-		else
-		{
-			botstacksize = humanstacksize = effstacksize = gametype;
-			OnMenuPlayCashGame();
-		}
+		OnMenuPlayCashGame();
 	}
 	catch( std::exception & e )
 	{
@@ -352,29 +338,32 @@ void CSimpleGameDlg::updateinvested(Player justacted)
 bool CSimpleGameDlg::loadbotfile()
 {
 #ifdef USE_NETWORK_CLIENT
-	if( _mybot->GetSessionType( ) == SESSION_NONE )
-	{
-		MessageCreateNewSession message;
-		message.gametype = GAME_SIMPLEGAME;
-		_mybot->CreateNewSession( message );
-	}
-	else
-	{
-		MessageBox( "Already loaded." );
-	}
+	unsigned gametype;
+	if( ! getuserinput("Choices:\n   Enter \"1\" for Limit\n   Enter \"2\" for No-Limit", gametype )
+			|| ( gametype != 1 && gametype != 2 ) )
+		return false;
+
+	if( _mybot->GetSessionType( ) != SESSION_NONE )
+		_mybot->CancelSession( );
+
+	MessageCreateNewSession message;
+	if( gametype == 1 )
+		message.gametype = GAME_PLAYMONEY_LIMIT;
+	else if(gametype == 2)
+		message.gametype = GAME_PLAYMONEY_NOLIMIT;
+	_mybot->CreateNewSession( message );
 #else
 	CFileDialog filechooser(TRUE, "xml", NULL, OFN_NOCHANGEDIR, "Bot Definition XML files (*.xml)|*.xml||");
 	if(filechooser.DoModal() == IDCANCEL) 
 		return false;
 	//load in the new file now.
-	if(_mybot == NULL)
-		delete _mybot; //will kill diag
+	delete _mybot; //will kill diag
 	_mybot = new BotAPI(
-		string((LPCTSTR)filechooser.GetPathName()),
-		false,
-		MTRand::gettimeclockseed( ),
-		nulllogger,
-		nulllogger );
+			string((LPCTSTR)filechooser.GetPathName()),
+			false,
+			MTRand::gettimeclockseed( ),
+			m_logger, // this one is the 'logger'
+			BotAPI::botapinulllogger ); // this one is the reclog
 	if(ShowDiagnostics.GetCheck())
 		_mybot->setdiagnostics(true, this);
 #endif
@@ -393,19 +382,10 @@ bool CSimpleGameDlg::loadbotfile()
 
 double CSimpleGameDlg::mintotalwager(Player acting)
 {
-	double minwager;
+	if( fpgreater( invested[ acting ], invested[ 1 - acting ] ) )
+		REPORT( "Invested amounts are not consistant with acting player." );
 
-	//calling from the _sblind is a special case of how much we can wager
-	if(_gameround == PREFLOP && fpequal(invested[acting], _sblind))
-		minwager = _bblind;
-	
-	//we're going first and nothing's been bet yet
-	else if(_gameround != PREFLOP && acting==P0 && fpequal(invested[1-acting],0))
-		minwager = 0;
-
-	//otherwise, this is the standard formula that FullTilt seems to follow
-	else
-		minwager = invested[1-acting] + max(_bblind, invested[1-acting]-invested[acting]);
+	double minwager = invested[ 1 - acting ] + betincrement( );
 
 	if(pot + minwager > effstacksize) //fp routines unneccessary
 		return effstacksize - pot;
@@ -413,9 +393,12 @@ double CSimpleGameDlg::mintotalwager(Player acting)
 		return minwager;
 }
 
-double CSimpleGameDlg::limitbetincrement()
+double CSimpleGameDlg::betincrement()
 {
-	return (_gameround == PREFLOP || _gameround == FLOP) ? _bblind : 2*_bblind;
+	if( _mybot->islimit( ) )
+		return ( _gameround == PREFLOP || _gameround == FLOP ) ? _bblind : 2 * _bblind;
+	else
+		return mymax( _bblind, myabs( invested[ P0 ] - invested[ P1 ] ) );
 }
 
 void CSimpleGameDlg::dofold(Player pl)
@@ -499,30 +482,25 @@ void CSimpleGameDlg::dobet(Player pl, double amount)
 {
 	//we can check the amount for validity. This is important since we
 	//will be getting values from the bot here.
-	if(fpgreater(mintotalwager(pl), amount) || fpgreater(amount + pot, effstacksize))
-		REPORT("someone bet an illegal amount.");
+	if( ! ( 
+				( fpequal( amount, invested[ 1 - pl ] ) && _gameround == PREFLOP && pl==P1 && fpgreatereq(_bblind,invested[1-pl]) ) || 
+				( fpequal( amount, 0 ) && _gameround != PREFLOP && pl==P0 && fpequal(invested[1-pl],0) ) || 
+				( fpgreatereq( amount, mintotalwager( pl ) ) && fpgreatereq( effstacksize, amount + pot ) ) 
+			) )
+		REPORT( "SimpleGame: Invalid bet amount. "
+				"(amount=" + tostr( amount )
+				+ " mintotalwager( " + tostr( pl ) + " )=" + tostr( mintotalwager( pl ) )
+				+ " effstacksize=" + tostr( effstacksize )
+				+ " pot=" + tostr( pot )
+				+ ")" );
 
 	if(fpequal(amount + pot, effstacksize))
-		if(_mybot->islimit())
-			_isallin = true;
-		else
-			REPORT("in no-limit, CSimpleGameDlg::dobet was used to communicate an all-in");
+		_isallin = true;
 
 	//inform the bot
 	_mybot->doaction(pl,BET,amount);
 	//set our invested amount
 	invested[pl] = amount;
-	updateinvested(pl);
-	//other players turn now
-	graypostact(Player(1-pl));
-}
-void CSimpleGameDlg::doallin(Player pl)
-{
-	//inform the bot
-	_mybot->doaction(pl, BETALLIN, 0);
-	_isallin=true;
-	//set our invested amount
-	invested[pl]=effstacksize-pot;
 	updateinvested(pl);
 	//other players turn now
 	graypostact(Player(1-pl));
@@ -671,16 +649,18 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 		//if min bet + our pot share < effstacksize
 		if(_mybot->islimit())
 		{
-			if(fpgreatereq(invested[1-nexttoact], 4*limitbetincrement()) || fpgreatereq(pot+invested[1-nexttoact], effstacksize))
+			if(fpgreatereq(invested[1-nexttoact], 4*betincrement()) || fpgreatereq(pot+invested[1-nexttoact], effstacksize))
 				BetRaiseButton.EnableWindow(FALSE);
 			else
 				BetRaiseButton.EnableWindow(TRUE);
 		}
 		else
+		{
 			if(fpgreater(effstacksize, pot + mintotalwager(human)))
 				BetRaiseButton.EnableWindow(TRUE);
 			else
 				BetRaiseButton.EnableWindow(FALSE);
+		}
 	}
 }
 
@@ -759,7 +739,7 @@ void CSimpleGameDlg::OnBnClickedButton3()
 
 	if(_mybot->islimit())
 	{
-		dobet(human, min(effstacksize-pot, invested[bot] + limitbetincrement()));
+		dobet(human, min(effstacksize-pot, invested[bot] + betincrement()));
 	}
 	else
 	{
@@ -773,6 +753,8 @@ void CSimpleGameDlg::OnBnClickedButton3()
 		//input checking: make sure it's not too small or too big, then do it.
 		if(fpgreatereq(val, mintotalwager(human)) && fpgreater(effstacksize, val+pot))
 			dobet(human, val);
+		else
+			MessageBox( ( "$" + tostr( val ) + " is an invalid amount. Need " + tostr( mintotalwager( human ) ) + " <= amount < " + tostr( effstacksize - pot ) ).c_str( ) );
 	}
 }
 
@@ -780,7 +762,7 @@ void CSimpleGameDlg::OnBnClickedButton3()
 void CSimpleGameDlg::OnBnClickedButton4()
 {
 	//we can do an all-in at any time, for any reason, baby.
-	doallin(human);
+	dobet(human, effstacksize - pot);
 }
 
 // This is the new game button
@@ -820,8 +802,12 @@ void CSimpleGameDlg::OnBnClickedButton5()
 	}
 
 	CString text;
-	text.Format("SimpleGame - %s - %d hands played - bet sizes: %.0f/%.0f", 
-		(istournament?"Tournament":"Cash Game"), handsplayed-1, _bblind, _bblind*2);
+	if( _mybot->islimit( ) )
+		text.Format("SimpleGame Limit - %s - %d hands played - bet sizes: %.0f/%.0f", 
+				(istournament?"Tournament":"Cash Game"), handsplayed-1, _bblind, _bblind*2);
+	else
+		text.Format("SimpleGame No-Limit - %s - %d hands played - blinds: %.0f/%.0f", 
+				(istournament?"Tournament":"Cash Game"), handsplayed-1, _sblind, _bblind);
 	SetWindowText(text); //titlebar
 	//change positions & set dealer chip
 	std::swap(human,bot);
@@ -930,7 +916,6 @@ void CSimpleGameDlg::OnBnClickedButton6()
 	case FOLD: dofold(bot); break;
 	case CALL: docall(bot); break;
 	case BET: dobet(bot, val); break;
-	case BETALLIN: doallin(bot); break;
 	}
 }
 

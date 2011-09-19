@@ -132,7 +132,8 @@ private:
 	Strategy * currstrat; //pointer from above array
 
 	double multiplier; //ACTUAL big blind amount divided by big blind amount used by strategy
-	double truestacksize; //actual stacksize, SCALED by multiplier
+	double actualstacksize; //actual stacksize, SCALED by multiplier, needed for limit
+	double actualbblind; //needed for no-limit
 	vector<double> actualinv; //the invested amount from the ACTUAL game, SCALED by multiplier
 	vector<int> perceivedinv; //the perceived invested amount, as determined by the steps in the betting tree
 	double actualpot; //the potamount from the ACTUAL game, SCALED by multiplier

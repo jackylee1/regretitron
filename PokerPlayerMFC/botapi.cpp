@@ -174,7 +174,8 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 	else
 		multiplier = stacksize / get_property(currstrat->gettree(), settings_tag()).stacksize;
 	//in no limit, we don't need to use this because we normalize the bet amounts to match stacksize
-	truestacksize = stacksize/multiplier;
+	actualstacksize = stacksize/multiplier;
+	actualbblind = bblind/multiplier;
 	actualinv[P0] = bblind/multiplier;
 	actualinv[P1] = sblind/multiplier;
 	perceivedinv[P0] = get_property(currstrat->gettree(), settings_tag()).bblind;
@@ -207,7 +208,7 @@ void BotAPI::setnewgame(Player playernum, CardMask myhand,
 		m_logger( "*** New Game: Player " + tostr( myplayer ) + " (" + ( myplayer ? "SB" : "BB" )
 				+ "), with SB = $" + tostr2( multiplier * actualinv[ 1 ] )
 				+ " and BB = $" + tostr2( multiplier * actualinv[ 0 ] ) );
-		m_logger( "**  The smaller pre-betting stacksize is: $" + tostr2( multiplier * truestacksize ) );
+		m_logger( "**  The smaller pre-betting stacksize is: $" + tostr2( multiplier * actualstacksize ) );
 		m_logger( "*   Using Strategy: " + currstrat->getfilename() + '\n' );
 
 		m_logger( ">>> Bot has hole cards: " + tostr( cards[ PREFLOP ] ) + '\n' );
@@ -255,7 +256,7 @@ void BotAPI::setnextround(int gr, CardMask newboard, double newpot/*really just 
 	cards.push_back(newboard);
 	currentgr = gr;
 
-	if( fpequal( actualpot, truestacksize ) ) //all-in
+	if( fpequal( actualpot, actualstacksize ) ) //all-in
 		if( currentgr == RIVER )
 			bot_status = WAITING_ENDOFGAME;
 		else
@@ -288,7 +289,7 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 		m_logger( "BotAPI::doaction( player=" + tostr( pl ) + ", a=" + tostr( a ) + ", amount=" + tostr( amount ) + " )"
 				+ "\nmultiplier = " + tostr( multiplier )
 				+ "\nmultiplied values:"
-				+ "\n truestacksize = " + tostr( multiplier * truestacksize )
+				+ "\n actualstacksize = " + tostr( multiplier * actualstacksize )
 				+ "\n actualinv[0] = " + tostr( multiplier * actualinv[0] )
 				+ "\n actualinv[1] = " + tostr( multiplier * actualinv[1] )
 				+ "\n perceivedinv[0] = " + tostr( multiplier * perceivedinv[0] )
@@ -303,7 +304,7 @@ void BotAPI::doaction(Player pl, Action a, double amount)
 
 	if(bot_status != WAITING_ACTION) REPORT("doaction called at wrong time " + tostr( (int)bot_status ) );
 	if(!playerequal(pl, currstrat->gettree()[currentnode].type)) REPORT("doaction thought the other player should be acting");
-	if( fpgreatereq( actualpot + actualinv[ pl ], truestacksize ) )
+	if( fpgreatereq( actualpot + actualinv[ pl ], actualstacksize ) )
 		REPORT( "A player who was already all-in is now doing an action." );
 	if( pl == myplayer && ( a != lastchosenaction || ! fpequal( amount/multiplier, lastchosenamount ) ) )
 		REPORT( "Bot failed to get filled on its orders exactly." );
@@ -403,7 +404,7 @@ void BotAPI::getactionstring( Action act, double amount, string & actionstr, int
 	}
 
 	//lastly, if we are all-in, might want to mention that
-	if( fpequal( truestacksize, actualpot + adjamount ) )
+	if( fpequal( actualstacksize, actualpot + adjamount ) )
 		actionstr += " (all-in)";
 }
 
@@ -419,7 +420,7 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 
 	if(bot_status != WAITING_ACTION) REPORT("bot is waiting for a round or is inconsistent state");
 	if(!playerequal(myplayer, currstrat->gettree()[currentnode].type)) REPORT("You asked for an answer when the bot thought action was on opp.");
-	if( fpgreatereq( actualpot + actualinv[ myplayer ], truestacksize ) )
+	if( fpgreatereq( actualpot + actualinv[ myplayer ], actualstacksize ) )
 		REPORT( "You're asking me what to do when we've already all-in'd." );
 
 	//get the probabilities
@@ -457,7 +458,7 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 	{
 		cumulativeprob += probabilities[i];
 		if( (cumulativeprob > randomprob || (fpequal(cumulativeprob, 1) && fpequal(randomprob, 1)))
-				|| ( islimit() && fpgreatereq(perceivedpot + (currstrat->gettree())[*eanswer].potcontrib, truestacksize) ) )
+				|| ( islimit() && fpgreatereq(perceivedpot + (currstrat->gettree())[*eanswer].potcontrib, actualstacksize) ) )
 			break;
 	}
 
@@ -520,7 +521,7 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 			case CallAllin:
 				if( out_degree( currentnode, currstrat->gettree( ) ) != 2 )
 					REPORT( "CallAllIn node found and not at a 2-membered node" );
-				amount = multiplier * (truestacksize - actualpot);
+				amount = multiplier * (actualstacksize - actualpot);
 				if( offtreebetallins )
 				{
 					if( islimit( ) ) REPORT( "offtreebetallins = true in limit" );
@@ -534,15 +535,15 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 				break;
 
 			case BetAllin:
-				amount = multiplier * (truestacksize - actualpot);
+				amount = multiplier * (actualstacksize - actualpot);
 				myact = BET;
 				break;
 
 			case Bet:
 				if(islimit()) //this could be a covert all-in, as the bot has generally more chips than reality
 				{
-					amount = multiplier * mymin(truestacksize - actualpot, (double)(currstrat->gettree()[*eanswer].potcontrib));
-					if(fpgreatereq(get_property(currstrat->gettree(), settings_tag()).bblind, truestacksize)) 
+					amount = multiplier * mymin(actualstacksize - actualpot, (double)(currstrat->gettree()[*eanswer].potcontrib));
+					if(fpgreatereq(get_property(currstrat->gettree(), settings_tag()).bblind, actualstacksize)) 
 						//then the stacksize must be between the sblind and the bblind size, the game consists of one choice,
 						//we must have just made it, and it will end the game. It is a call all-in from the small blind.
 						myact = CALL;
@@ -555,8 +556,15 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 
 					amount = multiplier * ( potc + actualinv[ 1 - myplayer ] - perceivedinv[ 1 - myplayer ] );
 
-					if(fpgreater(multiplier * mintotalwager(), amount))
+					if( ! (
+							  (	currentgr == PREFLOP && myplayer == P1 &&
+									fpgreater( actualinv[ 1 - myplayer ], actualinv[ myplayer ] ) && 
+									fpgreatereq( actualbblind, actualinv[ 1 - myplayer ] ) && 
+									fpequal( amount, multiplier * actualinv[ 1 - myplayer ] ) ) ||
+							  ( currentgr > PREFLOP && myplayer == P0 && fpequal( amount, 0 ) && fpequal( actualinv[ 1 - myplayer ], 0 ) ) 
+						  ) && fpgreater( multiplier * mintotalwager(), amount ) )
 					{
+						// a really good translation scheme would never hit this warning.
 						if( & m_logger != & botapinulllogger )
 							m_logger( "Warning: adjusting bet amount from " + tostr( amount ) + " to " + tostr( multiplier * mintotalwager() ) + "." );
 						amount = multiplier * mintotalwager();
@@ -568,12 +576,14 @@ Action BotAPI::getbotaction_internal( double & amount, bool doforceaction, Actio
 						o << "Translating bot's bet to outside world in no-limit:\n"
 							<< "   Bot perceives it is at $" << tostr2( multiplier * perceivedinv[ myplayer ] )
 							<< " vs $" << tostr2( multiplier * perceivedinv[ 1 - myplayer ] )
-							<< " (at stacksize $" << tostr2( multiplier * get_property( currstrat->gettree( ), settings_tag( ) ).stacksize ) << ")"
+							<< " (at pot $" << tostr2( multiplier * perceivedpot )
+						   	<< " and stacksize $" << tostr2( multiplier * get_property( currstrat->gettree( ), settings_tag( ) ).stacksize ) << ")"
 							<< " and now wishes to bet $" << tostr2( multiplier * potc ) << '\n'
 							<< "   In actuality it is at $" << tostr2( multiplier * actualinv[ myplayer ] )
 							<< " vs $" << tostr2( multiplier * actualinv[ 1 - myplayer ] )
-							<< " (at stacksize $" << tostr2( multiplier * truestacksize ) << ")"
-							<< " and will actually be betting $" << tostr2( multiplier * amount ) << "\n\n";
+							<< " (at pot $" << tostr2( multiplier * actualpot )
+							<< " and stacksize $" << tostr2( multiplier * actualstacksize ) << ")"
+							<< " and will actually be betting $" << tostr2( amount ) << "\n\n";
 						m_logger( o.str( ) );
 					}
 
@@ -774,10 +784,10 @@ void BotAPI::docall(Player pl, double amount)
 		}
 		else if( (currstrat->gettree())[*e].type == CallAllin )
 		{
-			if( ! fpequal( actualpot + amount, truestacksize ) )
+			if( ! fpequal( actualpot + amount, actualstacksize ) )
 				REPORT( "On a call, a CallAllin edge was found but the amount was not consitant with Calling allin."
 						  " amount=" + tostr( multiplier * amount )
-						+ " truestacksize=" + tostr( multiplier * truestacksize )
+						+ " actualstacksize=" + tostr( multiplier * actualstacksize )
 						+ " actualpot=" + tostr( multiplier * actualpot ) );
 			currentnode = target(*e, currstrat->gettree());
 			goto foundcalledge;
@@ -805,18 +815,19 @@ void BotAPI::dobet(Player pl, double amount)
 	//error checking 
 
 	if( ! ( 
-				amount == 0 || // either we are checking, or...
-				( fpgreatereq( amount, mintotalwager( ) ) && fpgreatereq( truestacksize, actualpot + amount ) ) // from the min bet to stacksize
+				( fpequal( amount, actualinv[1-pl] ) && currentgr == PREFLOP && pl==P1 && fpgreatereq(actualbblind,actualinv[1-pl]) ) || // either we are calling from SB, or...
+				( fpequal( amount, 0 ) && currentgr != PREFLOP && pl==P0 && fpequal(actualinv[1-pl],0) ) || // we are checking, or...
+				( fpgreatereq( amount, mintotalwager( ) ) && fpgreatereq( actualstacksize, actualpot + amount ) ) // from the min bet to stacksize
 		  ) )
 		REPORT( "Invalid bet amount. "
 				  "(amount=" + tostr( multiplier * amount )
 				+ " mintotalwager( )=" + tostr( multiplier * mintotalwager( ) )
-				+ " truestacksize=" + tostr( multiplier * truestacksize )
+				+ " actualstacksize=" + tostr( multiplier * actualstacksize )
 				+ " actualpot=" + tostr( multiplier * actualpot )
 				+ ")" );
 
 	//check if this is actually an all-in bet in no-limit
-	if( ! islimit( ) && fpequal( truestacksize, actualpot + amount ) )
+	if( ! islimit( ) && fpequal( actualstacksize, actualpot + amount ) )
 	{
 		if( pl == myplayer && offtreebetallins ) 
 			//if true, there would be no all-in node to find
@@ -863,7 +874,7 @@ void BotAPI::dobet(Player pl, double amount)
 	else
 	{
 		if(islimit() && !( fpequal(besterror, 0) ||
-					   ( fpequal(actualpot + amount, truestacksize) && !fpequal(get_property(currstrat->gettree(), settings_tag()).stacksize, truestacksize) )))
+					   ( fpequal(actualpot + amount, actualstacksize) && !fpequal(get_property(currstrat->gettree(), settings_tag()).stacksize, actualstacksize) )))
 			REPORT("in limit, we expect bets to either exactly match the tree's bets or this to be a covert all-in");
 		if( & m_logger != & botapinulllogger )
 		{
@@ -883,11 +894,13 @@ void BotAPI::dobet(Player pl, double amount)
 					<< "   Received a bet from " << ( pl == myplayer ? "myself the bot" : "opponent" ) << " of amount $" << tostr2( multiplier * amount )
 					<< " with the bot at $" << tostr2( multiplier * actualinv[ myplayer ] )
 					<< " and the opponent at $" << tostr2( multiplier * actualinv[ 1 - myplayer ] )
-					<< " (at stacksize $" << tostr2( multiplier * truestacksize ) << ")\n"
+					<< " (at pot $" << tostr2( multiplier * actualpot )
+					<< " and stacksize $" << tostr2( multiplier * actualstacksize ) << ")\n"
 					<< "   Bot translates this to a bet of $" << tostr2( currstrat->gettree()[*ebest].potcontrib * multiplier )
 					<< " with the bot at $" << tostr2( multiplier * perceivedinv[ myplayer ] )
 					<< " and the opponent at $" << tostr2( multiplier * perceivedinv[ 1 - myplayer ] )
-					<< " (at stacksize $" << tostr2( multiplier * get_property( currstrat->gettree( ), settings_tag( ) ).stacksize ) << ")\n\n";
+					<< " (at pot $" << tostr2( multiplier * perceivedpot )
+					<< " and stacksize $" << tostr2( multiplier * get_property( currstrat->gettree( ), settings_tag( ) ).stacksize ) << ")\n\n";
 				m_logger( o.str( ) );
 			}
 			else if( pl != myplayer )
@@ -919,9 +932,9 @@ void BotAPI::doallin(Player pl)
 
 	if( pl != myplayer )
 		if( & m_logger != & botapinulllogger )
-			m_logger( "       Opponent has bet all-in. (added $" + tostr2( multiplier * ( truestacksize - actualpot - actualinv[ pl ] ) ) + " to pot)" );
+			m_logger( "       Opponent has bet all-in. (added $" + tostr2( multiplier * ( actualstacksize - actualpot - actualinv[ pl ] ) ) + " to pot)" );
 
-	actualinv[pl] = truestacksize-actualpot;
+	actualinv[pl] = actualstacksize-actualpot;
 	perceivedinv[pl] = (currstrat->gettree())[*e].potcontrib;
 }
 
@@ -941,34 +954,32 @@ void BotAPI::processmyturn()
 // zero is not counted as a wager if checking
 double BotAPI::mintotalwager()
 {
-	const int & BB = get_property( currstrat->gettree( ), settings_tag( ) ).bblind;
-	const NodeType & acting = currstrat->gettree( )[ currentnode ].type;
-	
-	double minwager;
+	const int acting = playerindex( currstrat->gettree( )[ currentnode ].type );
 
-	//calling from the SBLIND is a special case of how much we can wager
-	if( currentgr == PREFLOP && fpgreater( BB, actualinv[ playerindex( acting ) ] ) )
-		minwager = BB;
+	if( ! fpgreatereq( actualinv[ 1 - acting ], actualinv[ acting ] ) )
+		REPORT( "acting player has smaller invested than non acting" );
+	
+	double minwager = actualinv[ 1 - acting ]; // a good starting point for calculation
 	
 	// limit follows a standard formula
-	else if( islimit( ) )
+	if( islimit( ) )
 	{
+		// perceived BB = actual BB in limit
 		if( currentgr == PREFLOP || currentgr == FLOP )
-			minwager = actualinv[ 1 - playerindex( acting ) ] + BB;
+			minwager += actualbblind;
 		else
-			minwager = actualinv[ 1 - playerindex( acting ) ] + 2 * BB;
+			minwager += 2 * actualbblind;
 	}
 
 	// no-limit, this is the standard formula that FullTilt seems to follow
 	else
 	{
-		minwager = actualinv[ 1 - playerindex( acting ) ] 
-			+ mymax( (double)BB, actualinv[ 1 - playerindex( acting ) ] - actualinv[ playerindex( acting ) ] );
+		minwager += mymax( actualbblind, actualinv[ 1 - acting ] - actualinv[ acting ] );
 	}
 
 	//lastly check to see if the only available action is going all-in
-	if( actualpot + minwager > truestacksize )
-		minwager = truestacksize - actualpot;
+	if( actualpot + minwager > actualstacksize )
+		minwager = actualstacksize - actualpot;
 
 	return minwager;
 }

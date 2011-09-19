@@ -79,6 +79,8 @@ void ClientAPI::CreateNewSession( const MessageCreateNewSession & request )
 	{
 		if( m_commonheader.sessionid != 0 )
 			throw Exception( "Trying to create new session but a session is already active" );
+
+		m_islimit = ! ( request.gametype == GAME_PLAYMONEY_NOLIMIT || request.gametype == GAME_REALMONEY_NOLIMIT );
 		
 		m_commonheader.messagetype = MESSAGE_TYPE_CREATENEWSESSION;
 		WriteStruct( m_socket, m_commonheader, request );

@@ -22,6 +22,7 @@ class ClientAPI
 public:
 	ClientAPI( ) 
 		: m_sessiontype( SESSION_NONE )
+		, m_islimit( true )
 		, m_ioservice( )
 		, m_socket( m_ioservice )
 	{ }
@@ -46,6 +47,7 @@ public:
 	}
 	void endofgame( );  // for when cards are unknown
 	void endofgame( CardMask opponentcards ); //for when cards are known
+	bool islimit( ) const { return m_islimit; }
 
 	//part of BotAPI not implemented in ClientAPI
 	string getxmlfile() const { return "Using network client."; }
@@ -65,6 +67,7 @@ private:
 
 	MessageHeader m_commonheader;
 	SessionTypeEnum m_sessiontype;
+	bool m_islimit;
 
 	boost::asio::io_service m_ioservice;
 	tcp::socket m_socket;

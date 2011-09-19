@@ -59,12 +59,11 @@ private:
     void updateinvested(Player justacted = (Player)-1);
 	bool loadbotfile();
 	double mintotalwager(Player acting);
-	double limitbetincrement();
+	double betincrement();
 	void dofold(Player pl);
 	void docall(Player pl);
 	void dobet(Player pl, double amount);
 	void dogameover(bool fold);
-	void doallin(Player pl);
 	void graygameover();
 	void graypostact(Player nexttoact);
 	//variables
@@ -72,7 +71,7 @@ private:
 	ClientAPI * _mybot;
 #else
 	BotAPI * _mybot;
-	NullLogger nulllogger;
+	ConsoleLogger m_logger;
 #endif
 	MTRand cardrandom;
 	int handsplayed;
