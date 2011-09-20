@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "SimpleGame.h"
 #include "UserInput.h"
+#include "MfcExceptions.h"
 
 
 // UserInput dialog
@@ -23,11 +24,11 @@ UserInput::~UserInput()
 }
 
 BOOL UserInput::OnInitDialog()
-{
+{ MFC_STD_EH_PROLOGUE
 	CDialog::OnInitDialog();
 	inputtext.SetWindowText(mymytext.c_str());
 	return TRUE;
-} 
+MFC_STD_EH_EPILOGUE } 
 
 void UserInput::DoDataExchange(CDataExchange* pDX)
 {

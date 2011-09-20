@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "MfcExceptions.h"
 #include "SimpleGame.h"
 #include "SimpleGameDlg.h"
 #include "XSleep.h"
@@ -50,13 +51,13 @@ CSimpleGameDlg::CSimpleGameDlg(CWnd* pParent /*=NULL*/)
 	  bot(P1),
 	  totalhumanwon(0),
 	  istournament(false)
-{
+{ MFC_STD_EH_PROLOGUE
 	CardMask_RESET(botcm0); //ensures show bot cards produces jokers if done early
 	CardMask_RESET(botcm1);
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	Create(CSimpleGameDlg::IDD, NULL);
 	ShowWindow(SW_SHOW);
-}
+MFC_STD_EH_EPILOGUE }
 
 void CSimpleGameDlg::DoDataExchange(CDataExchange* pDX)
 {
@@ -139,17 +140,17 @@ void CSimpleGameDlg::PostNcDestroy()
 // destroy it."
 //Okay.
 void CSimpleGameDlg::OnCancel()
-{
+{ MFC_STD_EH_PROLOGUE
 	_mybot->setdiagnostics(false); //this will DestroyWindow the diagnostics page if it exists.
 	DestroyWindow();
-}
+MFC_STD_EH_EPILOGUE }
 
 //this is a hack to make the enter key call the raise button
 //handler and do nothing else (like close the window).
 //fixes everything in one fell swoop.
 //http://www.flounder.com/dialogapp.htm
 void CSimpleGameDlg::OnOK()
-{
+{ MFC_STD_EH_PROLOGUE
 	if(MakeBotGoButton.IsWindowEnabled()) // bot's turn
 		OnBnClickedButton6();
 	else if(BetRaiseButton.IsWindowEnabled() && BetAmount.GetWindowTextLength()>0)
@@ -158,63 +159,58 @@ void CSimpleGameDlg::OnOK()
 		OnBnClickedButton2();
 	else if(NewGameButton.IsWindowEnabled())
 		OnBnClickedButton5();
-}
+MFC_STD_EH_EPILOGUE }
 
 BOOL CSimpleGameDlg::OnInitDialog()
-{
-	try
-	{
-		CDialog::OnInitDialog();
+{ MFC_STD_EH_PROLOGUE
 
-		// Set the icon for this dialog.  The framework does this automatically
-		//  when the application's main window is not a dialog
+	CDialog::OnInitDialog();
 
-		SetIcon(m_hIcon, TRUE);			// Set big icon
-		SetIcon(m_hIcon, FALSE);		// Set small icon
+	// Set the icon for this dialog.  The framework does this automatically
+	//  when the application's main window is not a dialog
 
-		//make a menu!
-		//"Create a CMenu object on the stack frame as a local, then call CMenu's 
-		// member functions to manipulate the new menu as needed. Next, call 
-		// CWnd::SetMenu to set the menu to a window, followed immediately by a 
-		// call to the CMenu object's Detach member function."
-		//(I save the menu to an object here so I can check/uncheck and such)
-		MyMenu.LoadMenu(IDR_MYMENU);
-		SetMenu(&MyMenu);
-		MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_CHECKED);
+	SetIcon(m_hIcon, TRUE);			// Set big icon
+	SetIcon(m_hIcon, FALSE);		// Set small icon
 
-		//find a strategy/portfolio file and create the bot api
+	//make a menu!
+	//"Create a CMenu object on the stack frame as a local, then call CMenu's 
+	// member functions to manipulate the new menu as needed. Next, call 
+	// CWnd::SetMenu to set the menu to a window, followed immediately by a 
+	// call to the CMenu object's Detach member function."
+	//(I save the menu to an object here so I can check/uncheck and such)
+	MyMenu.LoadMenu(IDR_MYMENU);
+	SetMenu(&MyMenu);
+	MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_CHECKED);
 
-	#ifdef USE_NETWORK_CLIENT
-		_mybot->Init( );
-	#endif
-		if(!loadbotfile()) 
-			exit(0);
+	//find a strategy/portfolio file and create the bot api
 
-		//initialize the window controls that need it
+#ifdef USE_NETWORK_CLIENT
+	_mybot->Init( );
+#endif
+	if(!loadbotfile()) 
+		exit(0);
 
-		TotalWon.SetWindowText(TEXT(""));
-		graygameover();
+	//initialize the window controls that need it
 
-		//set the picture on the File Open Button
+	TotalWon.SetWindowText(TEXT(""));
+	graygameover();
 
-		OpenBotButton.LoadBitmaps(IDB_OPEN1, IDB_OPEN1, IDB_OPEN1, IDB_OPEN2);
-		OpenBotButton.SizeToContent();
+	//set the picture on the File Open Button
 
-		OnMenuPlayCashGame();
-	}
-	catch( std::exception & e )
-	{
-		MessageBox( e.what( ) );
-	}
+	OpenBotButton.LoadBitmaps(IDB_OPEN1, IDB_OPEN1, IDB_OPEN1, IDB_OPEN2);
+	OpenBotButton.SizeToContent();
+
+	OnMenuPlayCashGame();
+
 	return TRUE;  // return TRUE  unless you set the focus to a control
-}
+MFC_STD_EH_EPILOGUE }
 
 // If you add a minimize button to your dialog, you will need the code below
 //  to draw the icon.  For MFC applications using the document/view model,
 //  this is automatically done for you by the framework.
 
 void CSimpleGameDlg::OnPaint()
-{
+{ MFC_STD_EH_PROLOGUE
 	if (IsIconic())
 	{
 		CPaintDC dc(this); // device context for painting
@@ -236,14 +232,14 @@ void CSimpleGameDlg::OnPaint()
 	{
 		CDialog::OnPaint();
 	}
-}
+MFC_STD_EH_EPILOGUE }
 
 // The system calls this function to obtain the cursor to display while the user drags
 //  the minimized window.
 HCURSOR CSimpleGameDlg::OnQueryDragIcon()
-{
+{ MFC_STD_EH_PROLOGUE
 	return static_cast<HCURSOR>(m_hIcon);
-}
+MFC_STD_EH_EPILOGUE }
 
 
 
@@ -686,18 +682,18 @@ void CSimpleGameDlg::graypostact(Player nexttoact)
 // ------------------------------ Check Boxes --------------------------------
 // clicked the check box to show/unshow bot cards
 void CSimpleGameDlg::OnBnClickedCheck1()
-{
+{ MFC_STD_EH_PROLOGUE
 	//we indescriminately print cards or cardbacks. 
 	//if called before any game starts, this will print garbage cards. that's ok.
 	if(ShowBotCards.GetCheck())
 		printbotcards();
 	else
 		printbotcardbacks();
-}
+MFC_STD_EH_EPILOGUE }
 
 // clicked the check box to show/unshow diagnostics window
 void CSimpleGameDlg::OnBnClickedCheck2()
-{
+{ MFC_STD_EH_PROLOGUE
 	//all window handling is done by MyBot. 
 	//This function is our only interaction
 	//(it decides when it's appropriate to pop up the window, and it closes it)
@@ -705,12 +701,12 @@ void CSimpleGameDlg::OnBnClickedCheck2()
 		_mybot->setdiagnostics(true, this);
 	else
 		_mybot->setdiagnostics(false);
-}
+MFC_STD_EH_EPILOGUE }
 
 // ---------------------------- Action Buttons -------------------------------
 // This is the fold/check button.
 void CSimpleGameDlg::OnBnClickedButton1()
-{
+{ MFC_STD_EH_PROLOGUE
 	//if this is true, we are checking
 	if(fpequal(invested[human], 0) && fpequal(invested[bot], 0))
 	{
@@ -733,11 +729,11 @@ void CSimpleGameDlg::OnBnClickedButton1()
 		dofold(human);
 	else
 		REPORT("inconsistant invested amounts");
-}
+MFC_STD_EH_EPILOGUE }
 
 // This is the call button.
 void CSimpleGameDlg::OnBnClickedButton2()
-{
+{ MFC_STD_EH_PROLOGUE
 	//if this is preflop and we are calling from the SB, 
 	// then that's actually a "bet" as it doesn't end the gr
 	if(_gameround == PREFLOP && fpequal(invested[human], _sblind) 
@@ -746,11 +742,11 @@ void CSimpleGameDlg::OnBnClickedButton2()
 	//all other cases, a call is a call
 	else
 		docall(human);
-}
+MFC_STD_EH_EPILOGUE }
 
 // This is the bet/raise button
 void CSimpleGameDlg::OnBnClickedButton3()
-{
+{ MFC_STD_EH_PROLOGUE
 	//the bet/raise button always has the meaning of betting/raising,
 	// (that is, meaning as defined by my poker api or, rather, BotAPI)
 
@@ -773,18 +769,20 @@ void CSimpleGameDlg::OnBnClickedButton3()
 		else
 			MessageBox( ( "$" + tostr( val ) + " is an invalid amount. Need " + tostr( mintotalwager( human ) ) + " <= amount < " + tostr( effstacksize - pot ) ).c_str( ) );
 	}
-}
+MFC_STD_EH_EPILOGUE }
 
 // This is the all-in button
 void CSimpleGameDlg::OnBnClickedButton4()
-{
+{ MFC_STD_EH_PROLOGUE
+
 	//we can do an all-in at any time, for any reason, baby.
 	dobet(human, effstacksize - pot);
-}
+
+MFC_STD_EH_EPILOGUE }
 
 // This is the new game button
 void CSimpleGameDlg::OnBnClickedButton5()
-{
+{ MFC_STD_EH_PROLOGUE
 	if(fpequal(0, mymin(humanstacksize, botstacksize)))
 	{
 		MessageBox( "no money left, use bankroll options on menu." );
@@ -917,11 +915,11 @@ void CSimpleGameDlg::OnBnClickedButton5()
 		docall(P1); //we have an auto call moment. stack is smaller than or equal to the small blind
 	else
 		graypostact(P1); //we play the game as normal.
-}
+MFC_STD_EH_EPILOGUE }
 
 //This is the "make bot go" button.
 void CSimpleGameDlg::OnBnClickedButton6()
-{
+{ MFC_STD_EH_PROLOGUE
 	double val;
 	Action act;
 	//get answer from bot
@@ -934,10 +932,10 @@ void CSimpleGameDlg::OnBnClickedButton6()
 	case CALL: docall(bot); break;
 	case BET: dobet(bot, val); break;
 	}
-}
+MFC_STD_EH_EPILOGUE }
 
 void CSimpleGameDlg::OnMenuNewTourney()
-{
+{ MFC_STD_EH_PROLOGUE
 	//set starting stacks for a tourney
 	humanstacksize = 1500;
 	botstacksize = 1500;
@@ -948,48 +946,48 @@ void CSimpleGameDlg::OnMenuNewTourney()
 	MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_UNCHECKED);
 	//message box should pop up notifying of new bet sizes
 	OnBnClickedButton5(); //new game button
-}
+MFC_STD_EH_EPILOGUE }
 
 void CSimpleGameDlg::OnMenuPlayCashGame()
-{
+{ MFC_STD_EH_PROLOGUE
 	istournament = false;
 	MyMenu.CheckMenuItem(ID_MENU_NEWTOURNEY, MF_UNCHECKED);
 	MyMenu.CheckMenuItem(ID_MENU_PLAYCASHGAME, MF_CHECKED);
 	MessageBox( ( "Playing Cash Game: Blinds are set to "+tostring(cashsblind)+", "+tostring(cashbblind) ).c_str( ), "New Game" );
 	OnBnClickedButton5();
-}
+MFC_STD_EH_EPILOGUE }
 
 void CSimpleGameDlg::OnMenuSetBotBankroll()
-{
+{ MFC_STD_EH_PROLOGUE
 	double input;
 	if(!getuserinput("How much for bot?", input) || input < 0)
 		return;
 	botstacksize = input;
 	effstacksize = mymin(botstacksize, humanstacksize);
 	updatess();
-}
+MFC_STD_EH_EPILOGUE }
 
 void CSimpleGameDlg::OnMenuSetYourBankroll()
-{
+{ MFC_STD_EH_PROLOGUE
 	double input;
 	if(!getuserinput("How much for human?", input) || input < 0)
 		return;
 	humanstacksize = input;
 	effstacksize = mymin(botstacksize, humanstacksize);
 	updatess();
-}
+MFC_STD_EH_EPILOGUE }
 
 void CSimpleGameDlg::OnMenuSetAllBankroll()
-{
+{ MFC_STD_EH_PROLOGUE
 	double input;
 	if(!getuserinput("How much for everybody?", input) || input < 0)
 		return;
 	botstacksize = humanstacksize = effstacksize = input;
 	updatess();
-}
+MFC_STD_EH_EPILOGUE }
 
 void CSimpleGameDlg::OnMenuFixBankroll()
-{
+{ MFC_STD_EH_PROLOGUE
 	if( isfixedbankroll( ) )
 	{
 		TotalWon.SetWindowText(TEXT(""));
@@ -1004,11 +1002,11 @@ void CSimpleGameDlg::OnMenuFixBankroll()
 		totalhumanwon = 0;
 		MyMenu.CheckMenuItem( ID_MENU_FIXBANKROLL, MF_CHECKED );
 	}
-}
+MFC_STD_EH_EPILOGUE }
 
 void CSimpleGameDlg::OnLoadbotfile()
-{ if(loadbotfile()) /*then start new game*/ OnBnClickedButton5(); } 
+{ MFC_STD_EH_PROLOGUE if(loadbotfile()) /*then start new game*/ OnBnClickedButton5(); MFC_STD_EH_EPILOGUE } 
 void CSimpleGameDlg::OnShowbotfile()
-{ MessageBox(_mybot->getxmlfile().c_str( ), "Bot version" ); } 
+{ MFC_STD_EH_PROLOGUE MessageBox(_mybot->getxmlfile().c_str( ), "Bot version" ); MFC_STD_EH_EPILOGUE } 
 void CSimpleGameDlg::OnMenuExit()
-{ OnCancel(); }
+{ MFC_STD_EH_PROLOGUE OnCancel(); MFC_STD_EH_EPILOGUE }

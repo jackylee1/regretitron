@@ -134,6 +134,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalIncludeDirectories="../pokereval/include;&quot;C:\Program Files (x86)\boost\boost_1_42&quot;"
 				PreprocessorDefinitions="_WINDOWS;NDEBUG;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
+				StringPooling="true"
 				MinimalRebuild="false"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="2"
@@ -251,6 +252,10 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath=".\MfcExceptions.h"
+				>
+			</File>
 			<File
 				RelativePath=".\Resource.h"
 				>
