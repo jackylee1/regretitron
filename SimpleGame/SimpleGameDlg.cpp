@@ -109,6 +109,7 @@ BEGIN_MESSAGE_MAP(CSimpleGameDlg, CDialog)
 	ON_COMMAND(ID_MENU_SETBOTBANKROLL, &CSimpleGameDlg::OnMenuSetBotBankroll)
 	ON_COMMAND(ID_MENU_SETALLBANKROLL, &CSimpleGameDlg::OnMenuSetAllBankroll)
 	ON_COMMAND(ID_MENU_SETYOURBANKROLL, &CSimpleGameDlg::OnMenuSetYourBankroll)
+	ON_COMMAND(ID_MENU_FIXBANKROLL, &CSimpleGameDlg::OnMenuFixBankroll)
 	ON_COMMAND(ID_LOADBOTFILE, &CSimpleGameDlg::OnLoadbotfile)
 	ON_COMMAND(ID_SHOWBOTFILE, &CSimpleGameDlg::OnShowbotfile)
 	ON_COMMAND(ID_MENU_EXIT, &CSimpleGameDlg::OnMenuExit)
@@ -512,20 +513,17 @@ void CSimpleGameDlg::dogameover(bool fold)
 
 	if (_winner==human)
 	{
+		totalhumanwon += (pot + invested[bot]);
 		humanstacksize += (pot + invested[bot]);
 		botstacksize -= (pot + invested[bot]);
 	}
 	else if (_winner==bot)
 	{
+		totalhumanwon -= (pot + invested[human]);
 		humanstacksize -= (pot + invested[human]);
 		botstacksize += (pot + invested[human]);
 	}
 	effstacksize = mymin(humanstacksize, botstacksize);
-
-	if(fpequal(humanstacksize, 0))
-		MessageBox( "bot won", "game over.", MB_OK );
-	if(fpequal(botstacksize, 0))
-		MessageBox( "you won", "Good job.", MB_OK );
 
 	//reset values to reprint the stacks to the screen
 	pot = invested[bot] = invested[human] = 0;
@@ -553,6 +551,25 @@ void CSimpleGameDlg::dogameover(bool fold)
 	{
 		InvestedHum.SetWindowText(TEXT("TIE"));
 		InvestedBot.SetWindowText(TEXT("TIE"));
+	}
+
+	//set the bankrolls back if they are fixed
+
+	if( isfixedbankroll( ) )
+	{
+		CString val;
+		val.Format(TEXT("P/L: %.0f"), totalhumanwon);
+		TotalWon.SetWindowText(val);
+		humanstacksize = humanfixedstacksize;
+		botstacksize = botfixedstacksize;
+		effstacksize = mymin(humanstacksize, botstacksize);
+	}
+	else
+	{
+		if(fpequal(humanstacksize, 0))
+			MessageBox( "bot won", "game over.", MB_OK );
+		if(fpequal(botstacksize, 0))
+			MessageBox( "you won", "Good job.", MB_OK );
 	}
 
 	//if auto, Start new game, else, Set grayness values
@@ -969,6 +986,24 @@ void CSimpleGameDlg::OnMenuSetAllBankroll()
 		return;
 	botstacksize = humanstacksize = effstacksize = input;
 	updatess();
+}
+
+void CSimpleGameDlg::OnMenuFixBankroll()
+{
+	if( isfixedbankroll( ) )
+	{
+		TotalWon.SetWindowText(TEXT(""));
+		MyMenu.CheckMenuItem( ID_MENU_FIXBANKROLL, MF_UNCHECKED );
+	}
+	else if( fpequal( humanstacksize, 0 ) || fpequal( botstacksize, 0 ) )
+		MessageBox( "Can't fix bankroll; someone has zero chips." );
+	else
+	{
+		humanfixedstacksize = humanstacksize;
+		botfixedstacksize = botstacksize;
+		totalhumanwon = 0;
+		MyMenu.CheckMenuItem( ID_MENU_FIXBANKROLL, MF_CHECKED );
+	}
 }
 
 void CSimpleGameDlg::OnLoadbotfile()

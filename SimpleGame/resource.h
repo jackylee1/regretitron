@@ -52,13 +52,14 @@
 #define ID_SHOWCURRENTBOTFILE           32784
 #define ID_BOTFILE_EXIT                 32785
 #define ID_MENU_EXIT                    32786
+#define ID_MENU_FIXBANKROLL             32787
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        135
-#define _APS_NEXT_COMMAND_VALUE         32787
+#define _APS_NEXT_COMMAND_VALUE         32788
 #define _APS_NEXT_CONTROL_VALUE         1034
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

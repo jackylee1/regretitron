@@ -97,7 +97,7 @@ BEGIN
     LTEXT           "Static",IDC_BCARD0,57,23,26,32
     LTEXT           "Static",IDC_BCARD1,87,23,26,32
     LTEXT           "",IDC_STATIC,7,141,37,8
-    EDITTEXT        IDC_EDIT5,6,151,35,12,ES_CENTER | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    EDITTEXT        IDC_EDIT5,8,151,44,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
     CONTROL         "Show Diagnostics",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,124,20,63,10
     CTEXT           "Static",IDC_BSTACK,63,7,44,8
     CTEXT           "Static",IDC_HSTACK,7,179,66,8
@@ -217,6 +217,7 @@ BEGIN
         MENUITEM "Set Bot Bankroll",            ID_MENU_SETBOTBANKROLL
         MENUITEM "Set Your Bankroll",           ID_MENU_SETYOURBANKROLL
         MENUITEM "Set All Bankroll!",           ID_MENU_SETALLBANKROLL
+        MENUITEM "Fix Bankroll",                ID_MENU_FIXBANKROLL
     END
 END
 

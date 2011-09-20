@@ -66,6 +66,7 @@ private:
 	void dogameover(bool fold);
 	void graygameover();
 	void graypostact(Player nexttoact);
+	bool isfixedbankroll( ) { return ( ( MyMenu.GetMenuState( ID_MENU_FIXBANKROLL, MF_BYCOMMAND ) & MF_CHECKED ) != 0 ); }
 	//variables
 #ifdef USE_NETWORK_CLIENT
 	ClientAPI * _mybot;
@@ -94,6 +95,8 @@ private:
 	double totalhumanwon;
 	double pot;
 	bool istournament;
+	double humanfixedstacksize;
+	double botfixedstacksize;
 
 	afx_msg void OnBnClickedButton1();
 	afx_msg void OnBnClickedButton3();
@@ -108,6 +111,7 @@ private:
 	afx_msg void OnMenuSetBotBankroll();
 	afx_msg void OnMenuSetAllBankroll();
 	afx_msg void OnMenuSetYourBankroll();
+	afx_msg void OnMenuFixBankroll();
 	afx_msg void OnLoadbotfile();
 	afx_msg void OnShowbotfile();
 	afx_msg void OnMenuExit();
