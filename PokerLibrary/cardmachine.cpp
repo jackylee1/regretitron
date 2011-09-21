@@ -1009,83 +1009,85 @@ cardsettings_t CardMachine::makecardsettings(
 	int tbinnum = getnumbins( tbin );
 	int rbinnum = getnumbins( rbin );
 
-	cardsettings_t historyretval =
+	if( usehistory == true )
 	{
-		{ pfbinnum, fbinnum, tbinnum, rbinnum },
+		cardsettings_t historyretval =
 		{
-			"bins/preflop"+pfbin,
-			"bins/flop"+pfbin+"-"+fbin,
-			"bins/turn"+pfbin+"-"+fbin+"-"+tbin,
-			"bins/river"+pfbin+"-"+fbin+"-"+tbin+"-"+rbin,
-		},
-		{
-			PackedBinFile::numwordsneeded(pfbinnum, INDEX2_MAX)*8,
-			PackedBinFile::numwordsneeded(fbinnum, INDEX23_MAX)*8,
-			PackedBinFile::numwordsneeded(tbinnum, INDEX231_MAX)*8,
-			PackedBinFile::numwordsneeded(rbinnum, INDEX2311_MAX)*8
-		},
-		true, //use history
-		useflopalyzer, //use flopalyzer
-		useboardbins, //use board bins
-		{ 0, boardfbin, boardtbin, boardrbin },
-		{
-			"",
-			"bins/boardflop" + tostr( boardfbin ),
-			"bins/boardturn" + tostr( boardtbin ),
-			"bins/boardriver" + tostr( boardrbin )
-		},
-		{
-			0,
-			PackedBinFile::numwordsneeded(boardfbin, INDEX3_MAX)*8,
-			PackedBinFile::numwordsneeded(boardtbin, INDEX31_MAX)*8,
-			PackedBinFile::numwordsneeded(boardrbin, INDEX311_MAX)*8
-		}
-	};
+			{ pfbinnum, fbinnum, tbinnum, rbinnum },
+			{
+				"bins/preflop"+pfbin,
+				"bins/flop"+pfbin+"-"+fbin,
+				"bins/turn"+pfbin+"-"+fbin+"-"+tbin,
+				"bins/river"+pfbin+"-"+fbin+"-"+tbin+"-"+rbin,
+			},
+			{
+				PackedBinFile::numwordsneeded(pfbinnum, INDEX2_MAX)*8,
+				PackedBinFile::numwordsneeded(fbinnum, INDEX23_MAX)*8,
+				PackedBinFile::numwordsneeded(tbinnum, INDEX231_MAX)*8,
+				PackedBinFile::numwordsneeded(rbinnum, INDEX2311_MAX)*8
+			},
+			true, //use history
+			useflopalyzer, //use flopalyzer
+			useboardbins, //use board bins
+			{ 0, boardfbin, boardtbin, boardrbin },
+			{
+				"",
+				"bins/flopb" + tostr( boardfbin ),
+				"bins/turnb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ),
+				"bins/riverb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + 'b' + tostr( boardrbin )
+			},
+			{
+				0,
+				PackedBinFile::numwordsneeded(boardfbin, INDEX3_MAX)*8,
+				PackedBinFile::numwordsneeded(boardtbin, INDEX31_MAX)*8,
+				PackedBinFile::numwordsneeded(boardrbin, INDEX311_MAX)*8
+			}
+		};
 
-	const string riverfile = "bins/riverb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + 'b' + tostr( boardrbin ) + '-' + rbin;
-	const bool bigfile = is2311( boost::filesystem::file_size( riverfile + ".bins" ) );
-
-	cardsettings_t nohistoryretval =
-	{
-		{ INDEX2_MAX, fbinnum, tbinnum, rbinnum },
-		{
-			"",
-			( fbinnum == INDEX23_MAX ? "" : "bins/flopb" + tostr( boardfbin ) + '-' + fbin ),
-			"bins/turnb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + tbin,
-			riverfile
-		},
-		{
-			0,
-			( fbinnum == INDEX23_MAX ? 0 : PackedBinFile::numwordsneeded(fbinnum, INDEX23_MAX)*8 ),
-			PackedBinFile::numwordsneeded(tbinnum, INDEX231_MAX)*8,
-			PackedBinFile::numwordsneeded(rbinnum, bigfile ? INDEX2311_MAX : INDEX25_MAX)*8
-		},
-		false, //use history
-		useflopalyzer, //use flopalyzer
-		useboardbins, //use board bins
-		{ 0, boardfbin, boardtbin, boardrbin },
-		{
-			"",
-			"bins/flopb" + tostr( boardfbin ),
-			"bins/turnb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ),
-			"bins/riverb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + 'b' + tostr( boardrbin )
-		},
-		{
-			0,
-			PackedBinFile::numwordsneeded(boardfbin, INDEX3_MAX)*8,
-			PackedBinFile::numwordsneeded(boardtbin, INDEX31_MAX)*8,
-			PackedBinFile::numwordsneeded(boardrbin, INDEX311_MAX)*8
-		}
-	};
-
-	if( usehistory )
-	{
 		return historyretval;
+
 	}
-	else
+	else // ( usehistory == false )
 	{
 		if( pfbinnum != INDEX2_MAX )
 			REPORT( "Bad value for pfbinnum when not using history. (should be max, 169)" );
+
+		const string riverfile = "bins/riverb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + 'b' + tostr( boardrbin ) + '-' + rbin;
+		const bool bigfile = is2311( boost::filesystem::file_size( riverfile + ".bins" ) );
+
+		cardsettings_t nohistoryretval =
+		{
+			{ INDEX2_MAX, fbinnum, tbinnum, rbinnum },
+			{
+				"",
+				( fbinnum == INDEX23_MAX ? "" : "bins/flopb" + tostr( boardfbin ) + '-' + fbin ),
+				"bins/turnb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + tbin,
+				riverfile
+			},
+			{
+				0,
+				( fbinnum == INDEX23_MAX ? 0 : PackedBinFile::numwordsneeded(fbinnum, INDEX23_MAX)*8 ),
+				PackedBinFile::numwordsneeded(tbinnum, INDEX231_MAX)*8,
+				PackedBinFile::numwordsneeded(rbinnum, bigfile ? INDEX2311_MAX : INDEX25_MAX)*8
+			},
+			false, //use history
+			useflopalyzer, //use flopalyzer
+			useboardbins, //use board bins
+			{ 0, boardfbin, boardtbin, boardrbin },
+			{
+				"",
+				"bins/flopb" + tostr( boardfbin ),
+				"bins/turnb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ),
+				"bins/riverb" + tostr( boardfbin ) + '-' + 'b' + tostr( boardtbin ) + '-' + 'b' + tostr( boardrbin )
+			},
+			{
+				0,
+				PackedBinFile::numwordsneeded(boardfbin, INDEX3_MAX)*8,
+				PackedBinFile::numwordsneeded(boardtbin, INDEX31_MAX)*8,
+				PackedBinFile::numwordsneeded(boardrbin, INDEX311_MAX)*8
+			}
+		};
+
 		return nohistoryretval;
 	}
 }
