@@ -77,6 +77,8 @@ unsigned SessionManager::GetBotID( GameTypeEnum gametype, otl_connect & database
 	getbotid >> botid >> endr;
 	if( botid == (unsigned)-1 )
 		throw Exception( "failed to get botid from botmapping" );
+	if( botid == 0 )
+		throw Exception( "No bot defined for that gametype" );
 	return botid;
 }
 
