@@ -107,351 +107,47 @@ treesettings_t makelimittreesettings( int sblind, int bblind, int stacksize )
 
 }
 
-//
-//  functions to create a bitchin limit tree.
-//
-
-void killtree(Vertex node, BettingTree &tree)
+void branchtree( int gr, int pot, int betagreed, int bettomeet, bool isfirstinround, const Vertex & thisnode, BettingTree & tree, const Vertex & T0, const Vertex & T1, const Vertex & TSD )
 {
-	switch(tree[node].type)
-	{
-		case TerminalP0Wins:
-		case TerminalP1Wins:
-		case TerminalShowDown:
-			return;
-		case NodeError:
-			REPORT("NodeError");
-		case P0Plays:
-		case P1Plays:
-			break;
-	}
+	const int & SB = get_property( tree, settings_tag( ) ).sblind;
+	const int & BB = get_property( tree, settings_tag( ) ).bblind;
+	const int & SS = get_property( tree, settings_tag( ) ).stacksize;
+	const bool & islimit = get_property( tree, settings_tag( ) ).limit;
 
-	EIter e, elast;
-	for(tie(e,elast) = out_edges(node, tree); e!=elast; )
-	{
-		Vertex tokill = target(*e, tree);
-		remove_edge(e++, tree); // must have e++ here. must remove an edge that e does not point to. 
-		killtree(tokill, tree);
-	}
-	remove_vertex(node, tree);
-}
-
-void prunelimit(int gr, int pot, int prev_potcontrib, BettingTree &tree, const Vertex &node, 
-		const Vertex &T0, const Vertex &T1, const Vertex &TSD, const int maxacts)
-{
-	//make sure this is a player node
-
-	switch(tree[node].type)
-	{
-		case P0Plays:
-		case P1Plays:
-			break;
-		default:
-			REPORT("tree broke");
-	}
-
-	if(get_property(tree, settings_tag()).stacksize <= get_property(tree, settings_tag()).sblind)
-	{
-		REPORT("I don't think a game is possible with that stacksize. No decisions are possible.");
-	}
-
-	//remove edges that put us all in
-
-	EIter e, elast;
-	const unsigned total = out_degree(node, tree);
-	unsigned removed = 0;
-	for(tie(e,elast) = out_edges(node, tree); e!=elast; )
-	{
-		if(pot + tree[*e].potcontrib >= get_property(tree, settings_tag()).stacksize)
-		{
-			switch(tree[*e].type)
-			{
-				case Fold:
-				case Call:
-					REPORT("these should be afordable or have been removed from the tree.");
-				case Bet:
-					killtree(target(*e, tree), tree); //comment out if vertex removal voids iterators
-					remove_edge(e++, tree); // must have e++ here. must remove an edge that e does not point to. 
-					removed++;
-					break;
-				case BetAllin: //leave these as is
-				case CallAllin:
-					e++;
-					break;
-			}
-		}
-		else
-		{
-			e++;
-		}
-	}
-
-	if(removed != total - out_degree(node, tree)) REPORT("baaaad");
-
-	//replace them with a single all-in sub-tree
-
-	if(removed > 0)
-	{
-		if(get_property(tree, settings_tag()).stacksize > 24 * get_property(tree, settings_tag()).bblind)
-			REPORT("stacksize is big enough that we should be playing deep-stacked limit");
-
-		Vertex x;
-
-		if(get_property(tree, settings_tag()).stacksize <= get_property(tree, settings_tag()).bblind)
-		{ 
-			//we are instantly all in in this, and only this, case. 
-			add_edge(node, TSD, EdgeProp(CallAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
-		}
-		else
-		{
-			//here, our opponent has the ability to respond.
-			if(tree[node].type == P0Plays)
-			{
-				x = add_vertex(NodeProp(P1Plays), tree);
-				add_edge(x, T0, EdgeProp(Fold, prev_potcontrib), tree);
-			}
-			else 
-			{
-				x = add_vertex(NodeProp(P0Plays), tree);
-				add_edge(x, T1, EdgeProp(Fold, prev_potcontrib), tree);
-			}
-
-			add_edge(node, x, EdgeProp(BetAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
-			add_edge(x, TSD, EdgeProp(CallAllin, get_property(tree, settings_tag()).stacksize - pot), tree);
-		}
-	}
-
-	//okay, now iterate through them like a normal person and get on goin'!
-
-	if(maxacts > MAX_ACTIONS)
-		REPORT("You are using more actions than the rest of the code!");
-	if(out_degree(node, tree) < 2 || (int)out_degree(node, tree) > maxacts)
-		REPORT("you have a "+tostring(out_degree(node, tree))+" membered node while max_actions is "+tostring(maxacts)+"!");
-	tree[node].actioni = get_property(tree, maxorderindex_tag())[gr][out_degree(node, tree)]++;
-
-	for(tie(e,elast) = out_edges(node, tree); e!=elast; e++)
-	{
-		switch(tree[*e].type)
-		{
-			case Bet:
-			case BetAllin:
-				prunelimit(gr, pot, tree[*e].potcontrib, tree, target(*e, tree), T0, T1, TSD, maxacts);
-				break;
-			case Call:
-				if(gr < 3)
-					prunelimit(gr+1, pot+tree[*e].potcontrib, 0, tree, target(*e, tree), T0, T1, TSD, maxacts);
-			default: //this is river Call's, CallAllin's and Fold's
-				break; //they all lead to terminal nodes.
-		}
-	}
-}
-
-
-//add on a limit tree for the flop/turn/river rounds
-Vertex addlimit(int gr, BettingTree &tree, const Vertex &T0, const Vertex &T1, const Vertex &TSD)
-{
-	if(gr > 3) return TSD;
-	if(gr < 1) REPORT("bad tree creation!!");
-
-	Vertex n0 = add_vertex(NodeProp(P0Plays), tree);
-	Vertex n1 = add_vertex(NodeProp(P1Plays), tree);
-	Vertex n2 = add_vertex(NodeProp(P0Plays), tree);
-	Vertex n3 = add_vertex(NodeProp(P1Plays), tree);
-	Vertex n4 = add_vertex(NodeProp(P0Plays), tree);
-	Vertex n5 = add_vertex(NodeProp(P1Plays), tree);
-	Vertex n6 = add_vertex(NodeProp(P0Plays), tree);
-	Vertex n7 = add_vertex(NodeProp(P1Plays), tree);
-	Vertex n8 = add_vertex(NodeProp(P0Plays), tree);
-	Vertex n9 = add_vertex(NodeProp(P1Plays), tree);
-
-	const int b = get_property(tree, settings_tag()).bblind * (gr == 1 ? 1 : 2); //use big-bet for turn and river
-
-	add_edge(n0,n5,EdgeProp(Bet,0), tree);
-	add_edge(n0,n1,EdgeProp(Bet,1*b), tree);
-
-	add_edge(n1,T0,EdgeProp(Fold,0), tree);
-	add_edge(n1, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,1*b), tree);
-	add_edge(n1,n2,EdgeProp(Bet,2*b), tree);
-
-	add_edge(n2,T1,EdgeProp(Fold,1*b), tree);
-	add_edge(n2, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,2*b), tree);
-	add_edge(n2,n3,EdgeProp(Bet,3*b),tree);
-
-	add_edge(n3,T0,EdgeProp(Fold,2*b),tree);
-	add_edge(n3, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,3*b), tree);
-	add_edge(n3,n4,EdgeProp(Bet,4*b),tree);
-
-	add_edge(n4,T1,EdgeProp(Fold,3*b),tree);
-	add_edge(n4, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,4*b), tree);
-
-	add_edge(n5, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,0*b), tree);
-	add_edge(n5,n6,EdgeProp(Bet,1*b),tree);
-
-	add_edge(n6,T1,EdgeProp(Fold,0*b),tree);
-	add_edge(n6, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,1*b), tree);
-	add_edge(n6,n7,EdgeProp(Bet,2*b),tree);
-
-	add_edge(n7,T0,EdgeProp(Fold,1*b),tree);
-	add_edge(n7, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,2*b), tree);
-	add_edge(n7,n8,EdgeProp(Bet,3*b),tree);
-
-	add_edge(n8,T1,EdgeProp(Fold,2*b),tree);
-	add_edge(n8, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,3*b), tree);
-	add_edge(n8,n9,EdgeProp(Bet,4*b),tree);
-
-	add_edge(n9,T0,EdgeProp(Fold,3*b),tree);
-	add_edge(n9, addlimit(gr+1,tree,T0,T1,TSD), EdgeProp(Call,4*b), tree);
-
-	return n0;
-}
-
-
-//tests to make sure edge ordering is preserved
-void testtree()
-{
-	const int N = 7; //oughta do it
-	BettingTree t;
-	Vertex root = add_vertex(t);
-	Vertex n[N];
-	for(int i=0; i<N; i++)
-	{
-		n[i] = add_vertex(t);
-		add_edge(root, n[i], EdgeProp(Fold, i), t);
-	}
-	for(int i=0; i<N; i++)
-		for(int j=0; j<N; j++)
-			add_edge(n[i], add_vertex(t), EdgeProp(Fold, j), t);
-
-	// now check it
-
-	EIter e1, e1last;
-	EIter e2, e2last;
-	int i=0;
-	for(tie(e1,e1last) = out_edges(root, t); e1!=e1last; e1++, i++)
-	{
-		if(t[*e1].potcontrib != i)
-			REPORT("edge ordering not preserved...");
-		int j=0;
-		for(tie(e2,e2last) = out_edges(target(*e1, t), t); e2!=e2last; e2++, j++)
-			if(t[*e2].potcontrib != j)
-				REPORT("edge ordering not preserved...");
-	}
-}
-
-Vertex createlimittree(BettingTree &tree, const int max_actions, LoggerClass & treelogger)
-{
-	//erase whatevers there
-	tree.clear(); //shouldn't erase properties
-	get_property(tree, maxorderindex_tag()).resize(extents[4][multi_array_types::extent_range(2,MAX_ACTIONS+1)]);
-	for(int i=0; i<4; i++) for(int j=2; j<=MAX_ACTIONS; j++) get_property(tree, maxorderindex_tag())[i][j] = 0;
-
-	const int &SB = get_property(tree, settings_tag()).sblind;
-	const int &BB = get_property(tree, settings_tag()).bblind;
-
-	//create terminal nodes
-	Vertex T0 = add_vertex(NodeProp(TerminalP0Wins), tree);
-	Vertex T1 = add_vertex(NodeProp(TerminalP1Wins), tree);
-	Vertex TSD = add_vertex(NodeProp(TerminalShowDown), tree);
-
-	//put in the preflop, recursively adding in the rest
-	Vertex n0 = add_vertex(NodeProp(P1Plays), tree);
-	Vertex n1 = add_vertex(NodeProp(P0Plays), tree);
-	Vertex n2 = add_vertex(NodeProp(P0Plays), tree);
-	Vertex n3 = add_vertex(NodeProp(P1Plays), tree);
-	Vertex n4 = add_vertex(NodeProp(P0Plays), tree);
-	Vertex n5 = add_vertex(NodeProp(P1Plays), tree);
-	Vertex n6 = add_vertex(NodeProp(P0Plays), tree);
-	Vertex n7 = add_vertex(NodeProp(P1Plays), tree);
-
-	add_edge(n0,T0,EdgeProp(Fold,SB),tree);
-	add_edge(n0,n1,EdgeProp(Bet,1*BB),tree);
-	add_edge(n0,n2,EdgeProp(Bet,2*BB),tree);
-
-	add_edge(n1, addlimit(1,tree,T0,T1,TSD), EdgeProp(Call,1*BB), tree);
-	add_edge(n1,n5,EdgeProp(Bet,2*BB),tree);
-
-	add_edge(n5,T0,EdgeProp(Fold,1*BB),tree);
-	add_edge(n5, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,2*BB),tree);
-	add_edge(n5,n6,EdgeProp(Bet,3*BB),tree);
-
-	add_edge(n6,T1,EdgeProp(Fold,2*BB),tree);
-	add_edge(n6, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,3*BB),tree);
-	add_edge(n6,n7,EdgeProp(Bet,4*BB),tree);
-	
-	add_edge(n7,T0,EdgeProp(Fold,3*BB),tree);
-	add_edge(n7, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,4*BB),tree);
-
-	add_edge(n2,T1,EdgeProp(Fold,1*BB),tree);
-	add_edge(n2, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,2*BB),tree);
-	add_edge(n2,n3,EdgeProp(Bet,3*BB),tree);
-
-	add_edge(n3,T0,EdgeProp(Fold,2*BB),tree);
-	add_edge(n3, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,3*BB),tree);
-	add_edge(n3,n4,EdgeProp(Bet,4*BB),tree);
-
-	add_edge(n4,T1,EdgeProp(Fold,3*BB),tree);
-	add_edge(n4, addlimit(1,tree,T1,T1,TSD), EdgeProp(Call,4*BB),tree);
-
-	if(num_vertices(tree) != 6378 + 3)
-		REPORT("Tree is not verified. Repeat. Tree is not good.");
-
-	//prune it down to size according to stacksize
-	prunelimit(0, 0, BB, tree, n0, T0, T1, TSD, max_actions);
-
-	//at most (4 + 4 + 8 + 8) small bets = 24 bblinds can be spent in a game
-	treelogger( "Tree has " + tostr( num_vertices(tree)-3 ) + " nodes, and 3 terminal nodes also. "
-			+ "Lost " + tostr(  6378+3-num_vertices(tree) ) + " nodes compared to a full tree." );
-
-	if(get_property(tree, settings_tag()).stacksize >= 24 * get_property(tree, settings_tag()).bblind && num_vertices(tree) != 6378 + 3)
-		REPORT("Tree is not good. NO GOOD! DO NOT USE!!");
-
-	//return the root
-	return n0;
-}
-
-void branchnolimit(int gr, int pot, int potcontrib, int bettomeet, bool cancheck, bool amsblind, const Vertex & thisnode, BettingTree &tree, const Vertex &T0, const Vertex &T1, const Vertex &TSD)
-{
-	const int &SB = get_property(tree, settings_tag()).sblind;
-	const int &BB = get_property(tree, settings_tag()).bblind;
-	const int &SS = get_property(tree, settings_tag()).stacksize;
-
+	if( gr < PREFLOP || gr > RIVER )
+		REPORT( "invalid gr value in branchtree" );
 	if( SS <= SB )
 		REPORT( "No game possible with SS <= SB" );
-	if( pot < 0 || potcontrib < 0 || bettomeet < 0 || pot + bettomeet > SS )
+	if( pot < 0 || betagreed < 0 || bettomeet < 0 || pot + bettomeet > SS )
 		REPORT( "invalid numbers passed to branchnolimit" );
-	if( bettomeet < potcontrib )
+	if( bettomeet < betagreed )
 		REPORT( "Can't bet less than contributed already" );
-	if( cancheck && ( bettomeet != 0 || potcontrib != 0 ) )
-		REPORT( "Can only check when no bets and no potcontrib" );
+	if( isfirstinround && (
+			( gr == 0 && ( ( betagreed != SB && bettomeet != mymin( SS, BB ) ) || tree[ thisnode ].type != P1Plays ) ) ||
+			( gr > 0 && ( ( betagreed != 0 && bettomeet != 0 ) || tree[ thisnode ].type != P0Plays ) ) ) )
+		REPORT( "Betting amounts or player types are incorrect for the first node in the round" );
 	if( tree[ thisnode ].type != P0Plays && tree[ thisnode ].type != P1Plays )
-		REPORT( "Invalid node type in branchnolimit" );
+		REPORT( "Invalid node type in branchtree" );
 
 	const NodeType otherpl = ( tree[ thisnode ].type == P0Plays ? P1Plays : P0Plays );
 
-	if( bettomeet > potcontrib )
+	if( bettomeet > betagreed )
 	{
 		// add Fold edge
-		add_edge( thisnode, ( otherpl == P0Plays ? T0 : T1 ), EdgeProp( Fold, potcontrib ), tree );
+		add_edge( thisnode, ( otherpl == P0Plays ? T0 : T1 ), EdgeProp( Fold, betagreed ), tree );
 	}
 
-	if( cancheck )
+	if( pot + bettomeet == SS )
 	{
-		// add Bet edge with 0 bet
-		Vertex v = add_vertex( NodeProp( otherpl ), tree );
-		add_edge( thisnode, v, EdgeProp( Bet, 0 ), tree );
-		branchnolimit( gr, pot, 0, 0, false, false, v, tree, T0, T1, TSD );
+		// add CallAllin edge
+		add_edge( thisnode, TSD, EdgeProp( CallAllin, bettomeet ), tree );
 	}
-	else if( amsblind )
+	else if( isfirstinround )
 	{
 		// add Bet edge with bettomeet potcontrib
 		Vertex v = add_vertex( NodeProp( otherpl ), tree );
 		add_edge( thisnode, v, EdgeProp( Bet, bettomeet ), tree );
-		branchnolimit( gr, pot, bettomeet, bettomeet, false, false, v, tree, T0, T1, TSD );
-	}
-	else if( pot + bettomeet == SS )
-	{
-		// add CallAllin edge
-		add_edge( thisnode, TSD, EdgeProp( CallAllin, bettomeet ), tree );
+		branchtree( gr, pot, bettomeet, bettomeet, false, v, tree, T0, T1, TSD );
 	}
 	else
 	{
@@ -462,135 +158,210 @@ void branchnolimit(int gr, int pot, int potcontrib, int bettomeet, bool cancheck
 		{
 			Vertex v = add_vertex( NodeProp( P0Plays ), tree );
 			add_edge( thisnode, v, EdgeProp( Call, bettomeet ), tree );
-			branchnolimit( gr + 1, pot + bettomeet, 0, 0, true, false, v, tree, T0, T1, TSD );
+			branchtree( gr + 1, pot + bettomeet, 0, 0, true, v, tree, T0, T1, TSD );
 		}
 	}
 
 
-	// For Reference:
-	//   void branchnolimit(int gr, int pot, int potcontrib, int bettomeet, bool cancheck, bool amsblind, 
-	//		Vertex & thisnode, BettingTree &tree, const Vertex &T0, const Vertex &T1, const Vertex &TSD)
-
-
 	// if more betting is possible, add bets and a BetAllin node
 
-	if( pot + bettomeet < SS ) 
+	const int betincrement = ( islimit ? ( gr >= TURN ? 2 * BB : BB ) : mymax( BB, bettomeet - betagreed ) );
+
+	if( pot + bettomeet < SS && ( ! islimit || bettomeet < 4 * betincrement ) )
 	{
-		const int betincrement = mymax( BB, bettomeet - potcontrib );
-		for( int betamount = bettomeet + betincrement; pot + betamount < SS; betamount += betincrement )
+		for( int aboveamount = betincrement; pot + bettomeet + aboveamount < SS; aboveamount += betincrement )
+		// for( int aboveamount = betincrement; pot + bettomeet + aboveamount < SS; aboveamount *= 2 )
 		{
 			// add Betting node
 			Vertex v = add_vertex( NodeProp( otherpl ), tree );
-			add_edge( thisnode, v, EdgeProp( Bet, betamount ), tree );
-			branchnolimit( gr, pot, bettomeet, betamount, false, false, v, tree, T0, T1, TSD );
+			add_edge( thisnode, v, EdgeProp( Bet, bettomeet + aboveamount ), tree );
+			branchtree( gr, pot, bettomeet, bettomeet + aboveamount, false, v, tree, T0, T1, TSD );
+
+			if( islimit )
+				return; //if it's limit and we added a betting node here, return. otherwise, allow the BetAllin to be added.
 		}
 
 		// add BetAllin node
 		Vertex v = add_vertex( NodeProp( otherpl ), tree );
 		add_edge( thisnode, v, EdgeProp( BetAllin, SS - pot ), tree );
-		branchnolimit( gr, pot, bettomeet, SS - pot, false, false, v, tree, T0, T1, TSD );
+		branchtree( gr, pot, bettomeet, SS - pot, false, v, tree, T0, T1, TSD );
 	}
 }
 
-void verifynolimit( int gr, int pot, int potcontrib, const Vertex & node, BettingTree &tree, const Vertex &T0, const Vertex &T1, const Vertex &TSD, const int maxacts )
+void verifytree( int gr, int pot, int bettomeet, const Vertex & node, const BettingTree & tree, const Vertex & T0, const Vertex & T1, const Vertex & TSD, const int maxacts )
 {
-	const int &SB = get_property(tree, settings_tag()).sblind;
-	//const int &BB = get_property(tree, settings_tag()).bblind;
-	const int &SS = get_property(tree, settings_tag()).stacksize;
+	try
+	{
 
-	if( SS <= SB )
-		REPORT( "No game possible with SS <= SB" );
-	if( pot + potcontrib > SS )
-		REPORT( "too big pot + potcontrib" );
-	if( pot < 0 || potcontrib < 0 )
-		REPORT( "invalid numbers passed to branchnolimit" );
-	if( tree[ node ].type != P0Plays && tree[ node ].type != P1Plays )
-		REPORT( "Invalid node type in branchnolimit" );
+		const int & SB = get_property( tree, settings_tag( ) ).sblind;
+		//const int & BB = get_property( tree, settings_tag( ) ).bblind;
+		const int & SS = get_property( tree, settings_tag( ) ).stacksize;
 
-	//okay, now iterate through them like a normal person and get on goin'!
+		// simple error checks
 
-	if(maxacts > MAX_ACTIONS)
-		REPORT("You are using more actions than the rest of the code!");
-	if(out_degree(node, tree) < 2 || (int)out_degree(node, tree) > maxacts)
-		REPORT("you have a "+tostring(out_degree(node, tree))+" membered node while max_actions is "+tostring(maxacts)+"!");
-	tree[node].actioni = get_property(tree, maxorderindex_tag())[gr][out_degree(node, tree)]++;
+		if( tree[ T0 ].type != TerminalP0Wins
+				|| tree[ T1 ].type != TerminalP1Wins
+				|| tree[ TSD ].type != TerminalShowDown )
+			REPORT( "T0, T1, or TSD are incorrect" );
+		if( SS <= SB )
+			REPORT( "No game possible with SS <= SB" );
+		if( gr < PREFLOP || gr > RIVER )
+			REPORT( "invalid gr value in verifytree" );
+		if( pot + bettomeet > SS )
+			REPORT( "too big pot + bettomeet" );
+		if( pot < 0 || bettomeet < 0 )
+			REPORT( "invalid numbers passed to branchnolimit" );
+		if( tree[ node ].type != P0Plays && tree[ node ].type != P1Plays )
+			REPORT( "Invalid node type in branchnolimit" );
+		if( maxacts > MAX_ACTIONS )
+			REPORT( "You are using more actions than the rest of the code!" );
+		if( out_degree( node, tree ) < 2 || (int)out_degree( node, tree ) > maxacts )
+			REPORT( "you have a " + tostring( out_degree( node, tree ) ) + " membered node while max_actions is " + tostring( maxacts ) + "!" );
+
+		// do more complicated checks and call this function again recursively
+
+		int numcalls = 0;
+		int numfolds = 0;
+		int numbetallins = 0;
+		int lastedgepotcontrib = -1;
+		EIter e, elast;
+		for(tie(e,elast) = out_edges(node, tree); e!=elast; e++)
+		{
+			if( tree[ *e ].potcontrib <= lastedgepotcontrib )
+				REPORT( "potcontribs are not strictly increasing" );
+			lastedgepotcontrib = tree[ *e ].potcontrib;
+
+			switch(tree[*e].type)
+			{
+				case Bet:
+					if( tree[ *e ].potcontrib < bettomeet || pot + tree[ *e ].potcontrib >= SS )
+						REPORT( "Potcontrib not correct for a bet" );
+					if( tree[ node ].type == tree[ target( *e, tree ) ].type )
+						REPORT( "verifytree found same player after a bet" );
+					verifytree( gr, pot, tree[ *e ].potcontrib, target( *e, tree ), tree, T0, T1, TSD, maxacts );
+					break;
+
+				case BetAllin:
+					numbetallins++;
+					if( pot + tree[ *e ].potcontrib != SS )
+						REPORT( "Potcontrib not correct for a BetAllin" );
+					if( tree[ node ].type == tree[ target( *e, tree ) ].type )
+						REPORT( "verifytree found same player after a bet" );
+					verifytree( gr, pot, tree[ *e ].potcontrib, target( *e, tree ), tree, T0, T1, TSD, maxacts );
+					break;
+
+				case Call:
+					numcalls++;
+					if( bettomeet != tree[ *e ].potcontrib )
+						REPORT( "Potcontrib not correct for a Call" );
+					if( gr != RIVER )
+					{
+						if( tree[ target( *e, tree ) ].type != P0Plays )
+							REPORT( "verifytree found incorrect player at start of next round" );
+						verifytree( gr + 1, pot + tree[*e].potcontrib, 0, target(*e, tree), tree, T0, T1, TSD, maxacts);
+					}
+					else if( target( *e, tree ) != TSD || tree[ target( *e, tree ) ].type != TerminalShowDown )
+						REPORT( "Call edge at the river does not point to TerminalShowDown node" );
+					break;
+
+				case CallAllin:
+					numcalls++;
+					if( bettomeet != tree[ *e ].potcontrib || pot + bettomeet != SS )
+						REPORT( "Potcontrib not correct for a CallAllin" );
+					if( target( *e, tree ) != TSD || tree[ target( *e, tree ) ].type != TerminalShowDown )
+						REPORT( "CallAllin edge does not point to TerminalShowDown node" );
+					break;
+
+				case Fold:
+					numfolds++;
+					if( tree[ *e ].potcontrib >= bettomeet )
+						REPORT( "Potcontrib not correct for a Fold" );
+					if( ! ( ( tree[ node ].type == P1Plays && target( *e, tree ) == T0 && tree[ target( *e, tree ) ].type == TerminalP0Wins )
+								|| ( tree[ node ].type == P0Plays && target( *e, tree ) == T1 && tree[ target( *e, tree ) ].type == TerminalP1Wins ) ) )
+						REPORT( "Fold edge does not point to correct type of TerminalPxWins node." );
+					break;
+
+				default:
+					REPORT( "unknown edge type in tree" );
+			}
+
+			// ensure at most one call or callallin, at most one fold, at most one betallin
+
+			if( numcalls != 0 && numcalls != 1 )
+				REPORT( "Invalid number of calling edges from this node" );
+			if( numfolds != 0 && numfolds != 1 )
+				REPORT( "Invalid number of folding edges from this node" );
+			if( numbetallins != 0 && numbetallins != 1 )
+				REPORT( "Invalid number of betallin edges from this node" );
+
+		}
+	}
+	catch( std::exception & e )
+	{
+		throw Exception( "gr=" + tostr( gr ) + " pot=" + tostr( pot ) + " bettomeet=" + tostr( bettomeet ) + " acting=" + tostr( tree[ node ].type ) + "\n" + e.what( ) );
+	}
+}
+
+void assignactioni( int gr, const Vertex & node, BettingTree & tree )
+{
+	tree[ node ].actioni = get_property( tree, maxorderindex_tag( ) )[ gr ][ out_degree( node, tree ) ]++;
 
 	EIter e, elast;
-	for(tie(e,elast) = out_edges(node, tree); e!=elast; e++)
+	for( tie( e, elast ) = out_edges( node, tree ); e != elast; e++ )
 	{
-		switch(tree[*e].type)
+		switch( tree[ *e ].type )
 		{
 			case Bet:
-				if( pot + tree[ *e ].potcontrib >= SS )
-					REPORT( "Bet doesn't smell like bet" );
-				verifynolimit( gr, pot, tree[*e].potcontrib, target(*e, tree), tree, T0, T1, TSD, maxacts);
-				break;
 			case BetAllin:
-				if( pot + tree[ *e ].potcontrib != SS )
-					REPORT( "all-in is not really all-in" );
-				verifynolimit( gr, pot, tree[*e].potcontrib, target(*e, tree), tree, T0, T1, TSD, maxacts);
+				assignactioni( gr, target( *e, tree ), tree );
 				break;
+
 			case Call:
-				if(gr < 3)
-				{
-					verifynolimit( gr+1, pot+tree[*e].potcontrib, 0, target(*e, tree), tree, T0, T1, TSD, maxacts);
-					break;
-				}
-			default: 
-
-				//this is river Call's, CallAllin's and Fold's
-
-				switch( tree[ target( *e, tree ) ].type )
-				{
-					case TerminalP0Wins: 
-					case TerminalP1Wins:
-					case TerminalShowDown:
-						break;
-					default:
-						REPORT( "call, callallin, or fold that doesn't point to terminal node" );
-				}
-				break; //they all lead to terminal nodes.
+				if( gr != RIVER )
+					assignactioni( gr + 1, target( *e, tree ), tree );
+				break;
+			default:
+				break;
 		}
 	}
 }
 
-Vertex createnolimittree(BettingTree &tree, const int max_actions, LoggerClass & treelogger)
+Vertex createtree( BettingTree & tree, const int max_actions, LoggerClass & treelogger )
 {
-	//erase whatevers there
-	tree.clear(); //shouldn't erase properties
-	get_property(tree, maxorderindex_tag()).resize(extents[4][multi_array_types::extent_range(2,MAX_ACTIONS+1)]);
-	for(int i=0; i<4; i++) for(int j=2; j<=MAX_ACTIONS; j++) get_property(tree, maxorderindex_tag())[i][j] = 0;
+	// erase whatevers there
 
-	const int &SB = get_property(tree, settings_tag()).sblind;
-	const int &BB = get_property(tree, settings_tag()).bblind;
-	const int &SS = get_property(tree, settings_tag()).stacksize;
+	tree.clear( ); //shouldn't erase properties
+	get_property( tree, maxorderindex_tag( ) ).resize( extents[ 4 ][ multi_array_types::extent_range( 2, MAX_ACTIONS + 1 ) ] );
+	for( int i = 0; i < 4; i++ ) 
+		for( int j = 2; j <= MAX_ACTIONS; j++ ) 
+			get_property( tree, maxorderindex_tag( ) )[ i ][ j ] = 0;
+
+	const int & SB = get_property( tree, settings_tag( ) ).sblind;
+	const int & BB = get_property( tree, settings_tag( ) ).bblind;
+	const int & SS = get_property( tree, settings_tag( ) ).stacksize;
+	const bool & islimit = get_property( tree, settings_tag( ) ).limit;
 
 	//create terminal nodes
-	Vertex T0 = add_vertex(NodeProp(TerminalP0Wins), tree);
-	Vertex T1 = add_vertex(NodeProp(TerminalP1Wins), tree);
-	Vertex TSD = add_vertex(NodeProp(TerminalShowDown), tree);
+	Vertex T0 = add_vertex( NodeProp( TerminalP0Wins ), tree );
+	Vertex T1 = add_vertex( NodeProp( TerminalP1Wins ), tree );
+	Vertex TSD = add_vertex( NodeProp( TerminalShowDown ), tree );
 
-	//put in the preflop, recursively adding in the rest
-	Vertex root = add_vertex(NodeProp(P1Plays), tree);
+	//create the root
+	Vertex root = add_vertex( NodeProp( P1Plays ), tree );
 
-	branchnolimit( PREFLOP, 0, SB, mymin( BB, SS ), false, true, root, tree, T0, T1, TSD );
+	//recursively add the rest of the tree
+	branchtree( PREFLOP, 0, SB, mymin( BB, SS ), true, root, tree, T0, T1, TSD );
 
-	verifynolimit( PREFLOP, 0, SB, root, tree, T0, T1, TSD, max_actions ); //makes sure no node has too many actions
+	//extensively error check once again the tree
+	verifytree( PREFLOP, 0, mymin( BB, SS ), root, tree, T0, T1, TSD, max_actions );
 
-	treelogger( "No-Limit tree has " + tostr( num_vertices(tree)-3 ) + " nodes, and 3 terminal nodes also. " );
+	//assign maxorderindex values and actioni's recursively
+	assignactioni( PREFLOP, root, tree );
+
+	treelogger( string( islimit ? "" : "No-" ) + "Limit tree has " + tostr( num_vertices( tree ) - 3 ) + " nodes, and 3 terminal nodes also. " );
 
 	//return the root
 	return root;
-}
-
-Vertex createtree(BettingTree &tree, const int max_actions, LoggerClass & treelogger)
-{
-	testtree();
-
-	if( get_property(tree, settings_tag()).limit )
-		return createlimittree( tree, max_actions, treelogger );
-	else
-		return createnolimittree( tree, max_actions, treelogger );
 }
 
 //takes an action index, the gameround, a pointer to the relevant
