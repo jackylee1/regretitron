@@ -20,9 +20,9 @@ ReconcilerHelper::FormatEnum ReconcilerHelper::GetFileFormat( const boost::files
 	// example: "Hippodrome (40198327).xml"
 	boost::regex mergestring( ".* \\(.*\\)\\.xml" ); 
 
-	if( boost::regex_match( filepath.filename( ), fulltiltstring ) )
+	if( boost::regex_match( filepath.filename( ).generic_string( ), fulltiltstring ) )
 		return FORMAT_FULLTILT;
-	else if( boost::regex_match( filepath.filename( ), mergestring ) )
+	else if( boost::regex_match( filepath.filename( ).generic_string( ), mergestring ) )
 		return FORMAT_MERGE;
 	else
 		return FORMAT_NONE;

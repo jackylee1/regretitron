@@ -4,6 +4,9 @@
 #include <boost/thread.hpp>
 #include "sessionmanager.h"
 #include "../utility.h"
+#ifndef _WIN32
+#include <signal.h>
+#endif
 using namespace std;
 
 class IntContainer
